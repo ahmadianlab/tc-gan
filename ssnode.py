@@ -25,7 +25,7 @@ def thlin(x):
 
 
 def fixed_point_equation(r, ext, W, k, n):
-    return -r + k * thlin(numpy.dot(W, r) + ext)**2
+    return -r + k * thlin(numpy.dot(W, r) + ext)**n
 
 
 def drdt(r, _t, ext, W, k, n, tau):

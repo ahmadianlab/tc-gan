@@ -17,7 +17,7 @@ def generate_weight(N, J, delta, sigma, z):
     J = numpy.asarray(J)
     delta = numpy.asarray(delta)
     sigma = numpy.asarray(sigma)
-    x = numpy.linspace(-1, 1, N).reshape((1, -1))
+    x = numpy.linspace(-0.5, 0.5, N).reshape((1, -1))
     W = numpy.empty((2 * N, 2 * N))
     W[:N, :N] = weight(x, J[0, 0], delta[0, 0], sigma[0, 0], z[:N, :N])
     W[N:, :N] = weight(x, J[1, 0], delta[1, 0], sigma[1, 0], z[N:, :N])

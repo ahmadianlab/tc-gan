@@ -25,7 +25,7 @@ def thlin(x):
 
 
 def fixed_point_equation(r, ext, W, k, n):
-    return -r + k * thlin(numpy.dot(W, r) + ext)**2
+    return -r + k * thlin(numpy.dot(W, r) + ext)**n
 
 
 def drdt(r, _t, ext, W, k, n, tau):
@@ -57,8 +57,11 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2, tau=[1, 0.1], **kwds):
     return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
 
 
-def demo_dynamics(N=500, J=[[1, 2], [4, 3]], delta=[[0.1, 0.1], [0.1, 0.1]],
-                  sigma=numpy.ones((2, 2)) * 0.5, ext=[40, 20],
+def demo_dynamics(N=50,
+                  J=[[1, 3], [1, 1]],
+                  delta=numpy.ones((2, 2)) * 0.1,
+                  sigma=numpy.ones((2, 2)) * 0.2,
+                  ext=[40, 20],
                   tmax=3, tnum=300, seed=0, plot_fp=False):
     from matplotlib import pyplot
     W, _ = generate_parameter(N, J, delta, sigma, seed=seed)
@@ -75,6 +78,9 @@ def demo_dynamics(N=500, J=[[1, 2], [4, 3]], delta=[[0.1, 0.1], [0.1, 0.1]],
     ax2.set_xlabel('Time')
 
     if plot_fp:
-        fp = fixed_point(W, ext)
-        ax1.plot(tmax, [fp.x[:N]], 'o', color='C0')
-        ax2.plot(tmax, [fp.x[N:]], 'o', color='C1')
+        sol = fixed_point(W, ext)
+        ax1.plot(tmax, [sol.x[:N]], 'o', color='C0')
+        ax2.plot(tmax, [sol.x[N:]], 'o', color='C1')
+
+        if not sol.success:
+            print(sol.message)

@@ -19,9 +19,13 @@ def main():
     D = theano.shared(np.array([[.1,1.],[1.,.1]]),name = "d")
     S = theano.shared(np.array([[1.,1.],[1.,1.]]),name = "s")
 
-    n = theano.shared(3,name = "n_sites")
-    nz = theano.shared(1,name = 'n_samples')
-    nb = theano.shared(1,name = 'n_stim')
+    Jp = T.exp(J)
+    Dp = T.exp(D)
+    Sp = T.exp(S)
+
+    n = theano.shared(50,name = "n_sites")
+    nz = theano.shared(10,name = 'n_samples')
+    nb = theano.shared(10,name = 'n_stim')
 
     X = theano.shared(np.linspace(-1,1,n.get_value()),name = "positions")
 
@@ -29,7 +33,7 @@ def main():
     N = n.get_value()
     NZ = nz.get_value()
     NB = nb.get_value()
-    m = 2
+    m = 10
     ###    
 
     #a mask to get from the rates to just the ones we are measuring
@@ -38,7 +42,7 @@ def main():
     Z = T.matrix("z","float32")
 
     #symbolic W
-    ww = make_w.make_W_with_x(Z,J,D,S,n,X)
+    ww = make_w.make_W_with_x(Z,Jp,Dp,Sp,n,X)
 
     #symbolic jacobians
     dwdj = T.reshape(T.jacobian(T.flatten(ww),J),[2*n,2*n,2,2])
@@ -107,7 +111,7 @@ def main():
           inp - [nb,2N]
           Z - [nz,2N,2N]
 
-        and generates dr/dth
+        and generates dr/dth - [3,nz,nb,2N,2,2]
 
         '''
 
@@ -120,12 +124,8 @@ def main():
         #[nz,2n,2n]
         WW = np.array([W(z) for z in ZZ])
 
-#        print("got W")
-
         #[nz,nb,2N]
         RR = np.array([[SSsolve.fixed_point(WW[z],inp[i]).x for i in range(len(inp))] for z in range(len(ZZ))])
-
-#        print("got steady state {}".format(RR.mean()))
 
         DRTj = [[dRdJ(RR[z,b],inp[b],ZZ[z]) for b in range(len(inp))] for z in range(len(ZZ))]
         DRTd = [[dRdD(RR[z,b],inp[b],ZZ[z]) for b in range(len(inp))] for z in range(len(ZZ))]
@@ -136,99 +136,120 @@ def main():
         return DR
 
 
-    zz = np.random.rand(NZ,2*N,2*N)
-    II = np.random.normal(0,1,[NB,2*N])
+    timetest = False
+    if timetest:
+        zz = np.random.rand(NZ,2*N,2*N)
+        II = np.random.normal(0,1,[NB,2*N])
+        print("Computing gradients")
 
-    print("Computing gradients")
-
-    T_temp = time.time()
-
-    DR = dR_dtheta(II,zz)
-    print(DR.mean())
-
-    print("A single datapoint took {} seconds to get dRdTH".format(time.time() - T_temp))
-    print("An 8*5 batch would take {} seconds to get dRdTH".format(8*5*(time.time() - T_temp)))
-
-    print(DR.shape)
-
+        T_temp = time.time()
+        
+        DR = dR_dtheta(II,zz)
+        print(DR.mean())
+        
+        print("A single datapoint took {} seconds to get dRdTH".format(time.time() - T_temp))
+        print("An 8*5 batch would take {} seconds to get dRdTH".format(8*5*(time.time() - T_temp)))
+        
+        print(DR.shape)
+        exit()
+     
+    DRtest = False
+    if DRtest:
     #I want to test this by adjusting the parameters to give some specified output
-
-    def lossF(i,z,tar):
-        WW = np.array([W(zz) for zz in z])
-
-        r = np.array([[SSsolve.fixed_point(WW[n],i[m]).x for m in range(len(i))] for n in range(len(z))])
-
-        return ((r - tar)**2).mean(),r
-
+        
+        def lossF(i,z,tar):
+            WW = np.array([W(zz) for zz in z])
+            
+            r = np.array([[SSsolve.fixed_point(WW[n],i[m]).x for m in range(len(i))] for n in range(len(z))])
+            
+            return ((r - tar)**2).mean(),r
+        
     ##If the target is tar, and the loss is sqred loss, then Dl/Dr = 2*(r - tar)
     ##so Dl/Dt = 2*(r - tar).Dr/Dth
 
+        
+        target = np.random.rand(1,1,2*N)
+        target = np.ones_like(target)
+        
+        inp = np.random.normal(0,1,[1,2*N])
+        inp = np.ones_like(inp)
+        
+        Ztest = np.random.rand(1,2*N,2*N)
+        
+        for k in range(10000):
+            loss, r = lossF(inp,Ztest,target)
+            
+            if k % 1000 == 0:
+                print("Loss : {}\t{}".format(loss,r))
+                
+            DR = dR_dtheta(inp,Ztest)
 
-    target = np.random.rand(1,1,2*N)
-    target = np.ones_like(target)
-    inp = np.random.normal(0,1,[1,2*N])
-    Ztest = np.random.rand(1,2*N,2*N)
+            dl = 2*(r - target)
+            
+            J.set_value(J.get_value() - .01*np.tensordot(dl,DR[0],axes = [[0,1,2],[0,1,2]]))
+            D.set_value(D.get_value() - .01*np.tensordot(dl,DR[1],axes = [[0,1,2],[0,1,2]]))
+            S.set_value(S.get_value() - .01*np.tensordot(dl,DR[2],axes = [[0,1,2],[0,1,2]]))
 
-    for k in range(10000):
-        loss, r = lossF(inp,Ztest,target)
+        exit()
+        #I have verified that this does in fact seem to work
 
-        if k % 1000 == 0:
-            print("Loss : {}".format(loss))
-
-        DR = dR_dtheta(inp,Ztest)
-
-        dl = 2*(r - target)
-
-        J.set_value(J.get_value() - 1*np.tensordot(dl,DR[0],axes = [[0,1,2],[0,1,2]]))
-        D.set_value(D.get_value() - 1*np.tensordot(dl,DR[1],axes = [[0,1,2],[0,1,2]]))
-        S.set_value(S.get_value() - 1*np.tensordot(dl,DR[2],axes = [[0,1,2],[0,1,2]]))
-
-    exit()
-
-    #I want to make a network that takes a tensor of shape [nz,nb,2N] and generates dl/dr
-
-    red_R_true = T.tensor3("reduced rates","float32")
-
-    rates = T.tensor3("rates","float32")  
-    red_R_fake = T.tensordot(rates,M,axes = [2,1])
-   
-    nb = 20
- 
-    INSHAPE = (NZ,nb,m)
+    #Now I need to make the GAN
     
+    #I want to make a network that takes a tensor of shape [2N] and generates dl/dr
+
+    red_R_true = T.vector("reduced rates","float32")
+
+    red_R_fake = np.log(1 + T.tensordot(rvec,M,axes = [0,1]))
+    
+    get_reduced = theano.function([rvec],red_R_fake,allow_input_downcast = True)
+    
+    INSHAPE = [m]
  
     #I want to make a network that takes red_R and gives a scalar output
 
     DIS_red_r_true = SD.make_net(red_R_true,INSHAPE)
-    DIS_red_r_fake = SD.make_net(red_R_fake,INSHAPE)
+    DIS_red_r_fake = SD.make_net(red_R_fake,INSHAPE,params = lasagne.layers.get_all_layers(DIS_red_r_true))
 
     #get the outputs
     true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
     fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
 
-    #tie the parameters
-    Dparams = lasagne.layers.get_all_params(DIS_red_r_true)
-    Dparams = lasagne.layers.get_all_params(DIS_red_r_fake)
-
     #make the loss functions
-    true_loss = -np.log(true_dis_out).mean() - np.log(1. - fake_dis_out).mean()
-    fake_loss = -np.log(fake_dis_out).mean()
+    true_loss_exp = -np.log(true_dis_out).mean() - np.log(1. - fake_dis_out).mean()
+    fake_loss_exp = -np.log(fake_dis_out).mean()
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    true_dis_update = lasagne.updates.nesterov_momentum(true_loss,lasagne.layers.get_all_params(DIS_red_r_true),.01)
+    true_dis_update = lasagne.updates.nesterov_momentum(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true),.01)
+
+    true_loss = theano.function([red_R_true,rvec],true_loss_exp,allow_input_downcast = True)
+    fake_loss = theano.function([rvec],fake_loss_exp,allow_input_downcast = True)
 
     #to get the grads w.r.t. the generators parameters we need to do a jacobian 
-    fake_dis_grad_temp = T.jacobian(T.flatten(fake_dis_out),rates)
-    fake_dis_grad = T.reshape(fake_dis_grad_temp,[nz,nz,nb,2*N])
+    fake_dis_grad = T.jacobian(T.flatten(fake_loss_exp),rvec)
+    fake_dis_grad = T.reshape(fake_dis_grad,[2*N])
 
-    t_grad = theano.function([rates],fake_dis_grad,allow_input_downcast = True)
+    t_grad = theano.function([rvec],fake_dis_grad,allow_input_downcast = True)
+
+    test_rates = np.random.normal(0,1,[2*N])
+
+    dLdJ_exp = T.tensordot(fake_dis_grad,dRdJ_exp,axes = [0,0])
+    dLdJ = theano.function([rvec,ivec,Z],dLdJ_exp,allow_input_downcast = True)
+
+    inp = np.concatenate([np.ones(N),np.zeros(N)])
+ 
+    ztest = np.random.rand(2*N,2*N)
 
 
-    test_rates = np.random.normal(0,1,[NZ,nb,2*N])
+    for k in range(1000):
 
-    oo = t_grad(test_rates)
+        wtest = W(ztest)
+        rtest = SSsolve.fixed_point(wtest,inp).x    
 
-    print(oo.shape)
-
+        dj = dLdJ(rtest,inp,ztest)
+        J.set_value(J.get_value() - 1.*dj)        
+    
+        if k % 10 == 0:
+            print(fake_loss(rtest))
+            
 if __name__ == "__main__":
     main()

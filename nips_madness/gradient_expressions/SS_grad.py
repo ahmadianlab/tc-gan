@@ -80,17 +80,18 @@ def WRgrad(R,W,DW,I,n,k):
 
     This expression takes theano variables for R,W,dW/dth,I,n, and k and outputs the gradient dr/dth
 
+
     '''
    
     V = T.dot(W,R) + I
  
-    phi = T.reshape(n*k*T.power(V,n-1),[-1,1])
+    phi = T.reshape(n*k*T.power(T.clip(V,0.,10000.),n - 1.),[-1,1])
 
     J = T.identity_like(W) - phi*W
 
-    B = T.reshape(phi,[-1])*T.dot(DW,R)
+    B = T.reshape(phi,[-1,1,1])*T.tensordot(DW,R,axes = [1,0])
     
-    return T.dot(T.nlinalg.MatrixInverse()(J),B)
+    return T.tensordot(T.nlinalg.MatrixInverse()(J),B,axes = [1,0])
 
 if __name__ == "__main__":
 

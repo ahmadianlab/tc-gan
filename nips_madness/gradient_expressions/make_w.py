@@ -15,21 +15,22 @@ def make_W_with_x(Z,J,D,S,N,X):
     #we want the tensor to be [nz, 2N,2N] in the end
     #lets start by making an [nz,2,2,N,N] matrix
 
-    j = T.reshape(sign*J,[1,2,1,2,1])
-    d = T.reshape(sign*D,[1,2,1,2,1])
-    s = T.reshape(S,[1,2,1,2,1])
+    j = T.reshape(sign*J,[2,1,2,1])
+    d = T.reshape(sign*D,[2,1,2,1])
+    s = T.reshape(S,[2,1,2,1])
 
-    z = T.reshape(Z,[-1,1,N,1,N])
+    z = T.reshape(Z,[2,N,2,N])
 
     xt = T.reshape(X,[1,-1])
 
-    xx = T.reshape((xt - xt.T),[1,1,N,1,N])
+    xx = T.reshape((xt - xt.T),[1,N,1,N])
 
     wnn = T.exp(-(xx)**2/(2 * s**2))
+    #[2,N,2,N]
 
     W = wnn*(j + d*z)
 
-    return T.reshape(W,[-1,2*N,2*N])
+    return T.reshape(W,[2*N,2*N])
     
 
 def test_x(x):

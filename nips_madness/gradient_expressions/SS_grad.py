@@ -46,26 +46,30 @@ def generate_weight_grads(N, J, delta, sigma, z):
 
     '''
 
-    J = np.asarray(J)
-    delta = np.asarray(delta)
+    # Copy J and delta and turn them into inhibition-aware matrices:
+    J = np.array(J) # copying since we are modifying it in-place
+    J[:, 1] *= -1
+    delta = np.array(delta) # ditto
+    delta[:, 1] *= -1
+
     sigma = np.asarray(sigma)
-    x = np.linspace(-1, 1, N).reshape((1, -1))
+    x = np.linspace(-0.5, 0.5, N).reshape((1, -1))
     W = np.empty((12, 2 * N, 2 * N))
 
     W[0,:N, :N] = weight_DJ(x, J[0, 0], delta[0, 0], sigma[0, 0], z[:N,:N])
     W[1,N:, :N] = weight_DJ(x, J[1, 0], delta[1, 0], sigma[1, 0], z[N:,:N])
-    W[2,:N, N:] = weight_DJ(x, -J[0, 1], delta[0, 1], sigma[0, 1], z[:N,N:])
-    W[3,N:, N:] = weight_DJ(x, -J[1, 1], delta[1, 1], sigma[1, 1], z[N:,N:])
+    W[2,:N, N:] = weight_DJ(x, J[0, 1], delta[0, 1], sigma[0, 1], z[:N,N:])
+    W[3,N:, N:] = weight_DJ(x, J[1, 1], delta[1, 1], sigma[1, 1], z[N:,N:])
 
     W[4,:N, :N] = weight_DD(x, J[0, 0], delta[0, 0], sigma[0, 0], z[:N,:N])
     W[5,N:, :N] = weight_DD(x, J[1, 0], delta[1, 0], sigma[1, 0], z[N:,:N])
-    W[6,:N, N:] = weight_DD(x, -J[0, 1], delta[0, 1], sigma[0, 1], z[:N,N:])
-    W[7,N:, N:] = weight_DD(x, -J[1, 1], delta[1, 1], sigma[1, 1], z[N:,N:])
+    W[6,:N, N:] = weight_DD(x, J[0, 1], delta[0, 1], sigma[0, 1], z[:N,N:])
+    W[7,N:, N:] = weight_DD(x, J[1, 1], delta[1, 1], sigma[1, 1], z[N:,N:])
 
     W[8,:N, :N] = weight_DS(x, J[0, 0], delta[0, 0], sigma[0, 0], z[:N,:N])
     W[9,N:, :N] = weight_DS(x, J[1, 0], delta[1, 0], sigma[1, 0], z[N:,:N])
-    W[10,:N, N:] = weight_DS(x, -J[0, 1], delta[0, 1], sigma[0, 1], z[:N,N:])
-    W[11,N:, N:] = weight_DS(x, -J[1, 1], delta[1, 1], sigma[1, 1], z[N:,N:])
+    W[10,:N, N:] = weight_DS(x, J[0, 1], delta[0, 1], sigma[0, 1], z[:N,N:])
+    W[11,N:, N:] = weight_DS(x, J[1, 1], delta[1, 1], sigma[1, 1], z[N:,N:])
 
     return W
 

@@ -1,5 +1,5 @@
-import ssnode as SS
-import gradient_expressions.SS_grad as grad
+import nips_madness.ssnode as SS
+import nips_madness.gradient_expressions.SS_grad as grad
 import theano
 import theano.tensor as T
 import lasagne as L

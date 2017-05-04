@@ -146,8 +146,8 @@ if __name__ == "__main__":
     dwds = T.reshape(T.jacobian(T.flatten(ww),S),[nz,2*n,2*n,2,2])
 
     DWJ = theano.function([Z],dwdj,allow_input_downcast = True)
-    DWD = theano.function([Z],dwdj,allow_input_downcast = True)
-    DWS = theano.function([Z],dwdj,allow_input_downcast = True)
+    DWD = theano.function([Z],dwdd,allow_input_downcast = True)
+    DWS = theano.function([Z],dwds,allow_input_downcast = True)
 
     ##make our Z vector
     NN = n.get_value()

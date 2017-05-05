@@ -3,7 +3,7 @@ from __future__ import print_function, division
 import numpy
 import scipy.optimize
 
-from weight_gen import generate_parameter
+from .weight_gen import generate_parameter
 
 
 def make_neu_vec(N, E, I):

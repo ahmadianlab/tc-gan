@@ -17,9 +17,9 @@ def main():
     exp = theano.shared(2.2,name = "exp")
     coe = theano.shared(.04,name = "coe")
 
-    J = theano.shared(np.array([[-.1,.1],[.1,-.2]]).astype("float32"),name = "j")
+    J = theano.shared(np.array([[-.1,.5],[.5,-.2]]).astype("float32"),name = "j")
     D = theano.shared(np.array([[-1,-1],[-1,-1]]).astype("float32"),name = "d")
-    S = theano.shared(np.array([[0,-2.],[.1,-2.]]).astype("float32"),name = "s")
+    S = theano.shared(np.array([[0,-1.],[.1,-1.]]).astype("float32"),name = "s")
 
     Jp = T.exp(J)
     Dp = T.exp(D)
@@ -33,7 +33,7 @@ def main():
     #specifying the shape of model/input
     n = theano.shared(50,name = "n_sites")
     nz = theano.shared(10,name = 'n_samples')
-    nb = theano.shared(10,name = 'n_stim')
+    nb = theano.shared(5,name = 'n_stim')
 
     #array that computes the positions
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
@@ -282,24 +282,29 @@ def main():
  
     rtest = np.zeros([NZ,NB,2*N])
 
+    lr = 1.
+
     for k in range(100):
 
         wtest = W(ztest)
+        Ztest = [[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i]) for i in range(len(inp))] for w in range(len(wtest))]
+
         rtest = np.array([[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i]).x for i in range(len(inp))] for w in range(len(wtest))])
-        
-        Ztest = np.array([[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i]).success for i in range(len(inp))] for w in range(len(wtest))])
-        print(Ztest)
+        # import pdb
+        # pdb.set_trace()
+        # print(Ztest)
         
         dj = dLdJ(rtest,inp,ztest)
         dd = dLdD(rtest,inp,ztest)
         ds = dLdS(rtest,inp,ztest)
 
-        J.set_value((J.get_value() - .1*dj).astype("float32"))
-        D.set_value((J.get_value() - .1*dd).astype("float32"))
-        S.set_value((J.get_value() - .1*ds).astype("float32"))
+        J.set_value((J.get_value() - lr*dj).astype("float32"))
+        D.set_value((D.get_value() - lr*dd).astype("float32"))
+        S.set_value((S.get_value() - lr*ds).astype("float32"))
         
         if k % 1 == 0:
-            print("{}\t{}".format(fake_loss(rtest),rtest.mean()))
+            print("{}\t{}\t{}".format(fake_loss(rtest),rtest.mean(),
+                                      all(sol.success for sols in Ztest for sol in sols)))
  
 if __name__ == "__main__":
     main()

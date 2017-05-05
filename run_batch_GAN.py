@@ -4,7 +4,7 @@ import lasagne
 import numpy as np
 
 import discriminators.simple_discriminator as SD
-import nips_madness.gradient_expressions.make_w as make_w
+import nips_madness.gradient_expressions.make_w_batch as make_w
 import nips_madness.gradient_expressions.SS_grad as SSgrad
 import nips_madness.ssnode as SSsolve
 
@@ -27,9 +27,9 @@ def main():
     dDpD = T.reshape(T.jacobian(T.reshape(Dp,[-1]),D),[2,2,2,2])
     dSpS = T.reshape(T.jacobian(T.reshape(Sp,[-1]),S),[2,2,2,2])
     
-    n = theano.shared(10,name = "n_sites")
-    nz = theano.shared(1,name = 'n_samples')
-    nb = theano.shared(1,name = 'n_stim')
+    n = theano.shared(50,name = "n_sites")
+    nz = theano.shared(5,name = 'n_samples')
+    nb = theano.shared(5,name = 'n_stim')
 
     X = theano.shared(np.linspace(-1,1,n.get_value()).astype("float32"),name = "positions")
 
@@ -43,19 +43,19 @@ def main():
     #a mask to get from the rates to just the ones we are measuring
     M = theano.shared(np.array([[1 if k == j + (N/2) - (m/2) else 0 for k in range(2*N)] for j in range(m)]).astype("float32"),"mask")
 
-    Z = T.matrix("z","float32")
+    Z = T.tensor3("z","float32")
 
     #symbolic W
     ww = make_w.make_W_with_x(Z,Jp,Dp,Sp,n,X)
 
     #symbolic jacobians
-#    dwdj = T.reshape(T.jacobian(T.flatten(ww),J),[2*n,2*n,2,2])
-#    dwdd = T.reshape(T.jacobian(T.flatten(ww),D),[2*n,2*n,2,2])
-#    dwds = T.reshape(T.jacobian(T.flatten(ww),S),[2*n,2*n,2,2])
+    dwdj = T.reshape(T.jacobian(T.flatten(ww),J),[-1,2*n,2*n,2,2])
+    dwdd = T.reshape(T.jacobian(T.flatten(ww),D),[-1,2*n,2*n,2,2])
+    dwds = T.reshape(T.jacobian(T.flatten(ww),S),[-1,2*n,2*n,2,2])
 
-    dwdj = make_w.make_WJ_with_x(Z,Jp,Dp,Sp,n,X,dJpJ)
-    dwdd = make_w.make_WJ_with_x(Z,Jp,Dp,Sp,n,X,dDpD)
-    dwds = make_w.make_WJ_with_x(Z,Jp,Dp,Sp,n,X,dSpS)
+#    dwdj = make_w.make_WJ_with_x(Z,Jp,Dp,Sp,n,X,dJpJ)
+#    dwdd = make_w.make_WD_with_x(Z,Jp,Dp,Sp,n,X,dDpD)
+#    dwds = make_w.make_WS_with_x(Z,Jp,Dp,Sp,n,X,dSpS)
 
     W = theano.function([Z],ww,allow_input_downcast = True,on_unused_input = "ignore")
 
@@ -63,18 +63,20 @@ def main():
     DWd = theano.function([Z],dwdd,allow_input_downcast = True,on_unused_input = "ignore")
     DWs = theano.function([Z],dwds,allow_input_downcast = True,on_unused_input = "ignore")
 
-    print("DWj TEST: {}".format(np.abs(DWj(np.random.rand(2*N,2*N).astype("float32"))).mean()))
-    print("DWd TEST: {}".format(np.abs(DWd(np.random.rand(2*N,2*N).astype("float32"))).mean()))
-    print("DWs TEST: {}".format(np.abs(DWs(np.random.rand(2*N,2*N).astype("float32"))).mean()))
+    Ztest = np.random.rand(NZ,2*N,2*N).astype("float32")
+
+    print("DWj TEST: {}".format(np.abs(DWj(Ztest)).mean()))
+    print("DWd TEST: {}".format(np.abs(DWd(Ztest)).mean()))
+    print("DWs TEST: {}".format(np.abs(DWs(Ztest)).mean()))
 
     #now we need to get a function to generate dr/dth from dw/dth
 
-    rvec = T.vector("rvec","float32")
-    ivec = T.vector("ivec","float32")
+    rvec = T.tensor3("rvec","float32")
+    ivec = T.matrix("ivec","float32")
 
-    dRdJ_exp = SSgrad.WRgrad(rvec,ww,dwdj,ivec,exp,coe)
-    dRdD_exp = SSgrad.WRgrad(rvec,ww,dwdd,ivec,exp,coe)
-    dRdS_exp = SSgrad.WRgrad(rvec,ww,dwds,ivec,exp,coe)
+    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N)
+    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N)
+    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N)
 
     prof = False
 
@@ -82,24 +84,25 @@ def main():
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True,profile = prof)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True,profile = prof)
 
-    testDW = True
-    if testDW:
-        testz = np.random.rand(2*N,2*N).astype("float32")
-        testI = np.random.normal(0,10,2*N).astype("float32")
+    testDW = False
+    if testDW:        
+        testz = Ztest
+        testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = SSsolve.fixed_point(wtest,testI).x.astype("float32")
+        ssR = np.asarray([[SSsolve.fixed_point(wtest[z],testI[b]).x.astype("float32") for b in range(len(testI))] for z in range(len(testz))])
         print(ssR.mean())
         print(wtest.mean())
         print(DWj(testz).mean())
         
         
         print("Start DWtest")
-        for k in range(10):
-            wtest = W(testz)
+        for k in range(100):
+            wtest = np.reshape(W(testz),[NZ,2*N,2*N,1,1])
             
-            dd = DWj(testz)
-            dj = 2*np.tensordot(wtest,dd,axes = [[0,1],[0,1]])
+
+            dd = DWj(testz)#[nz,2N,2N,2,2]
+            dj = 2*(wtest*dd).mean(axis = 0).mean(axis = 0).mean(axis = 0)
             
             jnew = J.get_value() - .001*dj
             
@@ -133,17 +136,17 @@ def main():
 
         T1 = time.time()
         #[nz,2n,2n]
-        WW = np.array([W(z) for z in ZZ])
+        WW = W(ZZ)
 
         T2 = time.time()
         #[nz,nb,2N]
         RR = np.array([[SSsolve.fixed_point(WW[z],inp[i]).x for i in range(len(inp))] for z in range(len(ZZ))])
 
         T3 = time.time()
-        DRTj = [[dRdJ(RR[z,b],inp[b],ZZ[z]) for b in range(len(inp))] for z in range(len(ZZ))]
-        DRTd = [[dRdD(RR[z,b],inp[b],ZZ[z]) for b in range(len(inp))] for z in range(len(ZZ))]
-        DRTs = [[dRdS(RR[z,b],inp[b],ZZ[z]) for b in range(len(inp))] for z in range(len(ZZ))]
-        
+        DRTj = dRdJ(RR,inp,ZZ)
+        DRTd = dRdD(RR,inp,ZZ)
+        DRTs = dRdS(RR,inp,ZZ)
+ 
         T4 = time.time()
         
         DR = np.array([DRTj,DRTd,DRTs])
@@ -153,14 +156,14 @@ def main():
         return DR
 
 
-    timetest = False
+    timetest = True
     if timetest:
         zz = np.random.rand(NZ,2*N,2*N).astype("float32")
         II = np.random.normal(0,1,[NB,2*N]).astype("float32")
         print("Computing gradients")
 
         T_temp = time.time()
-        dwt = DWj(zz[0])
+        dwt = DWj(zz)
         print("dwt took {} seconds".format(time.time() - T_temp))
         
         T_temp = time.time()

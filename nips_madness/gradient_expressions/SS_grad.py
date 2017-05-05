@@ -75,23 +75,55 @@ def generate_weight_grads(N, J, delta, sigma, z):
 
 
 def WRgrad(R,W,DW,I,n,k):
-
     '''
 
     This expression takes theano variables for R,W,dW/dth,I,n, and k and outputs the gradient dr/dth
 
+    R - [nz,nb,2N]
+    W - [nz,2N,2N]
+    DW - [nz,2N,2N,2,2]
+    I - [nb,2N]
+    n - scalar
+    k - scalar
 
     '''
-   
-    V = T.dot(W,R) + I
- 
+
+    V = T.dot(W,R) + I 
     phi = T.reshape(n*k*T.power(T.clip(V,0.,10000.),n - 1.),[-1,1])
-
     J = T.identity_like(W) - phi*W
-
     B = T.reshape(phi,[-1,1,1])*T.tensordot(DW,R,axes = [1,0])
-    
     return T.tensordot(T.nlinalg.MatrixInverse()(J),B,axes = [1,0])
+
+def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N):
+    '''
+
+    This expression takes theano variables for R,W,dW/dth,I,n, and k and outputs the gradient dr/dth
+    
+    This one is set up to handle batches of [nz,nb]
+
+    R - [nz,nb,2N]
+    W - [nz,2N,2N]
+    DW - [nz,2N,2N,2,2]
+    I - [nb,2N]
+    n - scalar
+    k - scalar
+
+    '''
+    wt = T.reshape(W,[nz,1,2*N,2*N])
+    rt = T.reshape(R,[nz,nb,1,2*N])
+    V = (wt*rt).sum(axis = 3) + T.reshape(I,[1,nb,2*N]) #[nz,nb,2N]
+    phi = T.reshape(n*k*T.power(T.clip(V,0.,10000.),n - 1.),[nz,nb,2*N,1]) #[nz,nb,2N]
+    Wall = T.reshape(W,[-1,2*N,2*N])
+    WIt,up = theano.map(lambda x:T.identity_like(x),[Wall])
+    WIt = T.reshape(WIt,[nz,1,2*N,2*N])
+    J = WIt - phi*wt# [nz,nb,2*N,2*N]
+    dwt = T.reshape(DW,[nz,1,2*N,2*N,2,2])
+    rt = T.reshape(R,[nz,nb,1,2*N,1,1])
+    B = T.reshape(T.reshape(phi,[nz,nb,2*N,1,1])*((dwt*rt).sum(axis = 3)),[nz,nb,1,2*N,2,2]) #DW [nz,nb,2N,2N,2,2]
+    MI,up = theano.map(lambda x:T.nlinalg.MatrixInverse()(x),[T.reshape(J,[-1,2*N,2*N])])
+    MI = T.reshape(MI,[nz,nb,2*N,2*N,1,1])
+
+    return (MI*B).sum(axis = 3)
 
 if __name__ == "__main__":
 

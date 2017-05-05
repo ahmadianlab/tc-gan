@@ -3,7 +3,7 @@ from __future__ import print_function, division
 import numpy
 import scipy.optimize
 
-from weight_gen import generate_parameter
+from .weight_gen import generate_parameter
 
 
 def make_neu_vec(N, E, I):
@@ -55,6 +55,24 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2, tau=[1, 0.1], **kwds):
     tau = any_to_neu_vec(N, tau)
     args = (ext, W, k, n, tau)
     return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
+
+
+def sigmoid(x):
+    return 1 / (1 + numpy.exp(-x))
+
+
+def single_input(N, bandwidth, smoothness=0.01):
+    fs = numpy.linspace(-0.5, 0.5, N)
+    x = bandwidth / 2 + fs
+    y = bandwidth / 2 - fs
+    return sigmoid(x / smoothness) * sigmoid(y / smoothness)
+
+
+def all_inputs(N, bandwidths, **kwds):
+    """
+    Return an array of inputs in the shape ``(N, len(bandwidths))``.
+    """
+    return numpy.array([single_input(N, b, **kwds) for b in bandwidths])
 
 
 def demo_dynamics(N=50,

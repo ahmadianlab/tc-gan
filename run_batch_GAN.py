@@ -12,78 +12,80 @@ import time
 
 def main():
 
+    #defining all the parameters that we might want to train
+
     exp = theano.shared(2.2,name = "exp")
     coe = theano.shared(.04,name = "coe")
 
-    J = theano.shared(np.array([[.1,1.],[1.,.1]]).astype("float32"),name = "j")
-    D = theano.shared(np.array([[.1,1.],[1.,.1]]).astype("float32"),name = "d")
-    S = theano.shared(np.array([[1.,1.],[1.,1.]]).astype("float32"),name = "s")
+    J = theano.shared(np.array([[-.1,.1],[.1,-.2]]).astype("float32"),name = "j")
+    D = theano.shared(np.array([[-1,-1],[-1,-1]]).astype("float32"),name = "d")
+    S = theano.shared(np.array([[0,-2.],[.1,-2.]]).astype("float32"),name = "s")
 
     Jp = T.exp(J)
     Dp = T.exp(D)
     Sp = T.exp(S)
 
+    #compute jacobian of the primed variables w.r.t. J,D,S.
     dJpJ = T.reshape(T.jacobian(T.reshape(Jp,[-1]),J),[2,2,2,2])
     dDpD = T.reshape(T.jacobian(T.reshape(Dp,[-1]),D),[2,2,2,2])
     dSpS = T.reshape(T.jacobian(T.reshape(Sp,[-1]),S),[2,2,2,2])
-    
+
+    #specifying the shape of model/input
     n = theano.shared(50,name = "n_sites")
-    nz = theano.shared(5,name = 'n_samples')
-    nb = theano.shared(5,name = 'n_stim')
+    nz = theano.shared(10,name = 'n_samples')
+    nb = theano.shared(10,name = 'n_stim')
 
-    X = theano.shared(np.linspace(-1,1,n.get_value()).astype("float32"),name = "positions")
+    #array that computes the positions
+    X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
 
-    ##make our Z vector
-    N = n.get_value()
-    NZ = nz.get_value()
-    NB = nb.get_value()
-    m = 10
+    ##getting regular nums##
+    N = int(n.get_value())
+    NZ = int(nz.get_value())
+    NB = int(nb.get_value())
+    m = 2
     ###
 
     #a mask to get from the rates to just the ones we are measuring
     M = theano.shared(np.array([[1 if k == j + (N/2) - (m/2) else 0 for k in range(2*N)] for j in range(m)]).astype("float32"),"mask")
 
+    #theano variable for the random samples
     Z = T.tensor3("z","float32")
 
     #symbolic W
     ww = make_w.make_W_with_x(Z,Jp,Dp,Sp,n,X)
 
-    #symbolic jacobians
-    dwdj = T.reshape(T.jacobian(T.flatten(ww),J),[-1,2*n,2*n,2,2])
-    dwdd = T.reshape(T.jacobian(T.flatten(ww),D),[-1,2*n,2*n,2,2])
-    dwds = T.reshape(T.jacobian(T.flatten(ww),S),[-1,2*n,2*n,2,2])
+    #the next 3 are of shape [nz,2N,2N,2,2]
+    dwdj = T.tile(make_w.make_WJ_with_x(Z,Jp,Dp,Sp,n,X,dJpJ),(NZ,1,1,1,1))#deriv. of W w.r.t. J
+    dwdd = make_w.make_WD_with_x(Z,Jp,Dp,Sp,n,X,dDpD)#deriv. of W w.r.t. D
+    dwds = make_w.make_WS_with_x(Z,Jp,Dp,Sp,n,X,dSpS)#deriv of W w.r.t. S
 
-#    dwdj = make_w.make_WJ_with_x(Z,Jp,Dp,Sp,n,X,dJpJ)
-#    dwdd = make_w.make_WD_with_x(Z,Jp,Dp,Sp,n,X,dDpD)
-#    dwds = make_w.make_WS_with_x(Z,Jp,Dp,Sp,n,X,dSpS)
-
+    #function to get W given Z
     W = theano.function([Z],ww,allow_input_downcast = True,on_unused_input = "ignore")
 
+    #get deriv. of W given Z
     DWj = theano.function([Z],dwdj,allow_input_downcast = True,on_unused_input = "ignore")
     DWd = theano.function([Z],dwdd,allow_input_downcast = True,on_unused_input = "ignore")
     DWs = theano.function([Z],dwds,allow_input_downcast = True,on_unused_input = "ignore")
 
+    #a random Z sample for use in testing
     Ztest = np.random.rand(NZ,2*N,2*N).astype("float32")
-
-    print("DWj TEST: {}".format(np.abs(DWj(Ztest)).mean()))
-    print("DWd TEST: {}".format(np.abs(DWd(Ztest)).mean()))
-    print("DWs TEST: {}".format(np.abs(DWs(Ztest)).mean()))
-
     #now we need to get a function to generate dr/dth from dw/dth
 
+    #variables for rates and inputs
     rvec = T.tensor3("rvec","float32")
     ivec = T.matrix("ivec","float32")
 
+    #DrDth tensor expressions
     dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N)
     dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N)
     dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N)
 
-    prof = False
+    dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
+    dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
+    dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
 
-    dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True,profile = prof)
-    dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True,profile = prof)
-    dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True,profile = prof)
 
+    #run gradient descent on W (minimize W*W)
     testDW = False
     if testDW:        
         testz = Ztest
@@ -113,6 +115,7 @@ def main():
 
         exit()
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
+
 
     print("defined all the functions")
 
@@ -156,7 +159,7 @@ def main():
         return DR
 
 
-    timetest = True
+    timetest = False
     if timetest:
         zz = np.random.rand(NZ,2*N,2*N).astype("float32")
         II = np.random.normal(0,1,[NB,2*N]).astype("float32")
@@ -176,13 +179,14 @@ def main():
         
         print(DR.shape)
         exit()
-     
-    DRtest = True
+
+    #do gradient descent on R
+    DRtest = False
     if DRtest:
     #I want to test this by adjusting the parameters to give some specified output
         
         def lossF(i,z,tar):
-            WW = np.array([W(zz) for zz in z])
+            WW = W(z)
             
             r = np.array([[SSsolve.fixed_point(WW[n],i[m]).x for m in range(len(i))] for n in range(len(z))])
             
@@ -192,13 +196,13 @@ def main():
     ##so Dl/Dt = 2*(r - tar).Dr/Dth
 
         
-        target = np.random.rand(1,1,2*N)
-        target = np.ones_like(target)
+        target = np.random.normal(2,.1,(NZ,NB,2*N))
+#        target = np.ones_like(target)
         
-        inp = np.random.normal(0,1,[1,2*N])
+        inp = np.random.normal(0,1,[NB,2*N])
         inp = np.ones_like(inp)
         
-        Ztest = np.random.rand(1,2*N,2*N)
+        Ztest = np.random.rand(NZ,2*N,2*N)
         
         for k in range(1000):
             loss, r = lossF(inp,Ztest,target)
@@ -210,24 +214,27 @@ def main():
 
             dl = 2*(r - target)
             
-            J.set_value(J.get_value() + .001*np.tensordot(dl,DR[0],axes = [[0,1,2],[0,1,2]]).astype("float32"))
-            D.set_value(D.get_value() + .001*np.tensordot(dl,DR[1],axes = [[0,1,2],[0,1,2]]).astype("float32"))
-            S.set_value(S.get_value() + .001*np.tensordot(dl,DR[2],axes = [[0,1,2],[0,1,2]]).astype("float32"))
+            J.set_value(J.get_value() - .001*np.tensordot(dl,DR[0],axes = [[0,1,2],[0,1,2]]).astype("float32"))
+            D.set_value(D.get_value() - .001*np.tensordot(dl,DR[1],axes = [[0,1,2],[0,1,2]]).astype("float32"))
+            S.set_value(S.get_value() - .001*np.tensordot(dl,DR[2],axes = [[0,1,2],[0,1,2]]).astype("float32"))
 
         exit()
         #I have verified that this does in fact seem to work
 
-    #Now I need to make the GAN
-    
-    #I want to make a network that takes a tensor of shape [2N] and generates dl/dr
+    ###Now I need to make the GAN
+    ###
+    ###
+    ###    
+    ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
-    red_R_true = T.vector("reduced rates","float32")
+    red_R_true = T.tensor3("reduced rates","float32")#data
 
-    red_R_fake = np.log(1 + T.tensordot(rvec,M,axes = [0,1]))
+    red_R_fake = T.tensordot(rvec,M,axes = [2,1])#generated by our generator function
     
     get_reduced = theano.function([rvec],red_R_fake,allow_input_downcast = True)
-    
-    INSHAPE = [m]
+
+    #Defines the input shape for the discriminator network
+    INSHAPE = [NZ,NB,m]
  
     #I want to make a network that takes red_R and gives a scalar output
 
@@ -239,41 +246,60 @@ def main():
     fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
 
     #make the loss functions
-    true_loss_exp = -np.log(true_dis_out).mean() - np.log(1. - fake_dis_out).mean()
-    fake_loss_exp = -np.log(fake_dis_out).mean()
+    true_loss_exp = -np.log(true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
+    fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    true_dis_update = lasagne.updates.nesterov_momentum(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true),.01)
+    true_dis_update = lasagne.updates.nesterov_momentum(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true),.01)#discriminator training function
 
+    #make loss functions
     true_loss = theano.function([red_R_true,rvec],true_loss_exp,allow_input_downcast = True)
     fake_loss = theano.function([rvec],fake_loss_exp,allow_input_downcast = True)
 
     #to get the grads w.r.t. the generators parameters we need to do a jacobian 
-    fake_dis_grad = T.jacobian(T.flatten(fake_loss_exp),rvec)
-    fake_dis_grad = T.reshape(fake_dis_grad,[2*N])
+    fake_dis_grad = T.jacobian(T.flatten(fake_loss_exp),rvec) #gradient of generator loss w.r.t rates
+    fake_dis_grad = T.reshape(fake_dis_grad,[NZ,NB,2*N])
 
-    t_grad = theano.function([rvec],fake_dis_grad,allow_input_downcast = True)
 
-    test_rates = np.random.normal(0,1,[2*N])
+    t_grad = theano.function([rvec],fake_dis_grad,allow_input_downcast = True)#gradient function
 
-    dLdJ_exp = T.tensordot(fake_dis_grad,dRdJ_exp,axes = [0,0])
+    #reshape the generator gradient to fit with Dr/Dth
+    fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,NB,2*N,1,1])
+
+    #putthem together and sum of the z,b,and N axes to get a [2,2] tensor that is the gradient of the loss w.r.t. parameters
+    dLdJ_exp = (fake_dis_grad_expanded*dRdJ_exp).sum(axis = (0,1,2))
+    dLdD_exp = (fake_dis_grad_expanded*dRdD_exp).sum(axis = (0,1,2))
+    dLdS_exp = (fake_dis_grad_expanded*dRdS_exp).sum(axis = (0,1,2))
+
     dLdJ = theano.function([rvec,ivec,Z],dLdJ_exp,allow_input_downcast = True)
+    dLdD = theano.function([rvec,ivec,Z],dLdD_exp,allow_input_downcast = True)
+    dLdS = theano.function([rvec,ivec,Z],dLdS_exp,allow_input_downcast = True)
 
-    inp = np.concatenate([np.ones(N),np.zeros(N)])
+    #Now we set up values to use in testing.
+
+    inp = np.tile(np.concatenate([np.ones(N),np.ones(N)/2]),(NB,1)) #example input
+    ztest = np.random.rand(NZ,2*N,2*N)
  
-    ztest = np.random.rand(2*N,2*N)
+    rtest = np.zeros([NZ,NB,2*N])
 
-
-    for k in range(1000):
+    for k in range(100):
 
         wtest = W(ztest)
-        rtest = SSsolve.fixed_point(wtest,inp).x    
-
+        rtest = np.array([[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i]).x for i in range(len(inp))] for w in range(len(wtest))])
+        
+        Ztest = np.array([[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i]).success for i in range(len(inp))] for w in range(len(wtest))])
+        print(Ztest)
+        
         dj = dLdJ(rtest,inp,ztest)
-        J.set_value(J.get_value() - 1.*dj)        
-    
-        if k % 10 == 0:
-            print(fake_loss(rtest))
-            
+        dd = dLdD(rtest,inp,ztest)
+        ds = dLdS(rtest,inp,ztest)
+
+        J.set_value((J.get_value() - .1*dj).astype("float32"))
+        D.set_value((J.get_value() - .1*dd).astype("float32"))
+        S.set_value((J.get_value() - .1*ds).astype("float32"))
+        
+        if k % 1 == 0:
+            print("{}\t{}".format(fake_loss(rtest),rtest.mean()))
+ 
 if __name__ == "__main__":
     main()

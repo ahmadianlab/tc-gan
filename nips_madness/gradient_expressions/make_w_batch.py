@@ -3,6 +3,7 @@ import theano.tensor as T
 import numpy as np
 
 sign = theano.shared(np.array([[1,-1],[1,-1]]),name = "sign")
+dsign = T.reshape(sign,[2,2,1,1])
 
 def make_W_with_x(Z,J,D,S,N,X):
 
@@ -53,7 +54,7 @@ def make_WJ_with_x(Z,J,D,S,N,X,dj):
     wnn = T.exp(-(xx)**2/(2 * s**2))
     #[2,N,2,N]
 
-    jt = T.reshape(dj,[1,2,1,2,1,2,2])
+    jt = T.reshape(dsign*dj,[1,2,1,2,1,2,2])
 
     W = T.reshape(wnn,[1,2,N,2,N,1,1])*jt
 
@@ -83,7 +84,7 @@ def make_WD_with_x(Z,J,D,S,N,X,dd):
     wnn = T.exp(-(xx)**2/(2 * s**2))
     #[2,N,2,N]
 
-    dt = T.reshape(dd,[-1,2,1,2,1,2,2])
+    dt = T.reshape(dsign*dd,[1,2,1,2,1,2,2])
 
     W = T.reshape(wnn*z,[-1,2,N,2,N,1,1])*dt
 
@@ -113,9 +114,9 @@ def make_WS_with_x(Z,J,D,S,N,X,ds):
     wnn = T.exp(-(xx)**2/(2 * s**2))
     #[2,N,2,N]
 
-    st = T.reshape(ds,[1,2,1,2,1,2,2])
+    st = T.reshape(dsign*ds,[1,2,1,2,1,2,2])
 
-    W = T.reshape(wnn*(2*(xx)**2/(2 * s**3))*(j + d*z),[2,N,2,N,1,1])*st
+    W = T.reshape(wnn*(2*(xx)**2/(2 * s**3))*(j + d*z),[-1,2,N,2,N,1,1])*st
 
     return T.reshape(W,[-1,2*N,2*N,2,2])
     

@@ -17,7 +17,8 @@ import time
 
 import stimuli
 
-def main(datapath, iterations):
+def main(datapath, iterations, seed=0):
+    np.random.seed(seed)
 
     # Load data and "experiment" parameter (note that all [0]s are to
     # get rid of redundant dimensions of the MATLAB data and not
@@ -372,5 +373,8 @@ if __name__ == "__main__":
     parser.add_argument(
         '--iterations', default=1000, type=int,
         help='Number of iterations (default: %(default)s)')
+    parser.add_argument(
+        '--seed', default=0, type=int,
+        help='Seed for random numbers (default: %(default)s)')
     ns = parser.parse_args()
     main(**vars(ns))

@@ -17,7 +17,7 @@ import time
 
 import stimuli
 
-def main(datapath, iterations, seed=0):
+def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01):
     np.random.seed(seed)
 
     # Load data and "experiment" parameter (note that all [0]s are to
@@ -274,7 +274,7 @@ def main(datapath, iterations, seed=0):
     fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    D_updates = lasagne.updates.nesterov_momentum(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true),.01)#discriminator training function
+    D_updates = lasagne.updates.nesterov_momentum(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), disc_learn_rate)#discriminator training function
 
     #make loss functions
     true_loss = theano.function([red_R_true,rvec],true_loss_exp,allow_input_downcast = True)
@@ -298,9 +298,7 @@ def main(datapath, iterations, seed=0):
     dLdD = theano.function([rvec,ivec,Z],dLdD_exp,allow_input_downcast = True)
     dLdS = theano.function([rvec,ivec,Z],dLdS_exp,allow_input_downcast = True)
 
-    lr = .01
-
-    G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S],lr)
+    G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], gen_learn_rate)
     G_train_func = theano.function([rvec,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rvec,red_R_true],true_loss_exp,updates = D_updates,allow_input_downcast = True)
 
@@ -376,5 +374,11 @@ if __name__ == "__main__":
     parser.add_argument(
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
+    parser.add_argument(
+        '--gen-learn-rate', default=0.01, type=float,
+        help='Learning rate for generator (default: %(default)s)')
+    parser.add_argument(
+        '--disc-learn-rate', default=0.01, type=float,
+        help='Learning rate for discriminator (default: %(default)s)')
     ns = parser.parse_args()
     main(**vars(ns))

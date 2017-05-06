@@ -2,6 +2,7 @@ import theano
 import theano.tensor as T
 import lasagne
 import numpy as np
+import scipy.io
 
 import discriminators.simple_discriminator as SD
 import nips_madness.gradient_expressions.make_w_batch as make_w
@@ -13,6 +14,17 @@ import time
 import stimuli
 
 def main():
+
+    # Load data and "experiment" parameter (note that all [0]s are to
+    # get rid of redundant dimensions of the MATLAB data and not
+    # throwing away data):
+    mat = scipy.io.loadmat('training_data_TCs_Ne101.mat')
+    L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
+    bandwidths = mat['Modelparams'][0, 0]['bandwidths'][0] / L_mat
+    smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
+    contrast = mat['Modelparams'][0, 0]['c'][0, 0]
+    n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
+    data = mat['E_Tuning']      # shape: (N_data, nb)
 
     #defining all the parameters that we might want to train
 
@@ -33,9 +45,9 @@ def main():
     dSpS = T.reshape(T.jacobian(T.reshape(Sp,[-1]),S),[2,2,2,2])
 
     #specifying the shape of model/input
-    n = theano.shared(100,name = "n_sites")
+    n = theano.shared(n_sites,name = "n_sites")
     nz = theano.shared(10,name = 'n_samples')
-    nb = theano.shared(5,name = 'n_stim')
+    nb = theano.shared(data.shape[1],name = 'n_stim')
 
     #array that computes the positions
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
@@ -48,7 +60,7 @@ def main():
     m = 1
     ###
 
-    BAND_IN = stimuli.input([(a+1)*.8/float(NB) for a in range(NB)],X.get_value())
+    BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness)
 
     #a mask to get from the rates to just the ones we are measuring
     M = theano.shared(np.array([[1 if k == j + (N/2) - (m/2) else 0 for k in range(2*N)] for j in range(m)]).astype("float32"),"mask")
@@ -289,9 +301,6 @@ def main():
 
     inp = BAND_IN
 
-#    data = get_data()
-    data = np.random.normal(0,1,[10000,NB])
-    
     def log(a,F = "./SSNGAN_log.log",PRINT = True):
         print(a)
         f = open(F,"a")

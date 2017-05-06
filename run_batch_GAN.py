@@ -18,6 +18,7 @@ import time
 import stimuli
 
 def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01):
+
     np.random.seed(seed)
 
     # Load data and "experiment" parameter (note that all [0]s are to
@@ -67,7 +68,9 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     m = 1
     ###
 
-    BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness)
+    print("Contrast is {}".format(contrast))
+
+    BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness, contrast)
 
     #a mask to get from the rates to just the ones we are measuring
     M = theano.shared(np.array([[1 if k == j + (N/2) - (m/2) else 0 for k in range(2*N)] for j in range(m)]).astype("float32"),"mask")
@@ -302,12 +305,16 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     G_train_func = theano.function([rvec,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rvec,red_R_true],true_loss_exp,updates = D_updates,allow_input_downcast = True)
 
+    G_loss_func = theano.function([rvec,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
+    D_loss_func = theano.function([rvec,red_R_true],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
+
     #Now we set up values to use in testing.
 
     inp = BAND_IN
 
     def log(a,F = "./SSNGAN_log.log",PRINT = True):
-        print(a)
+        if PRINT:
+            print(a)
         f = open(F,"a")
         f.write(str(a) + "\n")
         f.close()
@@ -335,8 +342,15 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
         # pdb.set_trace()
         # print(Ztest)
 
-        Gloss = G_train_func(rtest,inp,ztest)
-        Dloss = D_train_func(rtest,true)
+        if k == 0:
+            Gloss = G_train_func(rtest,inp,ztest)
+            Dloss = D_train_func(rtest,true)
+        elif k % 100 < 90:
+            Gloss = G_train_func(rtest,inp,ztest)
+            Dloss = D_loss_func(rtest,true)
+        else:
+            Gloss = G_loss_func(rtest,inp,ztest)
+            Dloss = D_train_func(rtest,true)
         
         log("{},{}".format(Gloss,Dloss))
 
@@ -360,7 +374,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
                                                                   allpar[10],
                                                                   allpar[11])
 
-            log(string,F = "./parameters.log")
+            log(string,F = "./parameters.log",PRINT = False)
 
 if __name__ == "__main__":
     import argparse

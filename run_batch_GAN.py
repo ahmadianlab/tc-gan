@@ -24,12 +24,14 @@ def main():
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
     contrast = mat['Modelparams'][0, 0]['c'][0, 0]
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
+    coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
+    exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
 
     #defining all the parameters that we might want to train
 
-    exp = theano.shared(2.2,name = "exp")
-    coe = theano.shared(.04,name = "coe")
+    exp = theano.shared(exp_value,name = "exp")
+    coe = theano.shared(coe_value,name = "coe")
 
     J = theano.shared(np.array([[-.1,.5],[.5,-.2]]).astype("float64"),name = "j")
     D = theano.shared(np.array([[-1,-1],[-1,-1]]).astype("float64"),name = "d")
@@ -318,9 +320,14 @@ def main():
         ztest = np.random.rand(NZ,2*N,2*N) 
 
         wtest = W(ztest)
-        Ztest = [[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i]) for i in range(len(inp))] for w in range(len(wtest))]
+        # Ztest = [[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i],
+        #                               k = coe_value, n = exp_value)
+        #           for i in range(len(inp))] for w in range(len(wtest))]
 
-        rtest = np.array([[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i]).x for i in range(len(inp))] for w in range(len(wtest))])
+        rtest = np.array([[
+            SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i],
+                                k = coe_value, n = exp_value).x
+            for i in range(len(inp))] for w in range(len(wtest))])
         # import pdb
         # pdb.set_trace()
         # print(Ztest)

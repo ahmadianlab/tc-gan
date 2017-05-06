@@ -17,7 +17,7 @@ import time
 
 import stimuli
 
-def main(datapath):
+def main(datapath, iterations):
 
     # Load data and "experiment" parameter (note that all [0]s are to
     # get rid of redundant dimensions of the MATLAB data and not
@@ -315,7 +315,7 @@ def main(datapath):
 
     log("Gloss,Dloss")
 
-    for k in range(100):
+    for k in range(iterations):
         rtest = np.zeros([NZ,NB,2*N])
 
         np.random.shuffle(data)
@@ -369,5 +369,8 @@ if __name__ == "__main__":
     parser.add_argument(
         'datapath', default='training_data_TCs_Ne102.mat', nargs='?',
         help='Path to MATLAB data file (default: %(default)s)')
+    parser.add_argument(
+        '--iterations', default=1000, type=int,
+        help='Number of iterations (default: %(default)s)')
     ns = parser.parse_args()
-    main(ns.datapath)
+    main(**vars(ns))

@@ -1,3 +1,7 @@
+"""
+Run SSN-GAN learning given a MATLAB data file.
+"""
+
 import theano
 import theano.tensor as T
 import lasagne
@@ -13,12 +17,12 @@ import time
 
 import stimuli
 
-def main():
+def main(datapath):
 
     # Load data and "experiment" parameter (note that all [0]s are to
     # get rid of redundant dimensions of the MATLAB data and not
     # throwing away data):
-    mat = scipy.io.loadmat('training_data_TCs_Ne101.mat')
+    mat = scipy.io.loadmat(datapath)
     L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
     bandwidths = mat['Modelparams'][0, 0]['bandwidths'][0] / L_mat
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
@@ -360,4 +364,10 @@ def main():
             log(string,F = "./parameters.log")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        'datapath', default='training_data_TCs_Ne102.mat', nargs='?',
+        help='Path to MATLAB data file (default: %(default)s)')
+    ns = parser.parse_args()
+    main(ns.datapath)

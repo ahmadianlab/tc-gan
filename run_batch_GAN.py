@@ -18,9 +18,9 @@ import time
 import stimuli
 
 USEDATA = False
-LAYERS = [64,64]
+LAYERS = []
 
-def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01):
+def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.01):
 
     np.random.seed(seed)
 
@@ -33,9 +33,11 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
     contrast = mat['Modelparams'][0, 0]['c'][0, 0]
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
+    n_sites = 101
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
+
 
     #defining all the parameters that we might want to train
 
@@ -43,9 +45,9 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[1.,.2],[2.5,.15]])).astype("float64"),name = "j")
-    D2 = theano.shared(np.log(np.array([[8.,16.],[20.,1.2]])).astype("float64"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/8.).astype("float64"),name = "s")
+    J2 = theano.shared(np.log(np.array([[4.,1.],[10.,.5]])).astype("float64"),name = "j")
+    D2 = theano.shared(np.log(np.array([[.1,.1],[.1,.1]])).astype("float64"),name = "d")
+    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L_mat).astype("float64"),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
@@ -56,9 +58,9 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     Sp2 = T.exp(S2)
 
     #these are the parammeters to be fit
-    J = theano.shared(J2.get_value() + np.array([[-.3,.3],[.3,-.3]]),name = "j")
-    D = theano.shared(D2.get_value() + np.array([[-.5,.3],[.3,-.5]]),name = "d")
-    S = theano.shared(S2.get_value() + np.array([[.3,-.3],[.3,-.3]]),name = "s")
+    J = theano.shared(J2.get_value() + np.array([[.1,.1],[.1,.1]]),name = "j")
+    D = theano.shared(D2.get_value() + np.array([[.1,.1],[.1,.1]]),name = "d")
+    S = theano.shared(S2.get_value() + np.array([[.1,.1],[.1,.1]]),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
@@ -142,93 +144,37 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics([0,10.],wtest[z],testI[b])[-1].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics(2.,wtest[z],testI[b],k = coe_value, n = exp_value).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
         print(ssR.mean())
         print(wtest.mean())
         print(DWj(testz).mean())
-        
-        
+                
         print("Start DWtest")
-        for k in range(100):
+        for k in range(1000):
             wtest = np.reshape(W(testz),[NZ,2*N,2*N,1,1])
             
-
             dd = DWj(testz)#[nz,2N,2N,2,2]
-            dj = 2*(wtest*dd).mean(axis = 0).mean(axis = 0).mean(axis = 0)
+            dj = 2*(wtest*dd).mean(axis = (0,1,2))
+
+            dd = DWd(testz)#[nz,2N,2N,2,2]
+            dD = 2*(wtest*dd).mean(axis = (0,1,2))
+
+            dd = DWs(testz)#[nz,2N,2N,2,2]
+            ds = 2*(wtest*dd).mean(axis = (0,1,2))
             
-            jnew = J.get_value() - .001*dj
+            jnew = J.get_value() - .1*dj
+            dnew = D.get_value() - .1*dD
+            snew = S.get_value() - .1*ds
             
             J.set_value(jnew.astype("float32"))
+            D.set_value(dnew.astype("float32"))
+            S.set_value(snew.astype("float32"))
             
-            if k % 1 == 0:
+            if k % 10 == 0:
                 print((wtest*wtest).mean())
 
         exit()
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
-
-
-    print("defined all the functions")
-
-    def dR_dtheta(inp,ZZ):
-        '''
-
-        I need a function which takes 
-
-          inp - [nb,2N]
-          Z - [nz,2N,2N]
-
-        and generates dr/dth - [3,nz,nb,2N,2,2]
-
-        '''
-
-        if len(ZZ.shape) != 3:
-            print("Z must have three dimentions - [nz,2N,2N]")
-
-        if len(inp.shape) != 2:
-            print("inp must have two dimentions - [nb,2N]")
-
-        T1 = time.time()
-        #[nz,2n,2n]
-        WW = W(ZZ)
-
-        T2 = time.time()
-        #[nz,nb,2N]
-        RR = np.array([[SSsolve.solve_dynamics([0,10.],WW[z],inp[i])[-1] for i in range(len(inp))] for z in range(len(ZZ))])
-
-        T3 = time.time()
-        DRTj = dRdJ(RR,inp,ZZ)
-        DRTd = dRdD(RR,inp,ZZ)
-        DRTs = dRdS(RR,inp,ZZ)
- 
-        T4 = time.time()
-        
-        DR = np.array([DRTj,DRTd,DRTs])
-
-#        print("{}\t{}\t{}".format(T2-T1,T3-T2,T4-T3))
-
-        return DR
-
-
-    timetest = False
-    if timetest:
-        zz = np.random.rand(NZ,2*N,2*N).astype("float32")
-        II = np.random.normal(0,1,[NB,2*N]).astype("float32")
-        print("Computing gradients")
-
-        T_temp = time.time()
-        dwt = DWj(zz)
-        print("dwt took {} seconds".format(time.time() - T_temp))
-        
-        T_temp = time.time()
- 
-        DR = dR_dtheta(II,zz)
-        print(DR.mean())
-        
-        print("A single datapoint took {} seconds to get dRdTH".format(time.time() - T_temp))
-        print("An 8*5 batch would take {} seconds to get dRdTH".format(8*5*(time.time() - T_temp)))
-        
-        print(DR.shape)
-        exit()
 
     #do gradient descent on R
     DRtest = False
@@ -238,7 +184,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
         def lossF(i,z,tar):
             WW = W(z)
             
-            r = np.array([[SSsolve.solve_dynamics([0,10.],WW[n],i[m])[-1] for m in range(len(i))] for n in range(len(z))])
+            r = np.array([[SSsolve.solve_dynamics(300.,WW[n],i[m],r0 = np.zeros((2*N)),k = coe_value, n = exp_value) for m in range(len(i))] for n in range(len(z))])
             
             return ((r - tar)**2).mean(),r
         
@@ -246,30 +192,27 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     ##so Dl/Dt = 2*(r - tar).Dr/Dth
 
         
-        target = np.random.normal(2,.1,(NZ,NB,2*N))
+        target = np.random.rand(NZ,NB,2*N)
 #        target = np.ones_like(target)
         
-        inp = np.random.normal(0,1,[NB,2*N])
-        inp = np.ones_like(inp)
-        
+        inp = BAND_IN
         Ztest = np.random.rand(NZ,2*N,2*N)
         
-        for k in range(1000):
+        for k in range(100):
             loss, r = lossF(inp,Ztest,target)
             
-            if k % 100 == 0:
+            if k % 1 == 0:
                 print("Loss : {}\t{}".format(loss,r.mean()))
                 
-            DR = dR_dtheta(inp,Ztest)
-
-            dl = 2*(r - target)
+            DR =[dRdJ(r,inp,Ztest),dRdD(r,inp,Ztest),dRdS(r,inp,Ztest)]
             
-            J.set_value(J.get_value() - .001*np.tensordot(dl,DR[0],axes = [[0,1,2],[0,1,2]]).astype("float32"))
-            D.set_value(D.get_value() - .001*np.tensordot(dl,DR[1],axes = [[0,1,2],[0,1,2]]).astype("float32"))
-            S.set_value(S.get_value() - .001*np.tensordot(dl,DR[2],axes = [[0,1,2],[0,1,2]]).astype("float32"))
+            dl = np.reshape(2*(r - target),[NZ,NB,2*N,1,1])
+            
+            J.set_value(J.get_value() - .000001*(dl*DR[0]).mean(axis = (0,1,2)))
+            D.set_value(D.get_value() - .000001*(dl*DR[1]).mean(axis = (0,1,2)))
+            S.set_value(S.get_value() - .000001*(dl*DR[2]).mean(axis = (0,1,2)))
 
         exit()
-        #I have verified that this does in fact seem to work
 
     ###Now I need to make the GAN
     ###
@@ -279,7 +222,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
 
     red_R_true = T.matrix("reduced rates","float32")#data
 
-    red_R_fake = T.reshape(T.tensordot(rvec,M,axes = [2,1]),[NZ,NB])#generated by our generator function    
+    red_R_fake = T.reshape(T.tensordot(rvec,M,axes = [2,1]),[NZ,NB])#generated by our generator function
     get_reduced = theano.function([rvec],red_R_fake,allow_input_downcast = True)
 
     #Defines the input shape for the discriminator network
@@ -297,12 +240,16 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     D_acc = theano.function([rvec,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
 
     #make the loss functions
-    SM = .8
-    true_loss_exp = -SM*np.log(true_dis_out).mean() - (1. - SM)*np.log(1. - true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
-    fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
+    if 0:
+        SM = .8
+        true_loss_exp = -SM*np.log(true_dis_out).mean() - (1. - SM)*np.log(1. - true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
+        fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
+    else:
+        true_loss_exp = ((true_dis_out - 1.)**2).mean() + ((fake_dis_out + 1.)**2).mean()#discriminator loss
+        fake_loss_exp = ((fake_dis_out - 1.)**2).mean()#generative loss
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    D_updates = lasagne.updates.nesterov_momentum(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), disc_learn_rate)#discriminator training function
+    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), disc_learn_rate)#discriminator training function
 
     #make loss functions
     true_loss = theano.function([red_R_true,rvec],true_loss_exp,allow_input_downcast = True)
@@ -360,36 +307,41 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
         ztest = np.random.rand(NZ,2*N,2*N) 
         wtest = W(ztest)
         Ftest = np.array([[
-            SSsolve.solve_dynamics([0,10.],wtest[w],inp[i],r0 = rz,
-                                k = coe_value, n = exp_value)[-1]
-            for i in range(len(inp))] for w in range(len(wtest))])
-
+                        SSsolve.solve_dynamics(.1,wtest[w],inp[i],r0 = rz,
+                                                k = coe_value, n = exp_value)
+                        for i in range(len(inp))] for w in range(len(wtest))])
         rtest = np.array([[c for c in TC] for TC in Ftest])
         stest = np.array([[c for c in TC] for TC in Ftest])
-
+        
         Tfinal = time.time()
 
         Gloss = G_train_func(rtest,inp,ztest)
-
+        
         ##faketest
         if USEDATA == False:
             ztest2 = np.random.rand(NZ,2*N,2*N) 
-
+            
             wtest2 = W_test(ztest2)
+            
             Otrue = np.array([[
-                            SSsolve.solve_dynamics([0,10.],wtest2[w],inp[i],r0 = rz,
-                                                k = coe_value, n = exp_value)[-1]
-                            for i in range(len(inp))] for w in range(len(wtest2))])
-
+                        SSsolve.solve_dynamics(.1,wtest2[w],inp[i],r0 = rz,
+                                                k = coe_value, n = exp_value)
+                        for i in range(len(inp))] for w in range(len(wtest2))])
+            
             true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))
             Strue = np.array([[O for O in TC] for TC in Otrue])
-
+                
+ 
         else:
             Strue = [True]
-
+            
+#        print(true.mean(axis = 0))
+            
         Dloss = D_train_func(rtest,true)
         
         log("{},{},{},{},{},{},{},{}".format(k,Gloss,Dloss,D_acc(rtest,true),Tfinal - TT,time.time() - Tfinal,np.all(stest),np.all(Strue)))
+
+#        print(np.reshape(J.get_value(),[-1]))
 
         if len(LAYERS) == 0:
             GZmean = get_reduced(rtest).mean(axis = 0)

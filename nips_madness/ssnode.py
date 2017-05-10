@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import numpy
 import scipy.optimize
+import scipy.sparse
 
 from .weight_gen import generate_parameter
 
@@ -48,13 +49,39 @@ def fixed_point(W, ext, r0=None, k=0.04, n=2, **kwds):
     return scipy.optimize.root(fixed_point_equation, r0, args, **kwds)
 
 
-def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2, tau=[1, 0.1], **kwds):
+#def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01, 0.001], **kwds):
+#    if r0 is None:
+#        r0 = thlin(numpy.linalg.solve(W, -ext))
+#    N = W.shape[0] // 2
+#    tau = any_to_neu_vec(N, tau)
+#    args = (ext, W, k, n, tau)
+#    return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
+
+def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001], **kwds):
+
+    dt = .0001
+
     if r0 is None:
         r0 = thlin(numpy.linalg.solve(W, -ext))
+
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)
     args = (ext, W, k, n, tau)
-    return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
+
+    rr = r0
+    dr = ( - rr + k*numpy.power(thlin(numpy.dot(W,rr) + ext),n))/tau
+
+    nn = 0
+
+    WW = scipy.sparse.coo_matrix((W * (numpy.abs(W) > numpy.max(numpy.abs(W))/100)))
+    WW = scipy.sparse.csc_matrix(WW)
+
+    while numpy.sum(numpy.abs(dr)) > 10**-10 and nn < 1000:
+        nn += 1
+        rr = rr + dt * dr
+        dr = ( - rr + k*numpy.power(thlin(numpy.dot(W,rr) + ext),n))/tau
+
+    return rr
 
 def sigmoid(x):
     return 1 / (1 + numpy.exp(-x))

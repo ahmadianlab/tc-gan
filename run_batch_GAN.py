@@ -17,6 +17,9 @@ import time
 
 import stimuli
 
+USEDATA = False
+LAYERS = [64,64]
+
 def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01):
 
     np.random.seed(seed)
@@ -39,9 +42,27 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     exp = theano.shared(exp_value,name = "exp")
     coe = theano.shared(coe_value,name = "coe")
 
-    J = theano.shared(np.array([[-.1,.5],[.5,-.2]]).astype("float64"),name = "j")
-    D = theano.shared(np.array([[-1,-1],[-1,-1]]).astype("float64"),name = "d")
-    S = theano.shared(np.array([[0,-1.],[.1,-1.]]).astype("float64"),name = "s")
+    #these are parameters we will use to test the GAN
+    J2 = theano.shared(np.log(np.array([[1.,.2],[2.5,.15]])).astype("float64"),name = "j")
+    D2 = theano.shared(np.log(np.array([[8.,16.],[20.,1.2]])).astype("float64"),name = "d")
+    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/8.).astype("float64"),name = "s")
+
+#    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
+#    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
+#    S = theano.shared(np.log(np.array([[.5,.3],[1.0,.25]])).astype("float64"),name = "s")
+
+    Jp2 = T.exp(J2)
+    Dp2 = T.exp(D2)
+    Sp2 = T.exp(S2)
+
+    #these are the parammeters to be fit
+    J = theano.shared(J2.get_value() + np.array([[-.3,.3],[.3,-.3]]),name = "j")
+    D = theano.shared(D2.get_value() + np.array([[-.5,.3],[.3,-.5]]),name = "d")
+    S = theano.shared(S2.get_value() + np.array([[.3,-.3],[.3,-.3]]),name = "s")
+
+#    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
+#    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
+#    S = theano.shared(np.log(np.array([[.5,.3],[1.0,.25]])).astype("float64"),name = "s")
 
     Jp = T.exp(J)
     Dp = T.exp(D)
@@ -54,12 +75,11 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
 
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
-    nz = theano.shared(10,name = 'n_samples')
+    nz = theano.shared(5,name = 'n_samples')
     nb = theano.shared(data.shape[1],name = 'n_stim')
 
     #array that computes the positions
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
-
 
     ##getting regular nums##
     N = int(n.get_value())
@@ -81,6 +101,8 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     #symbolic W
     ww = make_w.make_W_with_x(Z,Jp,Dp,Sp,n,X)
 
+    ww2 = make_w.make_W_with_x(Z,Jp2,Dp2,Sp2,n,X)
+
     #the next 3 are of shape [nz,2N,2N,2,2]
     dwdj = T.tile(make_w.make_WJ_with_x(Z,Jp,Dp,Sp,n,X,dJpJ),(NZ,1,1,1,1))#deriv. of W w.r.t. J
     dwdd = make_w.make_WD_with_x(Z,Jp,Dp,Sp,n,X,dDpD)#deriv. of W w.r.t. D
@@ -88,6 +110,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
 
     #function to get W given Z
     W = theano.function([Z],ww,allow_input_downcast = True,on_unused_input = "ignore")
+    W_test = theano.function([Z],ww2,allow_input_downcast = True,on_unused_input = "ignore")
 
     #get deriv. of W given Z
     DWj = theano.function([Z],dwdj,allow_input_downcast = True,on_unused_input = "ignore")
@@ -119,7 +142,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.fixed_point(wtest[z],testI[b]).x.astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics([0,10.],wtest[z],testI[b])[-1].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
         print(ssR.mean())
         print(wtest.mean())
         print(DWj(testz).mean())
@@ -170,7 +193,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
 
         T2 = time.time()
         #[nz,nb,2N]
-        RR = np.array([[SSsolve.fixed_point(WW[z],inp[i]).x for i in range(len(inp))] for z in range(len(ZZ))])
+        RR = np.array([[SSsolve.solve_dynamics([0,10.],WW[z],inp[i])[-1] for i in range(len(inp))] for z in range(len(ZZ))])
 
         T3 = time.time()
         DRTj = dRdJ(RR,inp,ZZ)
@@ -215,7 +238,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
         def lossF(i,z,tar):
             WW = W(z)
             
-            r = np.array([[SSsolve.fixed_point(WW[n],i[m]).x for m in range(len(i))] for n in range(len(z))])
+            r = np.array([[SSsolve.solve_dynamics([0,10.],WW[n],i[m])[-1] for m in range(len(i))] for n in range(len(z))])
             
             return ((r - tar)**2).mean(),r
         
@@ -256,8 +279,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
 
     red_R_true = T.matrix("reduced rates","float32")#data
 
-    red_R_fake = T.reshape(T.tensordot(rvec,M,axes = [2,1]),[NZ,NB])#generated by our generator function
-    
+    red_R_fake = T.reshape(T.tensordot(rvec,M,axes = [2,1]),[NZ,NB])#generated by our generator function    
     get_reduced = theano.function([rvec],red_R_fake,allow_input_downcast = True)
 
     #Defines the input shape for the discriminator network
@@ -265,15 +287,18 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
  
     #I want to make a network that takes red_R and gives a scalar output
 
-    DIS_red_r_true = SD.make_net(red_R_true,INSHAPE)
-    DIS_red_r_fake = SD.make_net(red_R_fake,INSHAPE,params = lasagne.layers.get_all_layers(DIS_red_r_true))
+    DIS_red_r_true = SD.make_net(red_R_true,INSHAPE,LAYERS)
+    DIS_red_r_fake = SD.make_net(red_R_fake,INSHAPE,LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
 
     #get the outputs
     true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
     fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
 
+    D_acc = theano.function([rvec,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
+
     #make the loss functions
-    true_loss_exp = -np.log(true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
+    SM = .8
+    true_loss_exp = -SM*np.log(true_dis_out).mean() - (1. - SM)*np.log(1. - true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
     fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
@@ -302,6 +327,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
     dLdS = theano.function([rvec,ivec,Z],dLdS_exp,allow_input_downcast = True)
 
     G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], gen_learn_rate)
+
     G_train_func = theano.function([rvec,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rvec,red_R_true],true_loss_exp,updates = D_updates,allow_input_downcast = True)
 
@@ -312,69 +338,96 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.01, disc_learn_rate=0.01
 
     inp = BAND_IN
 
-    def log(a,F = "./SSNGAN_log.log",PRINT = True):
+    def log(a,F = "./SSNGAN_log_{}.log".format(len(LAYERS)),PRINT = True):
         if PRINT:
             print(a)
         f = open(F,"a")
         f.write(str(a) + "\n")
         f.close()
 
-    log("Gloss,Dloss")
+    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,truth_convergence")
 
     for k in range(iterations):
-        rtest = np.zeros([NZ,NB,2*N])
+        TT = time.time()
+        rz = np.zeros([2*N])
 
         np.random.shuffle(data)
 
+        #the data
         true = data[:NZ]
+
+        #generated samples
         ztest = np.random.rand(NZ,2*N,2*N) 
-
         wtest = W(ztest)
-        # Ztest = [[SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i],
-        #                               k = coe_value, n = exp_value)
-        #           for i in range(len(inp))] for w in range(len(wtest))]
-
-        rtest = np.array([[
-            SSsolve.fixed_point(wtest[w],inp[i],r0 = rtest[w,i],
-                                k = coe_value, n = exp_value).x
+        Ftest = np.array([[
+            SSsolve.solve_dynamics([0,10.],wtest[w],inp[i],r0 = rz,
+                                k = coe_value, n = exp_value)[-1]
             for i in range(len(inp))] for w in range(len(wtest))])
-        # import pdb
-        # pdb.set_trace()
-        # print(Ztest)
 
-        if k == 0:
-            Gloss = G_train_func(rtest,inp,ztest)
-            Dloss = D_train_func(rtest,true)
-        elif k % 100 < 90:
-            Gloss = G_train_func(rtest,inp,ztest)
-            Dloss = D_loss_func(rtest,true)
+        rtest = np.array([[c for c in TC] for TC in Ftest])
+        stest = np.array([[c for c in TC] for TC in Ftest])
+
+        Tfinal = time.time()
+
+        Gloss = G_train_func(rtest,inp,ztest)
+
+        ##faketest
+        if USEDATA == False:
+            ztest2 = np.random.rand(NZ,2*N,2*N) 
+
+            wtest2 = W_test(ztest2)
+            Otrue = np.array([[
+                            SSsolve.solve_dynamics([0,10.],wtest2[w],inp[i],r0 = rz,
+                                                k = coe_value, n = exp_value)[-1]
+                            for i in range(len(inp))] for w in range(len(wtest2))])
+
+            true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))
+            Strue = np.array([[O for O in TC] for TC in Otrue])
+
         else:
-            Gloss = G_loss_func(rtest,inp,ztest)
-            Dloss = D_train_func(rtest,true)
-        
-        log("{},{}".format(Gloss,Dloss))
+            Strue = [True]
 
-        if k%10 == 0:
+        Dloss = D_train_func(rtest,true)
+        
+        log("{},{},{},{},{},{},{},{}".format(k,Gloss,Dloss,D_acc(rtest,true),Tfinal - TT,time.time() - Tfinal,np.all(stest),np.all(Strue)))
+
+        if len(LAYERS) == 0:
+            GZmean = get_reduced(rtest).mean(axis = 0)
+            Dmean = true.mean(axis = 0)
+
+            Dparam = lasagne.layers.get_all_layers(DIS_red_r_true)[-1]
+            
+            DW = Dparam.W.get_value()
+            DB = Dparam.b.get_value()
+
+            logstrG = "{},{},{},{},{},{},{},{}".format(GZmean[0],GZmean[1],GZmean[2],GZmean[3],GZmean[4],GZmean[5],GZmean[6],GZmean[7])
+            logstrD = "{},{},{},{},{},{},{},{}".format(Dmean[0],Dmean[1],Dmean[2],Dmean[3],Dmean[4],Dmean[5],Dmean[6],Dmean[7])
+            logstrW = "{},{},{},{},{},{},{},{},{}".format(DW[0,0],DW[1,0],DW[2,0],DW[3,0],DW[4,0],DW[5,0],DW[6,0],DW[7,0],DB[0])
+
+            log(logstrG + "," + logstrD + "," + logstrW,F = "D_parameters_{}.log".format(len(LAYERS)),PRINT = False) 
+
+        if k%1 == 0:
             jj = J.get_value()
             dd = D.get_value()
             ss = S.get_value()
             
             allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
 
-            string = "{},{},{},{},{},{},{},{},{},{},{},{}".format(allpar[0],
-                                                                  allpar[1],
-                                                                  allpar[2],
-                                                                  allpar[3],
-                                                                  allpar[4],
-                                                                  allpar[5],
-                                                                  allpar[6],
-                                                                  allpar[7],
-                                                                  allpar[8],
-                                                                  allpar[9],
-                                                                  allpar[10],
-                                                                  allpar[11])
+            string = "{},{},{},{},{},{},{},{},{},{},{},{},{}".format(k,
+                                                                     allpar[0],
+                                                                     allpar[1],
+                                                                     allpar[2],
+                                                                     allpar[3],
+                                                                     allpar[4],
+                                                                     allpar[5],
+                                                                     allpar[6],
+                                                                     allpar[7],
+                                                                     allpar[8],
+                                                                     allpar[9],
+                                                                     allpar[10],
+                                                                     allpar[11])
 
-            log(string,F = "./parameters.log",PRINT = False)
+            log(string,F = "./parameters_{}.log".format(len(LAYERS)),PRINT = False)
 
 if __name__ == "__main__":
     import argparse

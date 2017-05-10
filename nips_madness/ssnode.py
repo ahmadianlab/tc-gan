@@ -56,7 +56,6 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2, tau=[1, 0.1], **kwds):
     args = (ext, W, k, n, tau)
     return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
 
-
 def sigmoid(x):
     return 1 / (1 + numpy.exp(-x))
 

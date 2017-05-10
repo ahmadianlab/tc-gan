@@ -62,6 +62,13 @@ def rate_to_volt(rate, k=0.04, n=2.2):
     return (rate / k)**(1 / n)
 
 
+def io_plin(v, volt_max, k, n):
+    vc = numpy.clip(v, 0, volt_max)
+    rate = k * (vc**n)
+    linear = k * (volt_max**(n-1)) * n * (v - volt_max)
+    return numpy.where(v <= volt_max, rate, rate + linear)
+
+
 def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
                    rate_max=100., **kwds):
 
@@ -76,7 +83,7 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
 
     rr = r0
     volt_max = rate_to_volt(rate_max, k, n)
-    V = numpy.clip(numpy.dot(W,rr) + ext, 0, volt_max)
+    V = io_plin(numpy.dot(W, rr) + ext, volt_max, k, n)
     dr = ( - rr + k*numpy.power(V,n))/tau
 
     nn = 0
@@ -87,7 +94,7 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
     while numpy.sum(numpy.abs(dr)) > 10**-10 and nn < 1000:
         nn += 1
         rr = rr + dt * dr
-        V = numpy.clip(numpy.dot(W,rr) + ext, 0, volt_max)
+        V = io_plin(numpy.dot(W, rr) + ext, volt_max, k, n)
         dr = ( - rr + k*numpy.power(V,n))/tau
 
     if nn == 0:

@@ -33,11 +33,9 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
     contrast = mat['Modelparams'][0, 0]['c'][0, 0]
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
-    n_sites = 101
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
-
 
     #defining all the parameters that we might want to train
 
@@ -45,8 +43,8 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[4.,1.],[10.,.5]])).astype("float64"),name = "j")
-    D2 = theano.shared(np.log(np.array([[.1,.1],[.1,.1]])).astype("float64"),name = "d")
+    J2 = theano.shared(np.log(np.array([[4.,2.],[6.5,.15]])).astype("float64"),name = "j")
+    D2 = theano.shared(np.log(np.array([[8.,1.6],[20.0,1.2]])).astype("float64"),name = "d")
     S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L_mat).astype("float64"),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
@@ -58,9 +56,9 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
     Sp2 = T.exp(S2)
 
     #these are the parammeters to be fit
-    J = theano.shared(J2.get_value() + np.array([[.1,.1],[.1,.1]]),name = "j")
-    D = theano.shared(D2.get_value() + np.array([[.1,.1],[.1,.1]]),name = "d")
-    S = theano.shared(S2.get_value() + np.array([[.1,.1],[.1,.1]]),name = "s")
+    J = theano.shared(J2.get_value() - np.array([[.5,.5],[.5,.5]]),name = "j")
+    D = theano.shared(D2.get_value() - np.array([[.5,.5],[.5,.5]]),name = "d")
+    S = theano.shared(S2.get_value() - np.array([[.5,.5],[.5,.5]]),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
@@ -77,7 +75,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
 
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
-    nz = theano.shared(5,name = 'n_samples')
+    nz = theano.shared(1,name = 'n_samples')
     nb = theano.shared(data.shape[1],name = 'n_stim')
 
     #array that computes the positions
@@ -177,41 +175,35 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
 
     #do gradient descent on R
-    DRtest = False
+    DRtest = True
     if DRtest:
     #I want to test this by adjusting the parameters to give some specified output
-        
-        def lossF(i,z,tar):
-            WW = W(z)
-            
-            r = np.array([[SSsolve.solve_dynamics(300.,WW[n],i[m],r0 = np.zeros((2*N)),k = coe_value, n = exp_value) for m in range(len(i))] for n in range(len(z))])
-            
-            return ((r - tar)**2).mean(),r
-        
-    ##If the target is tar, and the loss is sqred loss, then Dl/Dr = 2*(r - tar)
-    ##so Dl/Dt = 2*(r - tar).Dr/Dth
-
-        
-        target = np.random.rand(NZ,NB,2*N)
-#        target = np.ones_like(target)
-        
+         
         inp = BAND_IN
         Ztest = np.random.rand(NZ,2*N,2*N)
         
-        for k in range(100):
-            loss, r = lossF(inp,Ztest,target)
-            
-            if k % 1 == 0:
-                print("Loss : {}\t{}".format(loss,r.mean()))
-                
-            DR =[dRdJ(r,inp,Ztest),dRdD(r,inp,Ztest),dRdS(r,inp,Ztest)]
-            
-            dl = np.reshape(2*(r - target),[NZ,NB,2*N,1,1])
-            
-            J.set_value(J.get_value() - .000001*(dl*DR[0]).mean(axis = (0,1,2)))
-            D.set_value(D.get_value() - .000001*(dl*DR[1]).mean(axis = (0,1,2)))
-            S.set_value(S.get_value() - .000001*(dl*DR[2]).mean(axis = (0,1,2)))
+        WW = W(Ztest)
+               
+        rr1 = np.array([[SSsolve.solve_dynamics(1.,z,b,r0 = np.zeros((2*N))) for b in inp] for z in WW])
+ 
+        DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
+               
+        dd = .001
 
+        #J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
+        #D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
+        S.set_value(S.get_value() + np.array([[dd,0.],[0.,0.]]))
+
+        WW = W(Ztest)
+
+        rr2 = np.array([[SSsolve.solve_dynamics(1.,z,b,r0 = np.zeros((2*N))) for b in inp] for z in WW])
+
+        print(rr1.max())
+        print(rr1.min())
+
+        print((rr2 - rr1).mean()/dd)
+        print(DR[2][:,:,:,0,0].mean())
+ 
         exit()
 
     ###Now I need to make the GAN

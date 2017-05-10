@@ -63,7 +63,7 @@ def rate_to_volt(rate, k=0.04, n=2.2):
 
 
 def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
-                   rate_max=100, **kwds):
+                   rate_max=100., **kwds):
 
     dt = .0001
 
@@ -89,6 +89,9 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
         rr = rr + dt * dr
         V = numpy.clip(numpy.dot(W,rr) + ext, 0, volt_max)
         dr = ( - rr + k*numpy.power(V,n))/tau
+
+    if nn == 0:
+        print("Convergence Failed")
 
     return rr
 

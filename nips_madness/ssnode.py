@@ -58,7 +58,7 @@ def fixed_point(W, ext, r0=None, k=0.04, n=2, **kwds):
 #    return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
 
 
-def rate_to_volt(rate, k=0.04, n=2.2):
+def rate_to_volt(rate, k, n):
     return (rate / k)**(1 / n)
 
 
@@ -69,7 +69,7 @@ def io_plin(v, volt_max, k, n):
     return numpy.where(v <= volt_max, rate, rate + linear)
 
 
-def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
+def solve_dynamics(t, W, ext, k, n, r0=None, tau=[.01, .001],
                    rate_max=100., **kwds):
 
     dt = .0001

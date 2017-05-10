@@ -175,7 +175,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
 
     #do gradient descent on R
-    DRtest = True
+    DRtest = False
     if DRtest:
     #I want to test this by adjusting the parameters to give some specified output
          
@@ -188,11 +188,11 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
  
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
-        dd = .001
+        dd = .01
 
         #J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
-        #D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
-        S.set_value(S.get_value() + np.array([[dd,0.],[0.,0.]]))
+        D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
+        #S.set_value(S.get_value() + np.array([[dd,0.],[0.,0.]]))
 
         WW = W(Ztest)
 
@@ -202,7 +202,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
         print(rr1.min())
 
         print((rr2 - rr1).mean()/dd)
-        print(DR[2][:,:,:,0,0].mean())
+        print(DR[1][:,:,:,0,0].mean())
  
         exit()
 

@@ -37,13 +37,19 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
 
+    print(np.max(data))
+    print(np.min(data))
+
+    print(coe_value)
+    print(exp_value)
+
     #defining all the parameters that we might want to train
 
     exp = theano.shared(exp_value,name = "exp")
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[4.,2.],[6.5,.15]])).astype("float64"),name = "j")
+    J2 = theano.shared(np.log(np.array([[1.,.2],[2.5,.15]])).astype("float64"),name = "j")
     D2 = theano.shared(np.log(np.array([[8.,1.6],[20.0,1.2]])).astype("float64"),name = "d")
     S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L_mat).astype("float64"),name = "s")
 
@@ -56,9 +62,9 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
     Sp2 = T.exp(S2)
 
     #these are the parammeters to be fit
-    J = theano.shared(J2.get_value() - np.array([[.5,.5],[.5,.5]]),name = "j")
-    D = theano.shared(D2.get_value() - np.array([[.5,.5],[.5,.5]]),name = "d")
-    S = theano.shared(S2.get_value() - np.array([[.5,.5],[.5,.5]]),name = "s")
+    J = theano.shared(J2.get_value() - np.array([[0,0],[0,0]]),name = "j")
+    D = theano.shared(D2.get_value() - np.array([[0,0],[0,0]]),name = "d")
+    S = theano.shared(S2.get_value() - np.array([[0,0],[0,0]]),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
@@ -175,7 +181,7 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
 
     #do gradient descent on R
-    DRtest = False
+    DRtest = True
     if DRtest:
     #I want to test this by adjusting the parameters to give some specified output
          
@@ -184,25 +190,28 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
         
         WW = W(Ztest)
                
-        rr1 = np.array([[SSsolve.solve_dynamics(1.,z,b,r0 = np.zeros((2*N))) for b in inp] for z in WW])
+        rr1 = np.array([[SSsolve.solve_dynamics(1.,z,b,r0 = np.zeros((2*N)),k = coe_value,n = exp_value) for b in inp] for z in WW])
  
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
-        dd = .01
+        dd = .1
 
-        #J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
-        D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
+        J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
+        #D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
         #S.set_value(S.get_value() + np.array([[dd,0.],[0.,0.]]))
 
         WW = W(Ztest)
 
-        rr2 = np.array([[SSsolve.solve_dynamics(1.,z,b,r0 = np.zeros((2*N))) for b in inp] for z in WW])
+        rr2 = np.array([[SSsolve.solve_dynamics(1.,WW[z],inp[b],r0 = rr1[z,b],k = coe_value,n = exp_value) for b in range(len(inp))] for z in range(len(WW))])
+
+        print(rr2.max())
+        print(rr2.min())
 
         print(rr1.max())
         print(rr1.min())
 
         print((rr2 - rr1).mean()/dd)
-        print(DR[1][:,:,:,0,0].mean())
+        print(DR[0][:,:,:,0,0].mean())
  
         exit()
 

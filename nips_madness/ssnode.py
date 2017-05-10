@@ -74,9 +74,6 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
 
     dt = .0001
 
-    if r0 is None:
-        r0 = thlin(numpy.linalg.solve(W, -ext))
-
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)
     args = (ext, W, k, n, tau)
@@ -91,7 +88,7 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
     WW = scipy.sparse.coo_matrix((W * (numpy.abs(W) > numpy.max(numpy.abs(W))/100)))
     WW = scipy.sparse.csc_matrix(WW)
 
-    while numpy.sum(numpy.abs(dr)) > 10**-10 and nn < 1000:
+    while numpy.sum(numpy.abs(dr)) > 10**-20 and nn < 1000:
         nn += 1
         rr = rr + dt * dr
         V = io_plin(numpy.dot(W, rr) + ext, volt_max, k, n)

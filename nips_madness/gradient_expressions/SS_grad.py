@@ -4,6 +4,7 @@ import lasagne as L
 import numpy as np
 
 from ..weight_gen import weight, generate_weight
+from ..ssnode import rate_to_volt
 
 #what I need is: to write an expression that takes a variable R and matrix W (ss response and weight matrix) and returns the gradient.
 #Now I need functions that take the parameters and compute Wgrads w.r.t. the parameters
@@ -74,7 +75,7 @@ def generate_weight_grads(N, J, delta, sigma, z):
     return W
 
 
-def WRgrad(R,W,DW,I,n,k):
+def WRgrad(R,W,DW,I,n,k,rate_max=100):
     '''
 
     This expression takes theano variables for R,W,dW/dth,I,n, and k and outputs the gradient dr/dth
@@ -89,12 +90,13 @@ def WRgrad(R,W,DW,I,n,k):
     '''
 
     V = T.dot(W,R) + I 
-    phi = T.reshape(n*k*T.power(T.clip(V,0.,10000.),n - 1.),[-1,1])
+    V_clipped = T.clip(V, 0., rate_to_volt(rate_max, k, n))
+    phi = T.reshape(n*k*T.power(V_clipped,n - 1.),[-1,1])
     J = T.identity_like(W) - phi*W
     B = T.reshape(phi,[-1,1,1])*T.tensordot(DW,R,axes = [1,0])
     return T.tensordot(T.nlinalg.MatrixInverse()(J),B,axes = [1,0])
 
-def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N):
+def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N,rate_max=100):
     '''
 
     This expression takes theano variables for R,W,dW/dth,I,n, and k and outputs the gradient dr/dth
@@ -116,8 +118,9 @@ def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N):
     rt = T.reshape(R,[nz,nb,1,2*N])
 
     V = (wt*rt).sum(axis = 3) + T.reshape(I,[1,nb,2*N]) #[nz,nb,2N]
+    V_clipped = T.clip(V, 0., rate_to_volt(rate_max, k, n))
 
-    phi = T.reshape(n*k*T.power(T.clip(V,0.,10000.),n - 1.),[nz,nb,2*N,1]) #[nz,nb,2N]
+    phi = T.reshape(n*k*T.power(V_clipped,n - 1.),[nz,nb,2*N,1]) #[nz,nb,2N]
 
     Wall = T.reshape(W,[-1,2*N,2*N])
     WIt,up = theano.map(lambda x:T.identity_like(x),[Wall])

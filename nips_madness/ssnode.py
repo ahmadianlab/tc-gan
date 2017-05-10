@@ -57,7 +57,13 @@ def fixed_point(W, ext, r0=None, k=0.04, n=2, **kwds):
 #    args = (ext, W, k, n, tau)
 #    return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
 
-def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001], **kwds):
+
+def rate_to_volt(rate, k=0.04, n=2.2):
+    return (rate / k)**(1 / n)
+
+
+def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
+                   rate_max=100, **kwds):
 
     dt = .0001
 
@@ -69,7 +75,8 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001], **kwds):
     args = (ext, W, k, n, tau)
 
     rr = r0
-    dr = ( - rr + k*numpy.power(thlin(numpy.dot(W,rr) + ext),n))/tau
+    V = numpy.clip(numpy.dot(W,rr) + ext, 0, rate_to_volt(rate_max, k, n))
+    dr = ( - rr + k*numpy.power(V,n))/tau
 
     nn = 0
 

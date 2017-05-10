@@ -75,7 +75,8 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
     args = (ext, W, k, n, tau)
 
     rr = r0
-    V = numpy.clip(numpy.dot(W,rr) + ext, 0, rate_to_volt(rate_max, k, n))
+    volt_max = rate_to_volt(rate_max, k, n)
+    V = numpy.clip(numpy.dot(W,rr) + ext, 0, volt_max)
     dr = ( - rr + k*numpy.power(V,n))/tau
 
     nn = 0
@@ -86,7 +87,8 @@ def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01,.001],
     while numpy.sum(numpy.abs(dr)) > 10**-10 and nn < 1000:
         nn += 1
         rr = rr + dt * dr
-        dr = ( - rr + k*numpy.power(thlin(numpy.dot(W,rr) + ext),n))/tau
+        V = numpy.clip(numpy.dot(W,rr) + ext, 0, volt_max)
+        dr = ( - rr + k*numpy.power(V,n))/tau
 
     return rr
 

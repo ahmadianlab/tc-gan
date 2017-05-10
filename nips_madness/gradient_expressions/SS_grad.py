@@ -108,18 +108,29 @@ def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N):
     n - scalar
     k - scalar
 
-    '''
+
+    dr/dw = 
+    '''    
+
     wt = T.reshape(W,[nz,1,2*N,2*N])
     rt = T.reshape(R,[nz,nb,1,2*N])
+
     V = (wt*rt).sum(axis = 3) + T.reshape(I,[1,nb,2*N]) #[nz,nb,2N]
+
     phi = T.reshape(n*k*T.power(T.clip(V,0.,10000.),n - 1.),[nz,nb,2*N,1]) #[nz,nb,2N]
+
     Wall = T.reshape(W,[-1,2*N,2*N])
     WIt,up = theano.map(lambda x:T.identity_like(x),[Wall])
-    WIt = T.reshape(WIt,[nz,1,2*N,2*N])
+    WIt = T.reshape(WIt,[nz,1,2*N,2*N])#identity matrices for W
+
     J = WIt - phi*wt# [nz,nb,2*N,2*N]
+
     dwt = T.reshape(DW,[nz,1,2*N,2*N,2,2])
+
     rt = T.reshape(R,[nz,nb,1,2*N,1,1])
+
     B = T.reshape(T.reshape(phi,[nz,nb,2*N,1,1])*((dwt*rt).sum(axis = 3)),[nz,nb,1,2*N,2,2]) #DW [nz,nb,2N,2N,2,2]
+
     MI,up = theano.map(lambda x:T.nlinalg.MatrixInverse()(x),[T.reshape(J,[-1,2*N,2*N])])
     MI = T.reshape(MI,[nz,nb,2*N,2*N,1,1])
 

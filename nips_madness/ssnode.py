@@ -67,7 +67,7 @@ def io_atanh(v, r0, r1, v0, v1, k, n):
     v_pow = numpy.clip(v, 0, v0)
     r_pow = k * (v_pow**n)
     r_tanh = r0 + (r1 - r0) * numpy.tanh(
-        n * r0 / (r1 - r0) + (v - v0) / v0
+        n * r0 / (r1 - r0) * (v - v0) / v0
     )
     return numpy.where(v <= v0, r_pow, r_tanh)
 
@@ -159,3 +159,21 @@ def all_inputs(N, bandwidths, **kwds):
     Return an array of inputs in the shape ``(N, len(bandwidths))``.
     """
     return numpy.array([single_input(N, b, **kwds) for b in bandwidths])
+
+
+def plot_io_funs():
+    from matplotlib import pyplot
+
+    fig, ax = pyplot.subplots()
+    x = numpy.linspace(-1, 100)
+    k = 0.04
+    n = 2.2
+    r0 = 100
+    r1 = 200
+    v0 = rate_to_volt(r0, k, n)
+    v1 = rate_to_volt(r1, k, n)
+    ax.plot(x, k * (thlin(x)**n), label='power-law')
+    ax.plot(x, io_plin(x, v0, k, n), label='asym_linear')
+    ax.plot(x, io_atanh(x, r0, r1, v0, v1, k, n), label='asym_tanh')
+
+    ax.legend(loc='best')

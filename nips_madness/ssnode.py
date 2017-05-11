@@ -80,19 +80,14 @@ def solve_dynamics(t, W, ext, k, n, r0=None, tau=[.01, .001],
 
     rr = r0
     volt_max = rate_to_volt(rate_max, k, n)
-    V = io_plin(numpy.dot(W, rr) + ext, volt_max, k, n)
-    dr = ( - rr + k*numpy.power(V,n))/tau
+    dr = ( - rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
 
     nn = 0
-
-    WW = scipy.sparse.coo_matrix((W * (numpy.abs(W) > numpy.max(numpy.abs(W))/100)))
-    WW = scipy.sparse.csc_matrix(WW)
 
     while numpy.sum(numpy.abs(dr)) > 10**-20 and nn < 1000:
         nn += 1
         rr = rr + dt * dr
-        V = io_plin(numpy.dot(W, rr) + ext, volt_max, k, n)
-        dr = ( - rr + k*numpy.power(V,n))/tau
+        dr = ( - rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
 
     if nn == 0:
         print("Convergence Failed")

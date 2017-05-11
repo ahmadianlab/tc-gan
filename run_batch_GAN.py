@@ -19,7 +19,7 @@ import stimuli
 
 USEDATA = False
 LAYERS = [128]
-io_type = "asym_tanh"
+IOTYPE = "asym_tanh"
 
 def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.001):
 
@@ -138,9 +138,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
     ivec = T.matrix("ivec","float32")
 
     #DrDth tensor expressions
-    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N,io_type)
-    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N,io_type)
-    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N,io_type)
+    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N,IOTYPE)
+    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N,IOTYPE)
+    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N,IOTYPE)
 
     dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
@@ -153,7 +153,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],k = coe_value, n = exp_value).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],coe_value,exp_value,np.zeros((2*N)),io_type = IOTYPE).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
         print(ssR.mean())
         print(wtest.mean())
         print(DWj(testz).mean())
@@ -196,7 +196,10 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         
         WW = W(Ztest)
                
-        rr1 = np.array([[SSsolve.solve_dynamics(z,b,r0 = np.zeros((2*N)),k = coe_value,n = exp_value) for b in inp] for z in WW])
+        rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IOTYPE) for b in inp] for z in WW])
+        rr1_test = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N))) for b in inp] for z in WW])
+
+        print(np.max(np.abs(rr1 - rr1_test)))
 
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
@@ -208,7 +211,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
 
         WW = W(Ztest)
 
-        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],r0 = rr1[z,b],k = coe_value,n = exp_value) for b in range(len(inp))] for z in range(len(WW))])
+        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],coe_value,exp_value,rr1[z,b],io_type = IOTYPE) for b in range(len(inp))] for z in range(len(WW))])
 
         print(rr2.max())
         print(rr2.min())
@@ -219,7 +222,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         DRa = (rr2 - rr1)/dd
         DRp = DR[0][:,:,:,0,0]
 
-        print(np.max(np.abs(DRa-DRp))/np.max(np.abs(DRa)))
+        print(np.max(np.abs(DRa-DRp)))
  
         exit()
 
@@ -327,7 +330,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
             ztest = np.random.rand(1,2*N,2*N) 
             wtest = W(ztest)
             rates = [SSsolve.solve_dynamics(wtest[0],inp[i],r0 = rz,
-                                             k = coe_value, n = exp_value)
+                                             k = coe_value, n = exp_value,io_type = IOTYPE)
                      for i in range(len(inp))]
 
             if np.all(np.isfinite(rates)):
@@ -371,7 +374,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
                 wtest2 = W_test(ztest2)
                 
                 rates = [SSsolve.solve_dynamics(wtest2[0],inp[i],r0 = rz,
-                                                 k = coe_value, n = exp_value)
+                                                 k = coe_value, n = exp_value,io_type = IOTYPE)
                          for i in range(len(inp))]
                 
                 if np.all(np.isfinite(rates)):

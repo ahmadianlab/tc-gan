@@ -64,6 +64,11 @@ def io_plin(v, volt_max, k, n):
     linear = k * (volt_max**(n-1)) * n * (v - volt_max)
     return numpy.where(v <= volt_max, rate, rate + linear)
 
+def io_power(v, k, n):
+    vc = .5*(v + np.abs(v))
+    rate = k * (vc**n)
+    return rate
+
 
 def io_atanh(v, r0, r1, v0, v1, k, n):
     v_pow = numpy.clip(v, 0, v0)
@@ -159,6 +164,9 @@ def solve_dynamics_python(
     elif io_type == 'asym_tanh':
         def io_fun(v):
             return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, v1, k, n)
+    elif io_type == 'asym_power':
+        def io_fun(v):
+            return io_power(v, k, n)
     else:
         raise ValueError("Unknown I/O type: {}".format(io_type))
 

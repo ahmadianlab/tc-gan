@@ -68,17 +68,17 @@ def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N,io_type = "asym_tanh",r0 = 100.,r1 = 200.)
 def tanh_phi(V,k,n,r0,r1,nz,nb,N):
     v0 = rate_to_volt(r0, k, n)
     
-    V_clipped = rectify(V)
+    V_clipped = T.reshape(rectify(V),[nz,nb,2*N,1])
 
-    V_low = V_clipped*(V_clipped <= v0)
-    V_high = V_clipped*(V_clipped > v0)
+    V_l_mask = (V_clipped <= v0)
+    V_h_mask = (V_clipped > v0)
 
-    VH_arg = (n*r0/v0)*(V_high - v0)/(r1 - r0)
+    VH_arg = (n*r0/v0)*(V_clipped - v0)/(r1 - r0)
 
-    phi_low = T.reshape(n*k*T.power(V_low,n - 1.),[nz,nb,2*N,1]) #[nz,nb,2N]
-    phi_high = T.reshape((n*r0/v0)/T.power(T.cosh(VH_arg),2.),[nz,nb,2*N,1]) #[nz,nb,2N]
+    phi_low = n*k*T.power(V_clipped,n - 1.) #[nz,nb,2N]
+    phi_high = (n*r0/v0)*T.power(T.cosh(VH_arg),-2.)#[nz,nb,2N]
 
-    return phi_high + phi_low
+    return (phi_high*V_h_mask) + (phi_low*V_l_mask)
 
 def linear_phi(V,k,n,r0,nz,nb,N):
     V_clipped = T.clip(V, 0., rate_to_volt(r0, k, n))

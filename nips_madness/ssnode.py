@@ -76,7 +76,7 @@ def io_atanh(v, r0, r1, v0, v1, k, n):
 
 def solve_dynamics(
         W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=100000, atol=1e-2, dt=.001,
+        max_iter=100000, atol=1e-10, dt=.001,
         rate_soft_bound=100, rate_hard_bound=200,
         io_type='asym_linear'):
     """
@@ -148,7 +148,7 @@ def solve_dynamics(
 
 def solve_dynamics_python(
         W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=100000, atol=1e-2, dt=.001,
+        max_iter=100000, atol=1e-10, dt=.001,
         rate_soft_bound=100, rate_hard_bound=200,
         io_type='asym_linear'):
     v0 = rate_to_volt(rate_soft_bound, k, n)

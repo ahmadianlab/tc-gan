@@ -43,6 +43,7 @@ int solve_dynamics_asym_linear(
   double dt_I = dt / tau_I;
   double v0 = rate_to_volt(rate_soft_bound, k, n);
   double v1 = rate_to_volt(rate_hard_bound, k, n);
+  int converged;
   for (int step = 0; step < max_iter; ++step){
     for (int i = 0; i < N; ++i){
       ODE_STEP(io_alin, dt_E);
@@ -50,18 +51,24 @@ int solve_dynamics_asym_linear(
     for (int i = N; i < dim; ++i){
       ODE_STEP(io_alin, dt_I);
     }
+
+    converged = 1;
     for (int i = 0; i < dim; ++i){
       if (fabs(r1[i] - r0[i]) >= atol) {
-        r_tmp = r0;
-        r0 = r1;
-        r1 = r_tmp;
-        continue;
+        converged = 0;
+        break;
       }
     }
-    for (int i = 0; i < dim; ++i){
-      r0[i] = r1[i];
+
+    if (converged) {
+      for (int i = 0; i < dim; ++i){
+        r0[i] = r1[i];
+      }
+      return 0;
     }
-    return 0;
+    r_tmp = r0;
+    r0 = r1;
+    r1 = r_tmp;
   }
   return 1;
 }

@@ -64,7 +64,7 @@ def io_plin(v, volt_max, k, n):
 
 
 def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
-                   max_iter=100000, atol=1e-2,
+                   max_iter=100000, atol=1e-10,
                    rate_soft_bound=100, rate_hard_bound=200,
                    io_type='asyn_linear'):
     """

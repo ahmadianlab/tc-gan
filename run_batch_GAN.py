@@ -152,7 +152,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics(2.,wtest[z],testI[b],k = coe_value, n = exp_value).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],k = coe_value, n = exp_value).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
         print(ssR.mean())
         print(wtest.mean())
         print(DWj(testz).mean())
@@ -195,8 +195,8 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         
         WW = W(Ztest)
                
-        rr1 = np.array([[SSsolve.solve_dynamics(1.,z,b,r0 = np.zeros((2*N)),k = coe_value,n = exp_value) for b in inp] for z in WW])
-
+        rr1 = np.array([[SSsolve.solve_dynamics(z,b,r0 = np.zeros((2*N)),k = coe_value,n = exp_value) for b in inp] for z in WW])
+ 
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
 
         #MANUAL GRADIENT
@@ -225,7 +225,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
 
         WW = W(Ztest)
 
-        rr2 = np.array([[SSsolve.solve_dynamics(1.,WW[z],inp[b],r0 = rr1[z,b],k = coe_value,n = exp_value) for b in range(len(inp))] for z in range(len(WW))])
+        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],r0 = rr1[z,b],k = coe_value,n = exp_value) for b in range(len(inp))] for z in range(len(WW))])
 
         print(rr2.max())
         print(rr2.min())
@@ -343,7 +343,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         while len(Ftest) < NZ:
             ztest = np.random.rand(1,2*N,2*N) 
             wtest = W(ztest)
-            rates = [SSsolve.solve_dynamics(.1,wtest[0],inp[i],r0 = rz,
+            rates = [SSsolve.solve_dynamics(wtest[0],inp[i],r0 = rz,
                                              k = coe_value, n = exp_value)
                      for i in range(len(inp))]
 
@@ -387,7 +387,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
                 
                 wtest2 = W_test(ztest2)
                 
-                rates = [SSsolve.solve_dynamics(.1,wtest2[0],inp[i],r0 = rz,
+                rates = [SSsolve.solve_dynamics(wtest2[0],inp[i],r0 = rz,
                                                  k = coe_value, n = exp_value)
                          for i in range(len(inp))]
                 

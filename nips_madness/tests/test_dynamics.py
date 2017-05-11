@@ -89,7 +89,7 @@ def test_tuning_curve():
     X = numpy.linspace(-0.5, 0.5, n_sites)
     BAND_IN = stimuli.input(bandwidths, X, smoothness, contrast)
 
-    fps = [solve_dynamics(None, W, ext, k=coe_value, n=exp_value,
+    fps = [solve_dynamics(W, ext, k=coe_value, n=exp_value,
                           r0=numpy.zeros(2 * n_sites))
            for ext in BAND_IN]
     E_Tuning_actual = numpy.array([x[i_beg:i_end] for x in fps]).T
@@ -227,7 +227,7 @@ def test_gradients():
 
     print("DW {}".format(DWd(ZZ)[0,0,0,0,0]))
 
-    fps = np.array([[solve_dynamics(None, W(ZZ)[0], ext, k=coe_value, n=exp_value,
+    fps = np.array([[solve_dynamics(W(ZZ)[0], ext, k=coe_value, n=exp_value,
                           r0=numpy.zeros(2 * n_sites))
            for ext in BAND_IN]])
 

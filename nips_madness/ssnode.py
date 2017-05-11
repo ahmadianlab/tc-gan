@@ -1,10 +1,13 @@
 from __future__ import print_function, division
 
+try:
+    range = xrange  # Python 2/3 compatibility
+except NameError:
+    pass
+
 import numpy
 import scipy.optimize
 import scipy.sparse
-
-from .weight_gen import generate_parameter
 
 
 def make_neu_vec(N, E, I):
@@ -49,15 +52,6 @@ def fixed_point(W, ext, r0=None, k=0.04, n=2, **kwds):
     return scipy.optimize.root(fixed_point_equation, r0, args, **kwds)
 
 
-#def solve_dynamics(t, W, ext, r0=None, k=0.04, n=2.2, tau=[.01, 0.001], **kwds):
-#    if r0 is None:
-#        r0 = thlin(numpy.linalg.solve(W, -ext))
-#    N = W.shape[0] // 2
-#    tau = any_to_neu_vec(N, tau)
-#    args = (ext, W, k, n, tau)
-#    return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
-
-
 def rate_to_volt(rate, k, n):
     return (rate / k)**(1 / n)
 
@@ -69,31 +63,66 @@ def io_plin(v, volt_max, k, n):
     return numpy.where(v <= volt_max, rate, rate + linear)
 
 
-def solve_dynamics(t, W, ext, k, n, r0=None, tau=[.016, .002],
-                   rate_max=100., **kwds):
+def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
+                   max_iter=100000, atol=1e-2,
+                   rate_soft_bound=100, rate_hard_bound=200,
+                   io_type='asyn_linear'):
+    """
+    Solve ODE for the SSN until it converges to a fixed point.
+
+    Parameters
+    ----------
+    W : array of shape (2*N, 2*N)
+        The weight matrix.
+    ext : array of shape (2*N,)
+        Stationary input to the network.
+    k : float
+        Scaling factor of the I/O function.
+    n : float
+        Power of the SSN nonlinearity.
+    r0 : array of shape (2*N,)
+        The initial condition in terms of rate.
+    tau : array of shape (2,) or (2*N,)
+        The time constants of the neurons.
+    max_iter : int
+        The hard bound to the number of iteration of the Euler method.
+    atol : float
+        Absolute tolerance to the each component of the derivative.
+    rate_soft_bound : float
+        The I/O function is power-law below this point.
+    rate_hard_bound : float
+        The true maximum rate.  Used only when ``io_type='asyn_tanh'``.
+    io_type : {'asyn_linear', 'asyn_tanh'}
+        If ``'asyn_linear'`` (default), the I/O function is linear after
+        `rate_soft_bound`.  If ``'asyn_tanh'``, the I/O function is
+        tanh after `rate_soft_bound` and the rate is bounded by
+        `rate_hard_bound`.
+
+    Returns
+    -------
+    r : array of shape (2*N,)
+        A fixed point or something else if the ODE is failed to converge.
+
+    """
 
     dt = .001
 
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)
-    args = (ext, W, k, n, tau)
 
     rr = r0
-    volt_max = rate_to_volt(rate_max, k, n)
-    dr = ( - rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
+    volt_max = rate_to_volt(rate_soft_bound, k, n)
 
-    nn = 0
-    lim = 100000
-
-    while numpy.sum(numpy.abs(dr)) > 10**-5 and nn < lim:
-        nn += 1
+    for _ in range(max_iter):
+        dr = (- rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
         rr = rr + dt * dr
-        dr = ( - rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
-
-    if nn == lim:
-        print("Convergence Failed")
+        if numpy.abs(dr).max() < atol:
+            break
+    else:
+        print("SSN Convergence Failed")
 
     return rr
+
 
 def sigmoid(x):
     return 1 / (1 + numpy.exp(-x))
@@ -111,32 +140,3 @@ def all_inputs(N, bandwidths, **kwds):
     Return an array of inputs in the shape ``(N, len(bandwidths))``.
     """
     return numpy.array([single_input(N, b, **kwds) for b in bandwidths])
-
-
-def demo_dynamics(N=50,
-                  J=[[1, 3], [1, 1]],
-                  delta=numpy.ones((2, 2)) * 0.1,
-                  sigma=numpy.ones((2, 2)) * 0.2,
-                  ext=[40, 20],
-                  tmax=3, tnum=300, seed=0, plot_fp=False):
-    from matplotlib import pyplot
-    W, _ = generate_parameter(N, J, delta, sigma, seed=seed)
-    ext = any_to_neu_vec(N, ext)
-    t = numpy.linspace(0, tmax, tnum)
-    r = solve_dynamics(t, W, ext)
-
-    fig, (ax1, ax2) = pyplot.subplots(nrows=2, sharex=True)
-    ax1.plot(t, r[:, :N], color='C0', linewidth=0.5)
-    ax1.set_ylabel('Excitatory neurons')
-
-    ax2.plot(t, r[:, N:], color='C1', linewidth=0.5)
-    ax2.set_ylabel('Inhibitory neurons')
-    ax2.set_xlabel('Time')
-
-    if plot_fp:
-        sol = fixed_point(W, ext)
-        ax1.plot(tmax, [sol.x[:N]], 'o', color='C0')
-        ax2.plot(tmax, [sol.x[N:]], 'o', color='C1')
-
-        if not sol.success:
-            print(sol.message)

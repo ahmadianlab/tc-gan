@@ -17,12 +17,20 @@ import time
 
 import stimuli
 
-USEDATA = False
-LAYERS = [128]
-IOTYPE = "asym_tanh"
 
-def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.001):
+def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01, loss = "CE", use_data = False, IO_type = "asym_tanh", layers = [],n_samples = 10):
 
+    ##Make the tag for the files
+    if use_data:
+        tag = "data_"
+    else:
+        tag = "generated_"
+
+    tag = tag + IO_type + "_" + loss
+
+    for l in layers:
+        tag = tag + "_" + str(l)
+        
     np.random.seed(seed)
 
     # Load data and "experiment" parameter (note that all [0]s are to
@@ -34,11 +42,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
     contrast = mat['Modelparams'][0, 0]['c'][0, 0]
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
-    n_sites = 10
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
-
 
     #defining all the parameters that we might want to train
 
@@ -80,7 +86,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
 
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
-    nz = theano.shared(1,name = 'n_samples')
+    nz = theano.shared(n_samples,name = 'n_samples')
     nb = theano.shared(data.shape[1],name = 'n_stim')
 
     #array that computes the positions
@@ -138,9 +144,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
     ivec = T.matrix("ivec","float32")
 
     #DrDth tensor expressions
-    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N,IOTYPE)
-    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N,IOTYPE)
-    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N,IOTYPE)
+    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N,IO_type)
+    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N,IO_type)
+    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N,IO_type)
 
     dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
@@ -153,7 +159,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],coe_value,exp_value,np.zeros((2*N)),io_type = IOTYPE).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],coe_value,exp_value,np.zeros((2*N)),io_type = IO_type).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
         print(ssR.mean())
         print(wtest.mean())
         print(DWj(testz).mean())
@@ -186,7 +192,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
 
     #do gradient descent on R
-    DRtest = True
+    DRtest = False
     if DRtest:
         print("starting DR")
     #I want to test this by adjusting the parameters to give some specified output
@@ -196,14 +202,11 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         
         WW = W(Ztest)
                
-        rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IOTYPE) for b in inp] for z in WW])
-        rr1_test = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N))) for b in inp] for z in WW])
-
-        print(np.max(np.abs(rr1 - rr1_test)))
+        rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IO_type) for b in inp] for z in WW])
 
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
-        dd = 0.0001
+        dd = 0.00001
 
         J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
         #D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
@@ -211,7 +214,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
 
         WW = W(Ztest)
 
-        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],coe_value,exp_value,rr1[z,b],io_type = IOTYPE) for b in range(len(inp))] for z in range(len(WW))])
+        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],coe_value,exp_value,rr1[z,b],io_type = IO_type) for b in range(len(inp))] for z in range(len(WW))])
 
         print(rr2.max())
         print(rr2.min())
@@ -240,10 +243,15 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
     #Defines the input shape for the discriminator network
     INSHAPE = [NZ,NB]
  
+    ##Input Variable Definition
+
+    in_fake = T.log(1. + red_R_fake)
+    in_true = T.log(1. + red_R_true)
+
     #I want to make a network that takes red_R and gives a scalar output
 
-    DIS_red_r_true = SD.make_net(red_R_true,INSHAPE,LAYERS)
-    DIS_red_r_fake = SD.make_net(red_R_fake,INSHAPE,LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
+    DIS_red_r_true = SD.make_net(in_true,INSHAPE,loss,layers)
+    DIS_red_r_fake = SD.make_net(in_fake,INSHAPE,loss,layers,params = lasagne.layers.get_all_layers(DIS_red_r_true))
 
     #get the outputs
     true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
@@ -252,13 +260,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
     D_acc = theano.function([rvec,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
 
     #make the loss functions
-    if 0:
-        SM = .8
+    if loss == "CE":
+        SM = .9
         true_loss_exp = -SM*np.log(true_dis_out).mean() - (1. - SM)*np.log(1. - true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
         fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
-    else:
+    elif loss == "LS":
         true_loss_exp = ((true_dis_out - 1.)**2).mean() + ((fake_dis_out + 1.)**2).mean()#discriminator loss
         fake_loss_exp = ((fake_dis_out - 1.)**2).mean()#generative loss
+    else:
+        print("Invalid loss specified")
+        exit()
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), disc_learn_rate)#discriminator training function
@@ -297,7 +308,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
 
     inp = BAND_IN
 
-    def log(a,F = "./SSNGAN_log_{}.log".format(len(LAYERS)),PRINT = True):
+    def log(a,F = "./SSNGAN_log_{}.log".format(tag),PRINT = True):
         if PRINT:
             print(a)
         f = open(F,"a")
@@ -326,11 +337,12 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         Ftest = []
         Ztest = []
         model_fail = 0
+
         while len(Ftest) < NZ:
             ztest = np.random.rand(1,2*N,2*N) 
             wtest = W(ztest)
             rates = [SSsolve.solve_dynamics(wtest[0],inp[i],r0 = rz,
-                                             k = coe_value, n = exp_value,io_type = IOTYPE)
+                                             k = coe_value, n = exp_value,io_type = IO_type)
                      for i in range(len(inp))]
 
             if np.all(np.isfinite(rates)):
@@ -342,10 +354,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
         rtest = np.array([[c for c in TC] for TC in Ftest])
-        stest = np.array([[c for c in TC] for TC in Ftest])
         
-        Tfinal = time.time()
-
         Gloss = G_train_func(rtest,inp,Ztest)
 
         ########################################
@@ -363,7 +372,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
 
         
         ##faketest
-        if USEDATA == False:
+        if use_data == False:
             Otrue = []
             Ztrue = []
             true_fail = 0
@@ -374,7 +383,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
                 wtest2 = W_test(ztest2)
                 
                 rates = [SSsolve.solve_dynamics(wtest2[0],inp[i],r0 = rz,
-                                                 k = coe_value, n = exp_value,io_type = IOTYPE)
+                                                 k = coe_value, n = exp_value,io_type = IO_type)
                          for i in range(len(inp))]
                 
                 if np.all(np.isfinite(rates)):
@@ -389,11 +398,14 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
  
         else:
             true_fail = 0
-            
-        Dloss = D_train_func(rtest,true)
+
+        Tfinal = time.time()
 
         ###################################
         ###################################
+
+        Gloss = G_train_func(rtest,inp,Ztest)
+        Dloss = D_train_func(rtest,true)
         
         log("{},{},{},{},{},{},{},{}".format(k,Gloss,Dloss,D_acc(rtest,true),Tfinal - TT,time.time() - Tfinal,model_fail,true_fail))
 
@@ -402,7 +414,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
             
         Dparam = lasagne.layers.get_all_layers(DIS_red_r_true)[-1]
         
-        if len(LAYERS) == 0:
+        if len(layers) == 0:
             DW = Dparam.W.get_value()
             DB = Dparam.b.get_value()
         else:
@@ -414,7 +426,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         logstrD = "{},{},{},{},{},{},{},{}".format(Dmean[0],Dmean[1],Dmean[2],Dmean[3],Dmean[4],Dmean[5],Dmean[6],Dmean[7])
         logstrW = "{},{},{},{},{},{},{},{},{}".format(DW[0,0],DW[1,0],DW[2,0],DW[3,0],DW[4,0],DW[5,0],DW[6,0],DW[7,0],DB[0])
         
-        log(logstrG + "," + logstrD + "," + logstrW,F = "D_parameters_{}.log".format(len(LAYERS)),PRINT = False) 
+        log(logstrG + "," + logstrD + "," + logstrW,F = "D_parameters_{}.log".format(tag),PRINT = False) 
         
         if k%1 == 0:
             jj = J.get_value()
@@ -437,16 +449,17 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
                                                                      allpar[10],
                                                                      allpar[11])
 
-            log(string,F = "./parameters_{}.log".format(len(LAYERS)),PRINT = False)
+            log(string,F = "./parameters_{}.log".format(tag),PRINT = False)
 
 if __name__ == "__main__":
+
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         'datapath', default='training_data_TCs_Ne102.mat', nargs='?',
         help='Path to MATLAB data file (default: %(default)s)')
     parser.add_argument(
-        '--iterations', default=10000, type=int,
+        '--iterations', default=1000, type=int,
         help='Number of iterations (default: %(default)s)')
     parser.add_argument(
         '--seed', default=0, type=int,
@@ -457,5 +470,24 @@ if __name__ == "__main__":
     parser.add_argument(
         '--disc-learn-rate', default=0.01, type=float,
         help='Learning rate for discriminator (default: %(default)s)')
+    parser.add_argument(
+        '--use-data', default=False, action='store_true',
+        help='Use data (True) or generate our own TC samples (False) (default: %(default)s)')
+    parser.add_argument(
+        '--IO_type', default="asym_tanh",
+        help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')
+    parser.add_argument(
+        '--loss', default="CE",
+        help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')
+    parser.add_argument(
+        '--layers', default=[],
+        help='Learning rate for discriminator (default: %(default)s)')
+    parser.add_argument(
+        '--n_samples', default=10,
+        help='Learning rate for discriminator (default: %(default)s)')
+
+
     ns = parser.parse_args()
+    ns.layers = eval(str(ns.layers))
+
     main(**vars(ns))

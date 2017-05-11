@@ -18,9 +18,9 @@ import time
 import stimuli
 
 USEDATA = False
-LAYERS = []
+LAYERS = [128]
 
-def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.001):
+def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.001):
 
     np.random.seed(seed)
 
@@ -411,21 +411,25 @@ def main(datapath, iterations, seed=0, gen_learn_rate=0.001, disc_learn_rate=0.0
         
         log("{},{},{},{},{},{},{},{}".format(k,Gloss,Dloss,D_acc(rtest,true),Tfinal - TT,time.time() - Tfinal,model_fail,true_fail))
 
-        if len(LAYERS) == 0:
-            GZmean = get_reduced(rtest).mean(axis = 0)
-            Dmean = true.mean(axis = 0)
-
-            Dparam = lasagne.layers.get_all_layers(DIS_red_r_true)[-1]
+        GZmean = get_reduced(rtest).mean(axis = 0)
+        Dmean = true.mean(axis = 0)
             
+        Dparam = lasagne.layers.get_all_layers(DIS_red_r_true)[-1]
+        
+        if len(LAYERS) == 0:
             DW = Dparam.W.get_value()
             DB = Dparam.b.get_value()
+        else:
+            DW = np.ones((8,1))
+            DB = [0.]
 
-            logstrG = "{},{},{},{},{},{},{},{}".format(GZmean[0],GZmean[1],GZmean[2],GZmean[3],GZmean[4],GZmean[5],GZmean[6],GZmean[7])
-            logstrD = "{},{},{},{},{},{},{},{}".format(Dmean[0],Dmean[1],Dmean[2],Dmean[3],Dmean[4],Dmean[5],Dmean[6],Dmean[7])
-            logstrW = "{},{},{},{},{},{},{},{},{}".format(DW[0,0],DW[1,0],DW[2,0],DW[3,0],DW[4,0],DW[5,0],DW[6,0],DW[7,0],DB[0])
-
-            log(logstrG + "," + logstrD + "," + logstrW,F = "D_parameters_{}.log".format(len(LAYERS)),PRINT = False) 
-
+            
+        logstrG = "{},{},{},{},{},{},{},{}".format(GZmean[0],GZmean[1],GZmean[2],GZmean[3],GZmean[4],GZmean[5],GZmean[6],GZmean[7])
+        logstrD = "{},{},{},{},{},{},{},{}".format(Dmean[0],Dmean[1],Dmean[2],Dmean[3],Dmean[4],Dmean[5],Dmean[6],Dmean[7])
+        logstrW = "{},{},{},{},{},{},{},{},{}".format(DW[0,0],DW[1,0],DW[2,0],DW[3,0],DW[4,0],DW[5,0],DW[6,0],DW[7,0],DB[0])
+        
+        log(logstrG + "," + logstrD + "," + logstrW,F = "D_parameters_{}.log".format(len(LAYERS)),PRINT = False) 
+        
         if k%1 == 0:
             jj = J.get_value()
             dd = D.get_value()

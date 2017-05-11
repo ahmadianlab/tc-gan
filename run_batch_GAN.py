@@ -19,7 +19,7 @@ import stimuli
 
 USEDATA = False
 LAYERS = [128]
-IOTYPE = "asym_linear"
+IOTYPE = "asym_tanh"
 
 def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.001):
 
@@ -197,10 +197,13 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         WW = W(Ztest)
                
         rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IOTYPE) for b in inp] for z in WW])
+        rr1_test = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N))) for b in inp] for z in WW])
+
+        print(np.max(np.abs(rr1 - rr1_test)))
 
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
-        dd = 0.001
+        dd = 0.0001
 
         J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
         #D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
@@ -219,7 +222,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         DRa = (rr2 - rr1)/dd
         DRp = DR[0][:,:,:,0,0]
 
-        print(np.max(np.abs(DRa-DRp))/np.max(np.abs(DRa)))
+        print(np.max(np.abs(DRa-DRp)))
  
         exit()
 

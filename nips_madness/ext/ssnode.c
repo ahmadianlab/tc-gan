@@ -2,6 +2,7 @@
 
 double dot(int dim, double x[restrict dim], double y[restrict dim]) {
   double result = 0;
+#pragma omp simd reduction(+:result)
   for (int i = 0; i < dim; ++i){
     result += x[i] * y[i];
   }

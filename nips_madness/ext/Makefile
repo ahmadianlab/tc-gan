@@ -1,4 +1,4 @@
-CFLAGS ?= -std=c99 -fPIC -Wall -O3
+CFLAGS ?= -fPIC -Wall -O3
 
 libssnode.so: ssnode.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -shared $< -o $@
+	$(CC) -std=c99 -fopenmp $(CFLAGS) $(CPPFLAGS) -shared $< -o $@

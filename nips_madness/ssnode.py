@@ -63,10 +63,19 @@ def io_plin(v, volt_max, k, n):
     return numpy.where(v <= volt_max, rate, rate + linear)
 
 
+def io_atanh(v, r0, r1, v0, v1, k, n):
+    v_pow = numpy.clip(v, 0, v0)
+    r_pow = k * (v_pow**n)
+    r_tanh = r0 + (r1 - r0) * numpy.tanh(
+        n * r0 / (r1 - r0) * (v - v0) / v0
+    )
+    return numpy.where(v <= v0, r_pow, r_tanh)
+
+
 def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
                    max_iter=100000, atol=1e-10,
                    rate_soft_bound=100, rate_hard_bound=200,
-                   io_type='asyn_linear'):
+                   io_type='asym_linear'):
     """
     Solve ODE for the SSN until it converges to a fixed point.
 
@@ -91,10 +100,10 @@ def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
     rate_soft_bound : float
         The I/O function is power-law below this point.
     rate_hard_bound : float
-        The true maximum rate.  Used only when ``io_type='asyn_tanh'``.
-    io_type : {'asyn_linear', 'asyn_tanh'}
-        If ``'asyn_linear'`` (default), the I/O function is linear after
-        `rate_soft_bound`.  If ``'asyn_tanh'``, the I/O function is
+        The true maximum rate.  Used only when ``io_type='asym_tanh'``.
+    io_type : {'asym_linear', 'asym_tanh'}
+        If ``'asym_linear'`` (default), the I/O function is linear after
+        `rate_soft_bound`.  If ``'asym_tanh'``, the I/O function is
         tanh after `rate_soft_bound` and the rate is bounded by
         `rate_hard_bound`.
 
@@ -105,16 +114,26 @@ def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
 
     """
 
+    v0 = rate_to_volt(rate_soft_bound, k, n)
+    v1 = rate_to_volt(rate_hard_bound, k, n)
+    if io_type == 'asym_linear':
+        def io_fun(v):
+            return io_plin(v, v0, k, n)
+    elif io_type == 'asym_tanh':
+        def io_fun(v):
+            return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, v1, k, n)
+    else:
+        raise ValueError("Unknown I/O type: {}".format(io_type))
+
     dt = .001
 
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)
 
     rr = r0
-    volt_max = rate_to_volt(rate_soft_bound, k, n)
 
     for _ in range(max_iter):
-        dr = (- rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
+        dr = (- rr + io_fun(numpy.dot(W, rr) + ext))/tau
         rr = rr + dt * dr
         if numpy.abs(dr).max() < atol:
             break
@@ -140,3 +159,21 @@ def all_inputs(N, bandwidths, **kwds):
     Return an array of inputs in the shape ``(N, len(bandwidths))``.
     """
     return numpy.array([single_input(N, b, **kwds) for b in bandwidths])
+
+
+def plot_io_funs():
+    from matplotlib import pyplot
+
+    fig, ax = pyplot.subplots()
+    x = numpy.linspace(-1, 100)
+    k = 0.04
+    n = 2.2
+    r0 = 100
+    r1 = 200
+    v0 = rate_to_volt(r0, k, n)
+    v1 = rate_to_volt(r1, k, n)
+    ax.plot(x, k * (thlin(x)**n), label='power-law')
+    ax.plot(x, io_plin(x, v0, k, n), label='asym_linear')
+    ax.plot(x, io_atanh(x, r0, r1, v0, v1, k, n), label='asym_tanh')
+
+    ax.legend(loc='best')

@@ -67,7 +67,7 @@ def asserting_div(num, divisor, desired_reminder):
     return got
 
 
-def test_tuning_curve():
+def test_tuning_curve_asym_linear(io_type='asym_linear'):
     conn_param = scipy.io.loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
     model_param = scipy.io.loadmat('training_data_TCs_Ne51-Zs.mat')
 
@@ -90,7 +90,8 @@ def test_tuning_curve():
     BAND_IN = stimuli.input(bandwidths, X, smoothness, contrast)
 
     fps = [solve_dynamics(W, ext, k=coe_value, n=exp_value,
-                          r0=numpy.zeros(2 * n_sites))
+                          r0=numpy.zeros(2 * n_sites),
+                          io_type=io_type)
            for ext in BAND_IN]
     E_Tuning_actual = numpy.array([x[i_beg:i_end] for x in fps]).T
 
@@ -103,6 +104,9 @@ def test_tuning_curve():
 
     numpy.testing.assert_allclose(E_Tuning_actual, E_Tuning_desired, rtol=0.1)
 
+
+def test_tuning_curve_asym_tanh():
+    test_tuning_curve_asym_linear(io_type='asym_tanh')
 
 
 def test_gradients():
@@ -246,5 +250,6 @@ def test_gradients():
 
 if __name__ == '__main__':
     test_weight()
-    test_tuning_curve()
+    test_tuning_curve_asym_linear()
+    test_tuning_curve_asym_tanh()
     test_gradients()

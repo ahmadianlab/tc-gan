@@ -9,6 +9,8 @@ import numpy
 import scipy.optimize
 import scipy.sparse
 
+from .clib import libssnode, double_ptr
+
 
 def make_neu_vec(N, E, I):
     """
@@ -72,10 +74,11 @@ def io_atanh(v, r0, r1, v0, v1, k, n):
     return numpy.where(v <= v0, r_pow, r_tanh)
 
 
-def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
-                   max_iter=100000, atol=1e-2,
-                   rate_soft_bound=100, rate_hard_bound=200,
-                   io_type='asym_linear'):
+def solve_dynamics(
+        W, ext, k, n, r0, tau=[.016, .002],
+        max_iter=100000, atol=1e-2, dt=.001,
+        rate_soft_bound=100, rate_hard_bound=200,
+        io_type='asym_linear'):
     """
     Solve ODE for the SSN until it converges to a fixed point.
 
@@ -91,7 +94,7 @@ def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
         Power of the SSN nonlinearity.
     r0 : array of shape (2*N,)
         The initial condition in terms of rate.
-    tau : array of shape (2,) or (2*N,)
+    tau : array of shape (2,)
         The time constants of the neurons.
     max_iter : int
         The hard bound to the number of iteration of the Euler method.
@@ -113,7 +116,41 @@ def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
         A fixed point or something else if the ODE is failed to converge.
 
     """
+    if io_type not in ('asym_linear', 'asym_tanh'):
+        raise ValueError("Unknown I/O type: {}".format(io_type))
 
+    W = numpy.asarray(W, dtype='double')
+    ext = numpy.asarray(ext, dtype='double')
+    r0 = numpy.array(r0, dtype='double')  # copied, as it will be modified
+    r1 = numpy.empty_like(r0)
+    tau_E, tau_I = tau
+
+    N = W.shape[0] // 2
+    assert 2 * N == W.shape[0] == W.shape[1]
+    assert W.ndim == 2
+    assert (2 * N,) == r0.shape == ext.shape
+
+    error = getattr(libssnode, 'solve_dynamics_{}'.format(io_type))(
+        N,
+        W.ctypes.data_as(double_ptr),
+        ext.ctypes.data_as(double_ptr),
+        float(k), float(n),
+        r0.ctypes.data_as(double_ptr),
+        r1.ctypes.data_as(double_ptr),
+        tau_E, tau_I,
+        dt, max_iter, atol,
+        rate_soft_bound, rate_hard_bound,
+    )
+    if error == 1:
+        print("SSN Convergence Failed")
+    return r0
+
+
+def solve_dynamics_python(
+        W, ext, k, n, r0, tau=[.016, .002],
+        max_iter=100000, atol=1e-2, dt=.001,
+        rate_soft_bound=100, rate_hard_bound=200,
+        io_type='asym_linear'):
     v0 = rate_to_volt(rate_soft_bound, k, n)
     v1 = rate_to_volt(rate_hard_bound, k, n)
     if io_type == 'asym_linear':
@@ -124,8 +161,6 @@ def solve_dynamics(W, ext, k, n, r0, tau=[.016, .002],
             return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, v1, k, n)
     else:
         raise ValueError("Unknown I/O type: {}".format(io_type))
-
-    dt = .001
 
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)

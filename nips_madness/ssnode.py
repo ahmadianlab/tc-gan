@@ -69,10 +69,10 @@ def io_plin(v, volt_max, k, n):
     return numpy.where(v <= volt_max, rate, rate + linear)
 
 
-def solve_dynamics(t, W, ext, k, n, r0=None, tau=[.01, .001],
+def solve_dynamics(t, W, ext, k, n, r0=None, tau=[.016, .002],
                    rate_max=100., **kwds):
 
-    dt = .0001
+    dt = .001
 
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)
@@ -83,13 +83,14 @@ def solve_dynamics(t, W, ext, k, n, r0=None, tau=[.01, .001],
     dr = ( - rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
 
     nn = 0
+    lim = 100000
 
-    while numpy.sum(numpy.abs(dr)) > 10**-20 and nn < 1000:
+    while numpy.sum(numpy.abs(dr)) > 10**-5 and nn < lim:
         nn += 1
         rr = rr + dt * dr
         dr = ( - rr + io_plin(numpy.dot(W, rr) + ext, volt_max, k, n))/tau
 
-    if nn == 0:
+    if nn == lim:
         print("Convergence Failed")
 
     return rr

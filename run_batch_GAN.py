@@ -308,10 +308,10 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
 
     inp = BAND_IN
 
-    def log(a,F = "./SSNGAN_log_{}.log".format(tag),PRINT = True):
+    def log(a,F = "SSNGAN_log_{}.log".format(tag),PRINT = True):
         if PRINT:
             print(a)
-        f = open(F,"a")
+        f = open("./logfiles/" + F,"a")
         f.write(str(a) + "\n")
         f.close()
 

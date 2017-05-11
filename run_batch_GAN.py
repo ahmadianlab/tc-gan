@@ -19,6 +19,7 @@ import stimuli
 
 USEDATA = False
 LAYERS = [128]
+io_type = "asym_tanh"
 
 def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.001):
 
@@ -33,6 +34,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
     contrast = mat['Modelparams'][0, 0]['c'][0, 0]
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
+    n_sites = 10
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
@@ -78,7 +80,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
 
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
-    nz = theano.shared(10,name = 'n_samples')
+    nz = theano.shared(1,name = 'n_samples')
     nb = theano.shared(data.shape[1],name = 'n_stim')
 
     #array that computes the positions
@@ -136,14 +138,13 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
     ivec = T.matrix("ivec","float32")
 
     #DrDth tensor expressions
-    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N)
-    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N)
-    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N)
+    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N,io_type)
+    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N,io_type)
+    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N,io_type)
 
     dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
-
 
     #run gradient descent on W (minimize W*W)
     testDW = False
@@ -185,7 +186,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
 
     #do gradient descent on R
-    DRtest = False
+    DRtest = True
     if DRtest:
         print("starting DR")
     #I want to test this by adjusting the parameters to give some specified output
@@ -197,27 +198,10 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.001, disc_learn_rate=0.0
                
         rr1 = np.array([[SSsolve.solve_dynamics(1.,z,b,r0 = np.zeros((2*N)),k = coe_value,n = exp_value) for b in inp] for z in WW])
 
+        print("Computing symbolic gradient")
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
-
-        #MANUAL GRADIENT
-        r = rr1[0,0]
-        w = WW[0]
-        i = inp[0]
-
-        phi = exp_value * coe_value * np.power(np.clip(np.dot(w,r) + i,0,10000),exp_value - 1.)
-
-        JACi = np.linalg.inv(np.identity(2*N) - np.reshape(phi,[-1,1])*w)
-
-        pdw = np.reshape(phi,[-1,1,1,1])*(DWj_slow_f(Ztest)[0])
-        
-        dr = np.array([[np.dot(JACi,(pdw*np.reshape(r,[1,-1,1,1])).sum(axis = 1)[:,i,j]) for j in range(2)] for i in range(2)])
-
-        print(dr.mean())
-        print(DR[0][0,0].mean())
-
-        ###### 
                
-        dd = 0.00001
+        dd = 0.0001
 
         J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
         #D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))

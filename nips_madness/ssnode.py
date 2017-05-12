@@ -5,11 +5,21 @@ try:
 except NameError:
     pass
 
+from contextlib import contextmanager
+import time
+
 import numpy
 import scipy.optimize
-import scipy.sparse
 
 from .clib import libssnode, double_ptr
+
+
+@contextmanager
+def print_timing(header=''):
+    pre = time.time()
+    yield
+    t = time.time() - pre
+    print(header, t)
 
 
 def make_neu_vec(N, E, I):
@@ -30,12 +40,12 @@ def thlin(x):
     return x * (x > 0)
 
 
-def fixed_point_equation(r, ext, W, k, n):
-    return -r + k * thlin(numpy.dot(W, r) + ext)**n
+def fixed_point_equation(r, ext, W, k, n, io_fun):
+    return -r + io_fun(numpy.dot(W, r) + ext)
 
 
-def drdt(r, _t, ext, W, k, n, tau):
-    return fixed_point_equation(r, ext, W, k, n) / tau
+def drdt(r, _t, ext, W, k, n, io_fun, tau):
+    return fixed_point_equation(r, ext, W, k, n, io_fun) / tau
 
 
 def fixed_point(W, ext, r0=None, k=0.04, n=2, **kwds):
@@ -186,6 +196,28 @@ def solve_dynamics_python(
     return rr
 
 
+def odeint(t, W, ext, r0, k, n, tau,
+           rate_soft_bound=100, rate_hard_bound=200, io_type='asym_tanh',
+           **kwds):
+    v0 = rate_to_volt(rate_soft_bound, k, n)
+    v1 = rate_to_volt(rate_hard_bound, k, n)
+    if io_type == 'asym_linear':
+        def io_fun(v):
+            return io_plin(v, v0, k, n)
+    elif io_type == 'asym_tanh':
+        def io_fun(v):
+            return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, v1, k, n)
+    elif io_type == 'asym_power':
+        def io_fun(v):
+            return io_power(v, k, n)
+    else:
+        raise ValueError("Unknown I/O type: {}".format(io_type))
+    N = W.shape[0] // 2
+    tau = any_to_neu_vec(N, tau)
+    args = (ext, W, k, n, io_fun, tau)
+    return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
+
+
 def sigmoid(x):
     return 1 / (1 + numpy.exp(-x))
 
@@ -220,3 +252,64 @@ def plot_io_funs():
     ax.plot(x, io_atanh(x, r0, r1, v0, v1, k, n), label='asym_tanh')
 
     ax.legend(loc='best')
+
+
+def plot_trajectory(
+        N=102,
+        J=numpy.array([[.0957, .0638], [.1197, .0479]]),
+        D=numpy.array([[.7660, .5106], [.9575, .3830]]),
+        S=numpy.array([[.6667, .2], [1.333, .2]]) / 8,
+        # io_type='asym_linear', seed=97,
+        io_type='asym_tanh', seed=65,
+        bandwidth=1, smoothness=0.25/8, contrast=20,
+        fp_solver_kwargs={},
+        tmax=3, tnum=300, plot_fp=False):
+    import stimuli
+    from .tests.test_dynamics import numeric_w
+    from matplotlib import pyplot
+
+    np = numpy
+    J = np.array([[.0957, .0638], [.1197, .0479]])
+    D = np.array([[.7660, .5106], [.9575, .3830]])
+    S = np.array([[.6667, .2], [1.333, .2]]) / 8
+
+    if io_type == 'asym_linear':
+        # Boost inhibition if io_type=='asym_linear'; otherwise the
+        # activity diverges.
+        J[:, 1] *= 1.7
+
+    rs = numpy.random.RandomState(seed)
+    Z = rs.rand(1, 2*N, 2*N)
+    W, = numeric_w(Z, J, D, S)
+    X = numpy.linspace(-0.5, 0.5, N)
+    ext, = stimuli.input([bandwidth], X, smoothness, contrast)
+
+    solver_kwargs = dict(
+        W=W,
+        ext=ext,
+        r0=numpy.zeros(W.shape[0]),
+        k=0.01, n=2.2, tau=[.016, .002],
+        io_type=io_type,
+    )
+
+    t = numpy.linspace(0, tmax, tnum)
+    with print_timing('Runtime (odeint):'):
+        r = odeint(t, **solver_kwargs)
+
+    if plot_fp:
+        with print_timing('Runtime (solve_dynamics):'):
+            fp = solve_dynamics(**dict(solver_kwargs, **fp_solver_kwargs))
+
+    fig, (ax1, ax2) = pyplot.subplots(nrows=2, sharex=True)
+    ax1.plot(t, r[:, :N], color='C0', linewidth=0.5)
+    ax1.set_ylabel('Excitatory neurons')
+
+    ax2.plot(t, r[:, N:], color='C1', linewidth=0.5)
+    ax2.set_ylabel('Inhibitory neurons')
+    ax2.set_xlabel('Time')
+
+    if plot_fp:
+        ax1.plot(tmax, [fp[:N]], 'o', color='C0')
+        ax2.plot(tmax, [fp[N:]], 'o', color='C1')
+
+    return locals()

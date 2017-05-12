@@ -81,11 +81,11 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     Sp2 = T.exp(S2)
 
     #these are the parammeters to be fit
-    dp = -.5
+    dp = .1
 
-    J = theano.shared(J2.get_value() + dp*np.array([[1.,1.],[1.,1.]]),name = "j")
-    D = theano.shared(D2.get_value() + dp*np.array([[1.,1.],[1.,1.]]),name = "d")
-    S = theano.shared(S2.get_value() + dp*np.array([[1.,1.],[1.,1.]]),name = "s")
+    J = theano.shared(J2.get_value() + dp*np.random.normal(0,1,(2,2)),name = "j")
+    D = theano.shared(D2.get_value() + dp*np.random.normal(0,1,(2,2)),name = "d")
+    S = theano.shared(S2.get_value() + dp*np.random.normal(0,1,(2,2)),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
@@ -168,6 +168,18 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
 
+    convtest = True
+    if convtest:
+        zt = np.random.rand(1,2*N,2*N)
+        wt = W_test(zt)[0]
+        rz = np.zeros((2*N))
+
+        for c in [1.,2.,4.,8.,16.]:
+            r  = SSsolve.fixed_point(wt,c*BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+        
+            print(np.max(r.x))
+        exit()
+
     timetest = False
     if timetest:
         times = []
@@ -178,10 +190,10 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
             rz = np.zeros((2*N))
 
             TT1 = time.time()
-            r,e  = SSsolve.solve_dynamics(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+            r  = SSsolve.fixed_point(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
 
-            total = time.time()-TT1
-            print(total,e)
+            total = time.time() - TT1
+            print(total,r.success)
             times.append(total)
 
 
@@ -384,12 +396,12 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         while len(Ftest) < NZ:
             ztest = np.random.rand(1,2*N,2*N) 
             wtest = W(ztest)
-            rates = [SSsolve.solve_dynamics(wtest[0],inp[i],r0 = rz,
+            rates = [SSsolve.fixed_point(wtest[0],inp[i],r0 = rz,
                                              k = coe_value, n = exp_value,io_type = IO_type)
                      for i in range(len(inp))]
 
-            error = [True for s in rates]
-            rates = [s for s in rates]
+            error = [s.success for s in rates]
+            rates = [s.x for s in rates]
 
             if np.all(error):
                 Ftest.append(rates)
@@ -426,12 +438,12 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                 
                 wtest2 = W_test(ztest2)
                 
-                rates = [SSsolve.solve_dynamics(wtest2[0],inp[i],r0 = rz,
+                rates = [SSsolve.fixed_point(wtest2[0],inp[i],r0 = rz,
                                                  k = coe_value, n = exp_value,io_type = IO_type)
                          for i in range(len(inp))]
 
-                error = [True for s in rates]
-                rates = [s for s in rates]
+                error = [s.success for s in rates]
+                rates = [s.x for s in rates]
                 
                 if np.all(error):
                     Otrue.append(rates)

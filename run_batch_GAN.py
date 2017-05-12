@@ -18,20 +18,32 @@ import time
 import stimuli
 
 
-def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01, loss = "CE", use_data = False, IO_type = "asym_tanh", layers = [],n_samples = 10,debug = True):
+def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01, loss = "CE", use_data = False, IO_type = "asym_tanh", layers = [],n_samples = 10,debug = True,rate_cost = 0):
 
     ##Make the tag for the files
+    #tag whether or not we use data
     if use_data:
         tag = "data_"
     else:
         tag = "generated_"
 
+    #tag the IO and loss
     tag = tag + IO_type + "_" + loss
 
+    #tag the layers
     for l in layers:
         tag = tag + "_" + str(l)
+
+    #tag the rate cost
+    if rate_cost > 0:
+        tag = tag + "_" + str(rate_cost)
+
+    print(tag)
+    #if debug mode, throw that all away
     if debug:
         tag = "DEBUG"
+    ############################
+
 
     np.random.seed(seed)
 
@@ -156,21 +168,24 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
 
-    timetest = True
+    timetest = False
     if timetest:
         times = []
+        EE = 0
         for k in range(100):
             zt = np.random.rand(1,2*N,2*N)
             wt = W_test(zt)[0]
             rz = np.zeros((2*N))
 
             TT1 = time.time()
-            SSsolve.solve_dynamics(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+            r,e  = SSsolve.solve_dynamics(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
 
             total = time.time()-TT1
-            print(total)
+            print(total,e)
             times.append(total)
 
+
+        print("Errors {}".format(np.sum(EE)))
         print("MAX {}".format(np.max(times)))
         print("MIN {}".format(np.min(times)))
         print("MEAN {}".format(np.mean(times)))
@@ -185,7 +200,8 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],coe_value,exp_value,np.zeros((2*N)),io_type = IO_type).astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],coe_value,exp_value,np.zeros((2*N)),io_type = IO_type)[0].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+
         print(ssR.mean())
         print(wtest.mean())
         print(DWj(testz).mean())
@@ -228,7 +244,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         
         WW = W(Ztest)
                
-        rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IO_type) for b in inp] for z in WW])
+        rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IO_type)[0] for b in inp] for z in WW])
 
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
@@ -240,7 +256,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
 
         WW = W(Ztest)
 
-        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],coe_value,exp_value,rr1[z,b],io_type = IO_type) for b in range(len(inp))] for z in range(len(WW))])
+        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],coe_value,exp_value,rr1[z,b],io_type = IO_type)[0] for b in range(len(inp))] for z in range(len(WW))])
 
         print(rr2.max())
         print(rr2.min())
@@ -297,6 +313,8 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         print("Invalid loss specified")
         exit()
 
+    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(rvec - 100.).sum()
+
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), disc_learn_rate)#discriminator training function
 
@@ -305,7 +323,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     fake_loss = theano.function([rvec],fake_loss_exp,allow_input_downcast = True)
 
     #to get the grads w.r.t. the generators parameters we need to do a jacobian 
-    fake_dis_grad = T.jacobian(T.flatten(fake_loss_exp),rvec) #gradient of generator loss w.r.t rates
+    fake_dis_grad = T.jacobian(T.flatten(fake_loss_exp_train),rvec) #gradient of generator loss w.r.t rates
     fake_dis_grad = T.reshape(fake_dis_grad,[NZ,NB,2*N])
 
     t_grad = theano.function([rvec],fake_dis_grad,allow_input_downcast = True)#gradient function
@@ -371,7 +389,10 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                                              k = coe_value, n = exp_value,io_type = IO_type)
                      for i in range(len(inp))]
 
-            if np.all(np.isfinite(rates)):
+            error = [bool(1-s[1]) for s in rates]
+            rates = [s[0] for s in rates]
+
+            if np.all(error):
                 Ftest.append(rates)
                 Ztest.append(ztest[0])
             else:
@@ -409,6 +430,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                 rates = [SSsolve.solve_dynamics(wtest2[0],inp[i],r0 = rz,
                                                  k = coe_value, n = exp_value,io_type = IO_type)
                          for i in range(len(inp))]
+
+                error = [bool(1 - s[1]) for s in rates]
+                rates = [s[0] for s in rates]
                 
                 if np.all(np.isfinite(rates)):
                     Otrue.append(rates)
@@ -508,13 +532,17 @@ if __name__ == "__main__":
         help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')
     parser.add_argument(
         '--layers', default=[],
-        help='Learning rate for discriminator (default: %(default)s)')
+        help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
         '--n_samples', default=10,
-        help='Learning rate for discriminator (default: %(default)s)')
+        help='Number of samples to draw from G each step (default: %(default)s)')
+    parser.add_argument(
+        '--rate_cost', default=0, type=float,
+        help='The cost of having the rate be large (default: %(default)s)')
 
 
     ns = parser.parse_args()
     ns.layers = eval(str(ns.layers))
+    ns.n_samples = eval(str(ns.n_samples))
 
     main(**vars(ns))

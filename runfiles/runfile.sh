@@ -1,9 +1,10 @@
 #!/bin/bash
 
-qsub -q generic ./runfiles/runfile_1.sh
-qsub -q generic ./runfiles/runfile_2.sh
-qsub -q generic ./runfiles/runfile_3.sh
-
-qsub -q generic ./runfiles/runfile_4.sh
-qsub -q generic ./runfiles/runfile_5.sh
-qsub -q generic ./runfiles/runfile_6.sh
+qsub -q generic -v loss="CE",layer="[]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh
+qsub -q generic -v loss="CE",layer="[128]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh
+qsub -q generic -v loss="CE",layer="[128,128]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh
+qsub -q generic -v loss="CE",layer="[128,128,128]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh
+qsub -q generic -v loss="LS",layer="[]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh
+qsub -q generic -v loss="LS",layer="[128]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh
+qsub -q generic -v loss="LS",layer="[128,128]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh
+qsub -q generic -v loss="LS",layer="[128,128,128]",nsam="20",io="asym_linear",rcost="100." ./runfiles/runfile_arg.sh

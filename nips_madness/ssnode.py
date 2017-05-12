@@ -90,7 +90,7 @@ def io_atanh(v, r0, r1, v0, k, n):
 
 def solve_dynamics(
         W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=100000, atol=1e-10, dt=.001,
+        max_iter=10000, atol=1e-10, dt=.001,
         rate_soft_bound=100, rate_hard_bound=200,
         io_type='asym_linear'):
     """
@@ -155,9 +155,7 @@ def solve_dynamics(
         dt, max_iter, atol,
         rate_soft_bound, rate_hard_bound,
     )
-    if error == 1:
-        print("SSN Convergence Failed")
-    return r0
+    return r0,error
 
 
 def make_io_fun(k, n,

@@ -79,7 +79,7 @@ def io_power(v, k, n):
     return rate
 
 
-def io_atanh(v, r0, r1, v0, v1, k, n):
+def io_atanh(v, r0, r1, v0, k, n):
     v_pow = numpy.clip(v, 0, v0)
     r_pow = k * (v_pow**n)
     r_tanh = r0 + (r1 - r0) * numpy.tanh(
@@ -164,13 +164,12 @@ def make_io_fun(k, n,
                 rate_soft_bound=100, rate_hard_bound=200,
                 io_type='asym_tanh'):
     v0 = rate_to_volt(rate_soft_bound, k, n)
-    v1 = rate_to_volt(rate_hard_bound, k, n)
     if io_type == 'asym_linear':
         def io_fun(v):
             return io_alin(v, v0, k, n)
     elif io_type == 'asym_tanh':
         def io_fun(v):
-            return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, v1, k, n)
+            return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, k, n)
     elif io_type == 'asym_power':
         def io_fun(v):
             return io_power(v, k, n)
@@ -208,24 +207,6 @@ def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
     tau = any_to_neu_vec(N, tau)
     args = (ext, W, k, n, io_fun, tau)
     return scipy.integrate.odeint(drdt, r0, t, args, **odeint_kwargs)
-
-
-def sigmoid(x):
-    return 1 / (1 + numpy.exp(-x))
-
-
-def single_input(N, bandwidth, smoothness=0.01):
-    fs = numpy.linspace(-0.5, 0.5, N)
-    x = bandwidth / 2 + fs
-    y = bandwidth / 2 - fs
-    return sigmoid(x / smoothness) * sigmoid(y / smoothness)
-
-
-def all_inputs(N, bandwidths, **kwds):
-    """
-    Return an array of inputs in the shape ``(N, len(bandwidths))``.
-    """
-    return numpy.array([single_input(N, b, **kwds) for b in bandwidths])
 
 
 def plot_io_funs():

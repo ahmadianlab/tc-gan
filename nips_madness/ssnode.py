@@ -96,6 +96,9 @@ def solve_dynamics(
     """
     Solve ODE for the SSN until it converges to a fixed point.
 
+    Note: if ``solver='euler'``, it may be better to use ``atol=1e-10``
+    and ``dt=.001``.
+
     Parameters
     ----------
     W : array of shape (2*N, 2*N)
@@ -113,7 +116,11 @@ def solve_dynamics(
     max_iter : int
         The hard bound to the number of iteration of the Euler method.
     atol : float
-        Absolute tolerance to the each component of the derivative.
+        Absolute tolerance to the change in rate.
+        If ``solver='gsl'``, the error is measured in terms of the
+        component-wise difference between the current rate and 0.1
+        seconds past rate.
+        If ``solver='euler'``, `dt` is used instead of 0.1.
     rate_soft_bound : float
         The I/O function is power-law below this point.
     rate_hard_bound : float
@@ -123,6 +130,12 @@ def solve_dynamics(
         `rate_soft_bound`.  If ``'asym_tanh'``, the I/O function is
         tanh after `rate_soft_bound` and the rate is bounded by
         `rate_hard_bound`.
+    solver : {'gsl', 'euler'}
+        ODE solver to be used.
+        gsl uses "msadams" solver implemented in the GNU Scientific
+        Library (A variable-coefficient linear multistep Adams
+        method).
+        euler is the hand-coded C implementation.
 
     Returns
     -------
@@ -132,6 +145,8 @@ def solve_dynamics(
     """
     if io_type not in ('asym_linear', 'asym_tanh'):
         raise ValueError("Unknown I/O type: {}".format(io_type))
+    if solver not in ('gsl', 'euler'):
+        raise ValueError("Unknown solver: {}".format(solver))
 
     W = numpy.asarray(W, dtype='double')
     ext = numpy.asarray(ext, dtype='double')

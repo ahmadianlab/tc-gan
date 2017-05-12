@@ -11,9 +11,14 @@ def make_bench_solve_dynamics(
         fun=solve_dynamics,
         bandwidth=8, smoothness=0.25/8, contrast=20,
         N=51, k=0.01, n=2.2, io_type='asym_linear', **kwds):
-    J = np.array([[.0957, .0638], [.1197, .0479]])
-    D = np.array([[.7660, .5106], [.9575, .3830]])
-    S = np.array([[.6667, .2], [1.333, .2]]) / 8
+#    J = np.array([[.0957, .0638], [.1197, .0479]])
+#    D = np.array([[.7660, .5106], [.9575, .3830]])
+#    S = np.array([[.6667, .2], [1.333, .2]]) / 8
+
+    J = np.array([[0.0532592, 0.0396442],[0.0724497, 0.03049]])
+    D = np.array([[0.417151, 0.28704],[ 0.568, 0.236162]])
+    S = np.array([[0.0483366, 0.0149695 ],[ 0.126188, 0.0149596]])
+
     if io_type == 'asym_linear':
         # Boost inhibition if io_type=='asym_linear'; otherwise the
         # activity diverges.

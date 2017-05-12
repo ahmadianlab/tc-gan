@@ -166,6 +166,8 @@ def fixed_point(
         Library (A variable-coefficient linear multistep Adams
         method).
         euler is the hand-coded C implementation.
+    check : bool
+        Raise `FixedPointError` if convergence failed.  Default is `False`.
 
     Returns
     -------

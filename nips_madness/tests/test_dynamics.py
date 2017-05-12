@@ -91,6 +91,7 @@ def test_tuning_curve_asym_linear(io_type='asym_linear'):
 
     fps = [solve_dynamics(W, ext, k=coe_value, n=exp_value,
                           r0=numpy.zeros(2 * n_sites),
+                          check=True,
                           io_type=io_type)
            for ext in BAND_IN]
     E_Tuning_actual = numpy.array([x[i_beg:i_end] for x in fps]).T
@@ -232,8 +233,9 @@ def test_gradients():
     print("DW {}".format(DWd(ZZ)[0,0,0,0,0]))
 
     fps = np.array([[solve_dynamics(W(ZZ)[0], ext, k=coe_value, n=exp_value,
-                          r0=numpy.zeros(2 * n_sites))
-           for ext in BAND_IN]])
+                                    check=True,
+                                    r0=numpy.zeros(2 * n_sites))
+                     for ext in BAND_IN]])
 
     DR = dRdD(fps,BAND_IN,ZZ)
     print("DRRRRRR {}".format(DR.mean()))

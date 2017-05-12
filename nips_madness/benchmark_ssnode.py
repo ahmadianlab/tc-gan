@@ -49,9 +49,9 @@ def make_bench_solve_dynamics(
 
 def find_slow_seed(
         repeat=1, top=10,
-        # Bad seeds with: io_type='asym_tanh'
-        # seeds=[322, 357, 795, 218, 265, 97],
         # Bad seeds with: io_type='asym_linear'
+        # seeds=[322, 357, 795, 218, 265, 97],
+        # Bad seeds with: io_type='asym_tanh'
         seeds=[65, 521, 154, 340, 334, 813, 736, 530, 198, 284, 707][:5],
         # seeds=range(1000),
         param_type='true', N=102, **kwds):

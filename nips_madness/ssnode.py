@@ -14,6 +14,29 @@ import scipy.optimize
 from .clib import libssnode, double_ptr
 
 
+class FixedPointResult(object):
+
+    message = None
+
+    def __init__(self, x, error):
+        self.x = x
+        self.error = error
+
+    @property
+    def success(self):
+        return self.error == 0
+
+    def to_exception(self):
+        return FixedPointError(self.message, self)
+
+
+class FixedPointError(Exception):
+
+    def __init__(self, message, result):
+        super(FixedPointError, self).__init__(message)
+        self.result = result
+
+
 @contextmanager
 def print_timing(header=''):
     pre = time.time()
@@ -48,7 +71,7 @@ def drdt(r, _t, ext, W, k, n, io_fun, tau):
     return fixed_point_equation(r, ext, W, k, n, io_fun) / tau
 
 
-def fixed_point(W, ext, r0, k, n, root_kwargs={}, **kwds):
+def fixed_point_root(W, ext, r0, k, n, root_kwargs={}, **kwds):
     """
     Find the fixed point of the SSN and return `OptimizeResult` object.
 
@@ -88,13 +111,23 @@ def io_atanh(v, r0, r1, v0, k, n):
     return numpy.where(v <= v0, r_pow, r_tanh)
 
 
-def solve_dynamics(
+def solve_dynamics(*args, **kwds):
+    sol = fixed_point(*args, **kwds)
+    if not sol.success:
+        print(sol.success)
+    return sol.x
+
+
+def fixed_point(
         W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=10000, atol=1e-10, dt=.001,
+        max_iter=10000, atol=1e-8, dt=.0001,
         rate_soft_bound=100, rate_hard_bound=200,
-        io_type='asym_linear'):
+        io_type='asym_linear', solver='gsl', check=False):
     """
     Solve ODE for the SSN until it converges to a fixed point.
+
+    Note: if ``solver='euler'``, it may be better to use ``atol=1e-10``
+    and ``dt=.001``.
 
     Parameters
     ----------
@@ -113,7 +146,11 @@ def solve_dynamics(
     max_iter : int
         The hard bound to the number of iteration of the Euler method.
     atol : float
-        Absolute tolerance to the each component of the derivative.
+        Absolute tolerance to the change in rate.
+        If ``solver='gsl'``, the error is measured in terms of the
+        component-wise difference between the current rate and 0.1
+        seconds past rate.
+        If ``solver='euler'``, `dt` is used instead of 0.1.
     rate_soft_bound : float
         The I/O function is power-law below this point.
     rate_hard_bound : float
@@ -123,15 +160,33 @@ def solve_dynamics(
         `rate_soft_bound`.  If ``'asym_tanh'``, the I/O function is
         tanh after `rate_soft_bound` and the rate is bounded by
         `rate_hard_bound`.
+    solver : {'gsl', 'euler'}
+        ODE solver to be used.
+        gsl uses "msadams" solver implemented in the GNU Scientific
+        Library (A variable-coefficient linear multistep Adams
+        method).
+        euler is the hand-coded C implementation.
+    check : bool
+        Raise `FixedPointError` if convergence failed.  Default is `False`.
 
     Returns
     -------
-    r : array of shape (2*N,)
-        A fixed point or something else if the ODE is failed to converge.
+    sol : FixedPointResult
+        It is an object with the following attributes:
+
+        x : array of shape (2*N,)
+            A fixed point (or something else if the ODE is failed to
+            converge).
+        success : bool
+            Whether or not a fixed point is found.
+        message : str
+            Error/success message.
 
     """
     if io_type not in ('asym_linear', 'asym_tanh'):
         raise ValueError("Unknown I/O type: {}".format(io_type))
+    if solver not in ('gsl', 'euler'):
+        raise ValueError("Unknown solver: {}".format(solver))
 
     W = numpy.asarray(W, dtype='double')
     ext = numpy.asarray(ext, dtype='double')
@@ -144,7 +199,8 @@ def solve_dynamics(
     assert W.ndim == 2
     assert (2 * N,) == r0.shape == ext.shape
 
-    error = getattr(libssnode, 'solve_dynamics_{}'.format(io_type))(
+    error = getattr(libssnode,
+                    'solve_dynamics_{}_{}'.format(io_type, solver))(
         N,
         W.ctypes.data_as(double_ptr),
         ext.ctypes.data_as(double_ptr),
@@ -155,7 +211,18 @@ def solve_dynamics(
         dt, max_iter, atol,
         rate_soft_bound, rate_hard_bound,
     )
-    return r0,error
+    sol = FixedPointResult(r0, error)
+    if error == 0:
+        sol.message = "Converged"
+    elif error == 1:
+        sol.message = "SSN Convergence Failed"
+    elif error > 900:
+        sol.message = "GSL error {}".format(error - 1000)
+    else:
+        sol.message = "Unknown error: code={}".format(error)
+    if check and not sol.success:
+        raise sol.to_exception()
+    return sol
 
 
 def make_io_fun(k, n,
@@ -207,20 +274,15 @@ def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
     return scipy.integrate.odeint(drdt, r0, t, args, **odeint_kwargs)
 
 
-def plot_io_funs():
+def plot_io_funs(k=0.01, n=2.2, r0=100, r1=200, xmin=-1, xmax=150):
     from matplotlib import pyplot
 
     fig, ax = pyplot.subplots()
-    x = numpy.linspace(-1, 100)
-    k = 0.04
-    n = 2.2
-    r0 = 100
-    r1 = 200
+    x = numpy.linspace(xmin, xmax)
     v0 = rate_to_volt(r0, k, n)
-    v1 = rate_to_volt(r1, k, n)
     ax.plot(x, k * (thlin(x)**n), label='power-law')
     ax.plot(x, io_alin(x, v0, k, n), label='asym_linear')
-    ax.plot(x, io_atanh(x, r0, r1, v0, v1, k, n), label='asym_tanh')
+    ax.plot(x, io_atanh(x, r0, r1, v0, k, n), label='asym_tanh')
 
     ax.legend(loc='best')
 

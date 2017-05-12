@@ -134,6 +134,7 @@ def fixed_point(
         # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
         max_iter=10000, atol=1e-10, dt=.001, solver='euler',
         rate_soft_bound=100, rate_hard_bound=200,
+        rate_stop_at=numpy.inf,
         io_type='asym_tanh', check=False):
     """
     Solve ODE for the SSN until it converges to a fixed point.
@@ -211,6 +212,9 @@ def fixed_point(
     assert W.ndim == 2
     assert (2 * N,) == r0.shape == ext.shape
 
+    if io_type == 'asym_linear':
+        rate_hard_bound = rate_stop_at
+
     error = getattr(libssnode,
                     'solve_dynamics_{}_{}'.format(io_type, solver))(
         N,
@@ -225,9 +229,15 @@ def fixed_point(
     )
     sol = FixedPointResult(r0, error)
     if error == 0:
-        sol.message = "Converged"
+        if numpy.isfinite(r0).all():
+            sol.message = "Converged"
+        else:
+            sol.error = 1
+            sol.message = "Converged to non-finite value"
     elif error == 1:
         sol.message = "SSN Convergence Failed"
+    elif error == 2:
+        sol.message = "Reached to rate_stop_at"
     elif error > 900:
         sol.message = "GSL error {}".format(error - 1000)
     else:

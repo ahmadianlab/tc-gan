@@ -90,7 +90,7 @@ def io_atanh(v, r0, r1, v0, k, n):
 
 def solve_dynamics(
         W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=100000, atol=1e-10, dt=.001,
+        max_iter=100000, atol=1e-8, dt=.0001,
         rate_soft_bound=100, rate_hard_bound=200,
         io_type='asym_linear'):
     """
@@ -157,6 +157,8 @@ def solve_dynamics(
     )
     if error == 1:
         print("SSN Convergence Failed")
+    elif error != 0:
+        raise RuntimeError("Error from libssnode: code={}".format(error))
     return r0
 
 

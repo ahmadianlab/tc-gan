@@ -156,6 +156,28 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
 
+    timetest = True
+    if timetest:
+        times = []
+        for k in range(100):
+            zt = np.random.rand(1,2*N,2*N)
+            wt = W_test(zt)[0]
+            rz = np.zeros((2*N))
+
+            TT1 = time.time()
+            SSsolve.solve_dynamics(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+
+            total = time.time()-TT1
+            print(total)
+            times.append(total)
+
+        print("MAX {}".format(np.max(times)))
+        print("MIN {}".format(np.min(times)))
+        print("MEAN {}".format(np.mean(times)))
+        print("MEDIAN {}".format(np.median(times)))
+
+        exit()
+
     #run gradient descent on W (minimize W*W)
     testDW = False
     if testDW:        

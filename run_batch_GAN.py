@@ -376,7 +376,6 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         #
         #This chunk of code generates samples from teh fitted model adn runs the G update
         #
-        #
         ###################
         Ftest = []
         Ztest = []
@@ -389,8 +388,8 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                                              k = coe_value, n = exp_value,io_type = IO_type)
                      for i in range(len(inp))]
 
-            error = [bool(1-s[1]) for s in rates]
-            rates = [s[0] for s in rates]
+            error = [True for s in rates]
+            rates = [s for s in rates]
 
             if np.all(error):
                 Ftest.append(rates)
@@ -431,10 +430,10 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                                                  k = coe_value, n = exp_value,io_type = IO_type)
                          for i in range(len(inp))]
 
-                error = [bool(1 - s[1]) for s in rates]
-                rates = [s[0] for s in rates]
+                error = [True for s in rates]
+                rates = [s for s in rates]
                 
-                if np.all(np.isfinite(rates)):
+                if np.all(error):
                     Otrue.append(rates)
                     Ztrue.append(ztest2[0])
                 else:

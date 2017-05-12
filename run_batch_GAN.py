@@ -18,7 +18,7 @@ import time
 import stimuli
 
 
-def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01, loss = "CE", use_data = False, IO_type = "asym_tanh", layers = [],n_samples = 10):
+def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01, loss = "CE", use_data = False, IO_type = "asym_tanh", layers = [],n_samples = 10,debug = True):
 
     ##Make the tag for the files
     if use_data:
@@ -30,7 +30,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
 
     for l in layers:
         tag = tag + "_" + str(l)
-        
+    if debug:
+        tag = "DEBUG"
+
     np.random.seed(seed)
 
     # Load data and "experiment" parameter (note that all [0]s are to
@@ -47,6 +49,8 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     data = mat['E_Tuning']      # shape: (N_data, nb)
 
     #defining all the parameters that we might want to train
+
+    print(n_sites)
 
     exp = theano.shared(exp_value,name = "exp")
     coe = theano.shared(coe_value,name = "coe")
@@ -151,6 +155,28 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
+
+    timetest = True
+    if timetest:
+        times = []
+        for k in range(100):
+            zt = np.random.rand(1,2*N,2*N)
+            wt = W_test(zt)[0]
+            rz = np.zeros((2*N))
+
+            TT1 = time.time()
+            SSsolve.solve_dynamics(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+
+            total = time.time()-TT1
+            print(total)
+            times.append(total)
+
+        print("MAX {}".format(np.max(times)))
+        print("MIN {}".format(np.min(times)))
+        print("MEAN {}".format(np.mean(times)))
+        print("MEDIAN {}".format(np.median(times)))
+
+        exit()
 
     #run gradient descent on W (minimize W*W)
     testDW = False
@@ -471,6 +497,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--use-data', default=False, action='store_true',
         help='Use data (True) or generate our own TC samples (False) (default: %(default)s)')
+    parser.add_argument(
+        '--debug', default=False, action='store_true',
+        help='Run in debug mode. Save logs with DEBUG tag')
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')

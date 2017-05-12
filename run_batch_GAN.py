@@ -354,8 +354,6 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
         rtest = np.array([[c for c in TC] for TC in Ftest])
-        
-        Gloss = G_train_func(rtest,inp,Ztest)
 
         ########################################
         ########################################

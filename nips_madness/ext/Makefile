@@ -13,7 +13,7 @@ gsl-2.3: gsl-2.3.tar.gz
 	touch $@
 
 gsl: gsl-2.3
-	cd $^ && ./configure --prefix=$(PWD)/gsl
+	cd $^ && ./configure --prefix=$$PWD/../gsl
 	$(MAKE) --directory=$^
 	$(MAKE) --directory=$^ install
 	touch $@

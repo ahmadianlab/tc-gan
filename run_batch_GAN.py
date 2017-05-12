@@ -377,25 +377,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         #This chunk of code generates samples from teh fitted model adn runs the G update
         #
         ###################
-        Ftest = []
-        Ztest = []
-        model_fail = 0
+        def Z_W_gen():
+            while True:
+                ztest = np.random.rand(1, 2*N, 2*N)
+                wtest, = W(ztest)
+                yield ztest[0], wtest
 
-        while len(Ftest) < NZ:
-            ztest = np.random.rand(1,2*N,2*N) 
-            wtest = W(ztest)
-            rates = [SSsolve.solve_dynamics(wtest[0],inp[i],r0 = rz,
-                                             k = coe_value, n = exp_value,io_type = IO_type)
-                     for i in range(len(inp))]
-
-            error = [True for s in rates]
-            rates = [s for s in rates]
-
-            if np.all(error):
-                Ftest.append(rates)
-                Ztest.append(ztest[0])
-            else:
-                model_fail += 1
+        Ztest, Ftest, info = SSsolve.find_fixed_points(
+            NZ, Z_W_gen(), inp,
+            r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
+        model_fail = info.rejections
 
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
@@ -417,27 +408,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         
         ##faketest
         if use_data == False:
-            Otrue = []
-            Ztrue = []
-            true_fail = 0
+            def Z_W_gen2():
+                while True:
+                    ztest2 = np.random.rand(1, 2*N, 2*N)
+                    wtest2, = W_test(ztest2)
+                    yield ztest2[0], wtest2
 
-            while len(Otrue) < NZ:
-                ztest2 = np.random.rand(1,2*N,2*N) 
-                
-                wtest2 = W_test(ztest2)
-                
-                rates = [SSsolve.solve_dynamics(wtest2[0],inp[i],r0 = rz,
-                                                 k = coe_value, n = exp_value,io_type = IO_type)
-                         for i in range(len(inp))]
-
-                error = [True for s in rates]
-                rates = [s for s in rates]
-                
-                if np.all(error):
-                    Otrue.append(rates)
-                    Ztrue.append(ztest2[0])
-                else:
-                    true_fail += 1
+            Ztrue, Otrue, info = SSsolve.find_fixed_points(
+                NZ, Z_W_gen2(), inp,
+                r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
+            true_fail = info.rejections
 
             Otrue = np.array(Otrue)
             Ztrue = np.array(Ztrue)

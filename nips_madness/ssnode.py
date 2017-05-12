@@ -131,9 +131,10 @@ def solve_dynamics(*args, **kwds):
 
 def fixed_point(
         W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=300, atol=1e-8, dt=.0001,
+        # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
+        max_iter=10000, atol=1e-10, dt=.001, solver='euler',
         rate_soft_bound=100, rate_hard_bound=200,
-        io_type='asym_linear', solver='gsl', check=False):
+        io_type='asym_tanh', check=False):
     """
     Solve ODE for the SSN until it converges to a fixed point.
 

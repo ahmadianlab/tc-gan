@@ -92,7 +92,7 @@ def solve_dynamics(
         W, ext, k, n, r0, tau=[.016, .002],
         max_iter=100000, atol=1e-8, dt=.0001,
         rate_soft_bound=100, rate_hard_bound=200,
-        io_type='asym_linear'):
+        io_type='asym_linear', solver='gsl'):
     """
     Solve ODE for the SSN until it converges to a fixed point.
 
@@ -144,7 +144,8 @@ def solve_dynamics(
     assert W.ndim == 2
     assert (2 * N,) == r0.shape == ext.shape
 
-    error = getattr(libssnode, 'solve_dynamics_{}'.format(io_type))(
+    error = getattr(libssnode,
+                    'solve_dynamics_{}_{}'.format(io_type, solver))(
         N,
         W.ctypes.data_as(double_ptr),
         ext.ctypes.data_as(double_ptr),

@@ -13,8 +13,10 @@ def load_library(name):
 double_ptr = ctypes.POINTER(ctypes.c_double)
 
 libssnode = load_library('libssnode')
-for fun in [libssnode.solve_dynamics_asym_linear,
-            libssnode.solve_dynamics_asym_tanh]:
+for fun in [libssnode.solve_dynamics_asym_linear_gsl,
+            libssnode.solve_dynamics_asym_tanh_gsl,
+            libssnode.solve_dynamics_asym_linear_euler,
+            libssnode.solve_dynamics_asym_tanh_euler]:
     fun.argtypes = [
         c_int, double_ptr, double_ptr, c_double, c_double,
         double_ptr, double_ptr,

@@ -66,16 +66,31 @@ int dydt_asym_tanh(double t, const double y[], double dydt[], void *params) {
   return GSL_SUCCESS;
 }
 
-int solve_dynamics_asym_tanh(
+int dydt_asym_linear(double t, const double y[], double dydt[], void *params) {
+  const SSNParam *ssn = params;
+  int dim = ssn->N * 2;
+#pragma omp parallel for schedule(static,1)
+  for (int i = 0; i < ssn->N; ++i){
+    dydt[i] = dYdT(io_alin, ssn->tau_E);
+  }
+#pragma omp parallel for schedule(static,1)
+  for (int i = ssn->N; i < dim; ++i){
+    dydt[i] = dYdT(io_alin, ssn->tau_I);
+  }
+  return GSL_SUCCESS;
+}
+
+int solve_dynamics_gsl(
         /* Model parameters: */
         int N, double *W, double *ext, double k, double n,
         double *r0, double *r1,
         double tau_E, double tau_I,
         /* Solver parameters: */
         double dt, int max_iter, double atol,
-        double rate_soft_bound, double rate_hard_bound) {
+        double rate_soft_bound, double rate_hard_bound,
+        int (* dydt) (double t, const double y[], double dydt[], void * params)) {
   SSNParam ssn;
-  gsl_odeiv2_system sys = {dydt_asym_tanh, NULL, 2 * N, &ssn};
+  gsl_odeiv2_system sys = {dydt, NULL, 2 * N, &ssn};
   gsl_odeiv2_driver *driver =
     gsl_odeiv2_driver_alloc_y_new(&sys, gsl_odeiv2_step_msadams,
                                   dt, 1e-6, 0.0);
@@ -128,12 +143,40 @@ int solve_dynamics_asym_tanh(
   return error_code;
 }
 
+int solve_dynamics_asym_linear_gsl(
+        /* Model parameters: */
+        int N, double *W, double *ext, double k, double n,
+        double *r0, double *r1,
+        double tau_E, double tau_I,
+        /* Solver parameters: */
+        double dt, int max_iter, double atol,
+        double rate_soft_bound, double rate_hard_bound) {
+  return solve_dynamics_gsl(N, W, ext, k, n, r0, r1, tau_E, tau_I,
+                            dt, max_iter, atol,
+                            rate_soft_bound, rate_hard_bound,
+                            dydt_asym_linear);
+}
+
+int solve_dynamics_asym_tanh_gsl(
+        /* Model parameters: */
+        int N, double *W, double *ext, double k, double n,
+        double *r0, double *r1,
+        double tau_E, double tau_I,
+        /* Solver parameters: */
+        double dt, int max_iter, double atol,
+        double rate_soft_bound, double rate_hard_bound) {
+  return solve_dynamics_gsl(N, W, ext, k, n, r0, r1, tau_E, tau_I,
+                            dt, max_iter, atol,
+                            rate_soft_bound, rate_hard_bound,
+                            dydt_asym_tanh);
+}
+
 #define ODE_STEP(io_fun, dt_) \
   r1[i] = r0[i] + \
     (- r0[i] + io_fun(dot(dim, W + dim * i, r0) + ext[i], \
                       rate_soft_bound, rate_hard_bound, v0, k, n)) * dt_
 
-int solve_dynamics_asym_linear(
+int solve_dynamics_asym_linear_euler(
         /* Model parameters: */
         int N, double *W, double *ext, double k, double n,
         double *r0, double *r1,

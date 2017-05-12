@@ -47,6 +47,20 @@ def make_bench_solve_dynamics(
     return stmt
 
 
+def find_slow_seed(seeds=range(100), repeat=3, top=10,
+                   param_type='bad', **kwds):
+    data = []
+    for s in seeds:
+        stmt = make_bench_solve_dynamics(seed=s, param_type=param_type, **kwds)
+        times = timeit.repeat(stmt, repeat=repeat, number=1)
+        data.append((min(times), times, s))
+    data.sort(reverse=True)
+    for min_time, times, s in data[:top]:
+        print('seed = {: <5}  min = {:<10.4g}  avg = {:<10.4g}'.format(
+            s, min_time, sum(times) / repeat))
+    return data
+
+
 def run_benchmarks(repeat=3):
     for name, target in [
             ('asym_linear (C)',
@@ -66,4 +80,5 @@ def run_benchmarks(repeat=3):
 
 
 if __name__ == '__main__':
+    # data = find_slow_seed()
     run_benchmarks()

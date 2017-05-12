@@ -47,7 +47,9 @@ def make_bench_solve_dynamics(
     return stmt
 
 
-def find_slow_seed(seeds=range(100), repeat=1, top=10,
+def find_slow_seed(repeat=1, top=10,
+                   seeds=[322, 357, 795, 218, 265, 97],
+                   # seeds=range(100),
                    param_type='true', N=102, **kwds):
     kwds = dict(param_type=param_type, N=N, **kwds)
     data = []

@@ -48,7 +48,7 @@ int solve_dynamics_asym_linear(
         double tau_E, double tau_I,
         /* Solver parameters: */
         double dt, int max_iter, double atol,
-        int rate_soft_bound, int rate_hard_bound) {
+        double rate_soft_bound, double rate_hard_bound) {
   int dim = 2 * N;
   double *r_tmp;
   double dt_E = dt / tau_E;
@@ -93,7 +93,7 @@ int solve_dynamics_asym_tanh(
         double tau_E, double tau_I,
         /* Solver parameters: */
         double dt, int max_iter, double atol,
-        int rate_soft_bound, int rate_hard_bound) {
+        double rate_soft_bound, double rate_hard_bound) {
   int dim = 2 * N;
   double *r_tmp;
   double dt_E = dt / tau_E;

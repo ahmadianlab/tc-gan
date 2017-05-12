@@ -20,6 +20,6 @@ for fun in [libssnode.solve_dynamics_asym_linear,
         double_ptr, double_ptr,
         c_double, c_double,
         c_double, c_int, c_double,
-        c_int, c_int,
+        c_double, c_double,
     ]
     fun.restype = ctypes.c_int

@@ -9,23 +9,27 @@ from .tests.test_dynamics import numeric_w
 
 def make_bench_solve_dynamics(
         fun=solve_dynamics,
+        param_type='true', seed=0,
         bandwidth=8, smoothness=0.25/8, contrast=20,
         N=51, k=0.01, n=2.2, io_type='asym_linear', **kwds):
-#    J = np.array([[.0957, .0638], [.1197, .0479]])
-#    D = np.array([[.7660, .5106], [.9575, .3830]])
-#    S = np.array([[.6667, .2], [1.333, .2]]) / 8
-
-    J = np.array([[0.0532592, 0.0396442],[0.0724497, 0.03049]])
-    D = np.array([[0.417151, 0.28704],[ 0.568, 0.236162]])
-    S = np.array([[0.0483366, 0.0149695 ],[ 0.126188, 0.0149596]])
+    if param_type == 'true':
+        J = np.array([[.0957, .0638], [.1197, .0479]])
+        D = np.array([[.7660, .5106], [.9575, .3830]])
+        S = np.array([[.6667, .2], [1.333, .2]]) / 8
+    elif param_type == 'bad':
+        J = np.array([[0.0532592, 0.0396442], [0.0724497, 0.03049]])
+        D = np.array([[0.417151, 0.28704], [0.568, 0.236162]])
+        S = np.array([[0.0483366, 0.0149695], [0.126188, 0.0149596]])
+    else:
+        raise ValueError("Unknown param_type: {}".format(param_type))
 
     if io_type == 'asym_linear':
         # Boost inhibition if io_type=='asym_linear'; otherwise the
         # activity diverges.
         J[:, 1] *= 1.7
 
-    np.random.seed(0)
-    Z = np.random.rand(1, 2*N, 2*N)
+    rs = np.random.RandomState(seed)
+    Z = rs.rand(1, 2*N, 2*N)
     W, = numeric_w(Z, J, D, S)
 
     X = np.linspace(-0.5, 0.5, N)

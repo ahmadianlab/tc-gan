@@ -11,7 +11,7 @@ def make_bench_solve_dynamics(
         fun=solve_dynamics,
         param_type='true', seed=0,
         bandwidth=1, smoothness=0.25/8, contrast=20,
-        N=51, k=0.01, n=2.2, io_type='asym_linear', **kwds):
+        N=51, k=0.01, n=2.2, io_type='asym_tanh', **kwds):
     if param_type == 'true':
         J = np.array([[.0957, .0638], [.1197, .0479]])
         D = np.array([[.7660, .5106], [.9575, .3830]])
@@ -47,10 +47,14 @@ def make_bench_solve_dynamics(
     return stmt
 
 
-def find_slow_seed(repeat=1, top=10,
-                   seeds=[322, 357, 795, 218, 265, 97],
-                   # seeds=range(100),
-                   param_type='true', N=102, **kwds):
+def find_slow_seed(
+        repeat=1, top=10,
+        # Bad seeds with: io_type='asym_tanh'
+        # seeds=[322, 357, 795, 218, 265, 97],
+        # Bad seeds with: io_type='asym_linear'
+        seeds=[65, 521, 154, 340, 334, 813, 736, 530, 198, 284, 707][:5],
+        # seeds=range(1000),
+        param_type='true', N=102, **kwds):
     kwds = dict(param_type=param_type, N=N, **kwds)
     data = []
     for s in seeds:

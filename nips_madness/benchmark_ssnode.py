@@ -10,7 +10,7 @@ from .tests.test_dynamics import numeric_w
 def make_bench_solve_dynamics(
         fun=solve_dynamics,
         param_type='true', seed=0,
-        bandwidth=8, smoothness=0.25/8, contrast=20,
+        bandwidth=1, smoothness=0.25/8, contrast=20,
         N=51, k=0.01, n=2.2, io_type='asym_linear', **kwds):
     if param_type == 'true':
         J = np.array([[.0957, .0638], [.1197, .0479]])
@@ -47,11 +47,12 @@ def make_bench_solve_dynamics(
     return stmt
 
 
-def find_slow_seed(seeds=range(100), repeat=3, top=10,
-                   param_type='bad', **kwds):
+def find_slow_seed(seeds=range(100), repeat=1, top=10,
+                   param_type='true', N=102, **kwds):
+    kwds = dict(param_type=param_type, N=N, **kwds)
     data = []
     for s in seeds:
-        stmt = make_bench_solve_dynamics(seed=s, param_type=param_type, **kwds)
+        stmt = make_bench_solve_dynamics(seed=s, **kwds)
         times = timeit.repeat(stmt, repeat=repeat, number=1)
         data.append((min(times), times, s))
     data.sort(reverse=True)

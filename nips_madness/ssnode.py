@@ -48,7 +48,7 @@ def drdt(r, _t, ext, W, k, n, io_fun, tau):
     return fixed_point_equation(r, ext, W, k, n, io_fun) / tau
 
 
-def fixed_point(W, ext, r0=None, k=0.04, n=2, **kwds):
+def fixed_point(W, ext, r0, k, n, root_kwargs={}, **kwds):
     """
     Find the fixed point of the SSN and return `OptimizeResult` object.
 
@@ -58,25 +58,24 @@ def fixed_point(W, ext, r0=None, k=0.04, n=2, **kwds):
         fp_state = sol.x
 
     """
-    if r0 is None:
-        r0 = thlin(numpy.linalg.solve(W, -ext))
-    args = (ext, W, k, n)
-    return scipy.optimize.root(fixed_point_equation, r0, args, **kwds)
+    io_fun = make_io_fun(k=k, n=n, **kwds)
+    args = (ext, W, k, n, io_fun)
+    return scipy.optimize.root(fixed_point_equation, r0, args, **root_kwargs)
 
 
 def rate_to_volt(rate, k, n):
     return (rate / k)**(1 / n)
 
 
-def io_plin(v, volt_max, k, n):
+def io_alin(v, volt_max, k, n):
     vc = numpy.clip(v, 0, volt_max)
     rate = k * (vc**n)
     linear = k * (volt_max**(n-1)) * n * (v - volt_max)
     return numpy.where(v <= volt_max, rate, rate + linear)
 
+
 def io_power(v, k, n):
-    vc = .5*(v + np.abs(v))
-    rate = k * (vc**n)
+    rate = k * (thlin(v)**n)
     return rate
 
 
@@ -161,16 +160,14 @@ def solve_dynamics(
     return r0
 
 
-def solve_dynamics_python(
-        W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=100000, atol=1e-10, dt=.001,
-        rate_soft_bound=100, rate_hard_bound=200,
-        io_type='asym_linear'):
+def make_io_fun(k, n,
+                rate_soft_bound=100, rate_hard_bound=200,
+                io_type='asym_tanh'):
     v0 = rate_to_volt(rate_soft_bound, k, n)
     v1 = rate_to_volt(rate_hard_bound, k, n)
     if io_type == 'asym_linear':
         def io_fun(v):
-            return io_plin(v, v0, k, n)
+            return io_alin(v, v0, k, n)
     elif io_type == 'asym_tanh':
         def io_fun(v):
             return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, v1, k, n)
@@ -179,7 +176,15 @@ def solve_dynamics_python(
             return io_power(v, k, n)
     else:
         raise ValueError("Unknown I/O type: {}".format(io_type))
+    return io_fun
 
+
+def solve_dynamics_python(
+        W, ext, k, n, r0, tau=[.016, .002],
+        max_iter=100000, atol=1e-10, dt=.001,
+        **kwds):
+
+    io_fun = make_io_fun(k=k, n=n, **kwds)
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)
 
@@ -196,26 +201,13 @@ def solve_dynamics_python(
     return rr
 
 
-def odeint(t, W, ext, r0, k, n, tau,
-           rate_soft_bound=100, rate_hard_bound=200, io_type='asym_tanh',
-           **kwds):
-    v0 = rate_to_volt(rate_soft_bound, k, n)
-    v1 = rate_to_volt(rate_hard_bound, k, n)
-    if io_type == 'asym_linear':
-        def io_fun(v):
-            return io_plin(v, v0, k, n)
-    elif io_type == 'asym_tanh':
-        def io_fun(v):
-            return io_atanh(v, rate_soft_bound, rate_hard_bound, v0, v1, k, n)
-    elif io_type == 'asym_power':
-        def io_fun(v):
-            return io_power(v, k, n)
-    else:
-        raise ValueError("Unknown I/O type: {}".format(io_type))
+def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
+           odeint_kwargs={}, **kwds):
+    io_fun = make_io_fun(k=k, n=n, **kwds)
     N = W.shape[0] // 2
     tau = any_to_neu_vec(N, tau)
     args = (ext, W, k, n, io_fun, tau)
-    return scipy.integrate.odeint(drdt, r0, t, args, **kwds)
+    return scipy.integrate.odeint(drdt, r0, t, args, **odeint_kwargs)
 
 
 def sigmoid(x):
@@ -248,7 +240,7 @@ def plot_io_funs():
     v0 = rate_to_volt(r0, k, n)
     v1 = rate_to_volt(r1, k, n)
     ax.plot(x, k * (thlin(x)**n), label='power-law')
-    ax.plot(x, io_plin(x, v0, k, n), label='asym_linear')
+    ax.plot(x, io_alin(x, v0, k, n), label='asym_linear')
     ax.plot(x, io_atanh(x, r0, r1, v0, v1, k, n), label='asym_tanh')
 
     ax.legend(loc='best')
@@ -288,7 +280,7 @@ def plot_trajectory(
         W=W,
         ext=ext,
         r0=numpy.zeros(W.shape[0]),
-        k=0.01, n=2.2, tau=[.016, .002],
+        k=0.01, n=2.2,
         io_type=io_type,
     )
 
@@ -297,8 +289,12 @@ def plot_trajectory(
         r = odeint(t, **solver_kwargs)
 
     if plot_fp:
+        # with print_timing('Runtime (fixed_point):'):
+        #     sol = fixed_point(**dict(solver_kwargs, **fp_solver_kwargs))
+        # fp = sol.x
         with print_timing('Runtime (solve_dynamics):'):
             fp = solve_dynamics(**dict(solver_kwargs, **fp_solver_kwargs))
+        print("max |odeint - fp_solver| =", abs(r[-1] - fp).max())
 
     fig, (ax1, ax2) = pyplot.subplots(nrows=2, sharex=True)
     ax1.plot(t, r[:, :N], color='C0', linewidth=0.5)

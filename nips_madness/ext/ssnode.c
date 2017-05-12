@@ -165,14 +165,7 @@ int solve_dynamics_asym_tanh_gsl(COMMON_ARG_DEF) {
     (- r0[i] + io_fun(dot(dim, W + dim * i, r0) + ext[i], \
                       rate_soft_bound, rate_hard_bound, v0, k, n)) * dt_
 
-int solve_dynamics_asym_linear_euler(
-        /* Model parameters: */
-        int N, double *W, double *ext, double k, double n,
-        double *r0, double *r1,
-        double tau_E, double tau_I,
-        /* Solver parameters: */
-        double dt, int max_iter, double atol,
-        double rate_soft_bound, double rate_hard_bound) {
+int solve_dynamics_asym_linear_euler(COMMON_ARG_DEF) {
   int dim = 2 * N;
   double *r_tmp;
   double dt_E = dt / tau_E;
@@ -210,14 +203,7 @@ int solve_dynamics_asym_linear_euler(
   return 1;
 }
 
-int solve_dynamics_asym_tanh_euler(
-        /* Model parameters: */
-        int N, double *W, double *ext, double k, double n,
-        double *r0, double *r1,
-        double tau_E, double tau_I,
-        /* Solver parameters: */
-        double dt, int max_iter, double atol,
-        double rate_soft_bound, double rate_hard_bound) {
+int solve_dynamics_asym_tanh_euler(COMMON_ARG_DEF) {
   int dim = 2 * N;
   double *r_tmp;
   double dt_E = dt / tau_E;

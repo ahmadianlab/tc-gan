@@ -227,20 +227,15 @@ def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
     return scipy.integrate.odeint(drdt, r0, t, args, **odeint_kwargs)
 
 
-def plot_io_funs():
+def plot_io_funs(k=0.01, n=2.2, r0=100, r1=200, xmin=-1, xmax=150):
     from matplotlib import pyplot
 
     fig, ax = pyplot.subplots()
-    x = numpy.linspace(-1, 100)
-    k = 0.04
-    n = 2.2
-    r0 = 100
-    r1 = 200
+    x = numpy.linspace(xmin, xmax)
     v0 = rate_to_volt(r0, k, n)
-    v1 = rate_to_volt(r1, k, n)
     ax.plot(x, k * (thlin(x)**n), label='power-law')
     ax.plot(x, io_alin(x, v0, k, n), label='asym_linear')
-    ax.plot(x, io_atanh(x, r0, r1, v0, v1, k, n), label='asym_tanh')
+    ax.plot(x, io_atanh(x, r0, r1, v0, k, n), label='asym_tanh')
 
     ax.legend(loc='best')
 

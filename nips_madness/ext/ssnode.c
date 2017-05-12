@@ -56,9 +56,11 @@ int solve_dynamics_asym_linear(
   double v0 = rate_to_volt(rate_soft_bound, k, n);
   int converged;
   for (int step = 0; step < max_iter; ++step){
+#pragma omp parallel for schedule(static,1)
     for (int i = 0; i < N; ++i){
       ODE_STEP(io_alin, dt_E);
     }
+#pragma omp parallel for schedule(static,1)
     for (int i = N; i < dim; ++i){
       ODE_STEP(io_alin, dt_I);
     }
@@ -99,9 +101,11 @@ int solve_dynamics_asym_tanh(
   double v0 = rate_to_volt(rate_soft_bound, k, n);
   int converged;
   for (int step = 0; step < max_iter; ++step){
+#pragma omp parallel for schedule(static,1)
     for (int i = 0; i < N; ++i){
       ODE_STEP(io_atanh, dt_E);
     }
+#pragma omp parallel for schedule(static,1)
     for (int i = N; i < dim; ++i){
       ODE_STEP(io_atanh, dt_I);
     }

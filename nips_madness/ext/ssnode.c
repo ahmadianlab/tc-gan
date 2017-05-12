@@ -80,14 +80,17 @@ int dydt_asym_linear(double t, const double y[], double dydt[], void *params) {
   return GSL_SUCCESS;
 }
 
+#define COMMON_ARG_DEF \
+        /* Model parameters: */ \
+        int N, double *W, double *ext, double k, double n, \
+        double *r0, double *r1, \
+        double tau_E, double tau_I, \
+        /* Solver parameters: */ \
+        double dt, int max_iter, double atol, \
+        double rate_soft_bound, double rate_hard_bound
+
 int solve_dynamics_gsl(
-        /* Model parameters: */
-        int N, double *W, double *ext, double k, double n,
-        double *r0, double *r1,
-        double tau_E, double tau_I,
-        /* Solver parameters: */
-        double dt, int max_iter, double atol,
-        double rate_soft_bound, double rate_hard_bound,
+        COMMON_ARG_DEF,
         int (* dydt) (double t, const double y[], double dydt[], void * params)) {
   SSNParam ssn;
   gsl_odeiv2_system sys = {dydt, NULL, 2 * N, &ssn};
@@ -143,28 +146,14 @@ int solve_dynamics_gsl(
   return error_code;
 }
 
-int solve_dynamics_asym_linear_gsl(
-        /* Model parameters: */
-        int N, double *W, double *ext, double k, double n,
-        double *r0, double *r1,
-        double tau_E, double tau_I,
-        /* Solver parameters: */
-        double dt, int max_iter, double atol,
-        double rate_soft_bound, double rate_hard_bound) {
+int solve_dynamics_asym_linear_gsl(COMMON_ARG_DEF) {
   return solve_dynamics_gsl(N, W, ext, k, n, r0, r1, tau_E, tau_I,
                             dt, max_iter, atol,
                             rate_soft_bound, rate_hard_bound,
                             dydt_asym_linear);
 }
 
-int solve_dynamics_asym_tanh_gsl(
-        /* Model parameters: */
-        int N, double *W, double *ext, double k, double n,
-        double *r0, double *r1,
-        double tau_E, double tau_I,
-        /* Solver parameters: */
-        double dt, int max_iter, double atol,
-        double rate_soft_bound, double rate_hard_bound) {
+int solve_dynamics_asym_tanh_gsl(COMMON_ARG_DEF) {
   return solve_dynamics_gsl(N, W, ext, k, n, r0, r1, tau_E, tau_I,
                             dt, max_iter, atol,
                             rate_soft_bound, rate_hard_bound,

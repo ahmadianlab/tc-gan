@@ -6,6 +6,8 @@ except NameError:
     pass
 
 from contextlib import contextmanager
+import collections
+import itertools
 import time
 
 import numpy
@@ -43,6 +45,15 @@ def print_timing(header=''):
     yield
     t = time.time() - pre
     print(header, t)
+
+
+def take(n, iterable):
+    """
+    Return first n items of the iterable as a list
+
+    from: https://docs.python.org/3/library/itertools.html#itertools-recipes
+    """
+    return list(itertools.islice(iterable, n))
 
 
 def make_neu_vec(N, E, I):
@@ -120,9 +131,10 @@ def solve_dynamics(*args, **kwds):
 
 def fixed_point(
         W, ext, k, n, r0, tau=[.016, .002],
-        max_iter=10000, atol=1e-10, dt=.001,
+        # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
+        max_iter=10000, atol=1e-10, dt=.001, solver='euler',
         rate_soft_bound=100, rate_hard_bound=200,
-        io_type='asym_linear', solver='euler', check=False):
+        io_type='asym_tanh', check=False):
     """
     Solve ODE for the SSN until it converges to a fixed point.
 
@@ -272,6 +284,35 @@ def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
     tau = any_to_neu_vec(N, tau)
     args = (ext, W, k, n, io_fun, tau)
     return scipy.integrate.odeint(drdt, r0, t, args, **odeint_kwargs)
+
+
+FixedPointsInfo = collections.namedtuple('FixedPointsInfo', [
+    'solutions', 'counter', 'rejections',
+])
+
+
+def find_fixed_points(num, Z_W_gen, exts, **common_kwargs):
+    exts = list(exts)  # make sure it can be iterated multiple times
+    counter = collections.Counter()
+
+    def infinite_solutions():
+        for Z, W in Z_W_gen:
+            solutions = []
+            for ext in exts:
+                sol = fixed_point(W, ext, **common_kwargs)
+                if not sol.success:
+                    counter[sol.error] += 1
+                    break
+                solutions.append(sol)
+            else:
+                yield Z, [s.x for s in solutions], solutions
+
+    zs, xs, solutions = zip(*take(num, infinite_solutions()))
+    return zs, xs, FixedPointsInfo(
+        solutions,
+        counter,
+        sum(counter.values()),
+    )
 
 
 def plot_io_funs(k=0.01, n=2.2, r0=100, r1=200, xmin=-1, xmax=150):

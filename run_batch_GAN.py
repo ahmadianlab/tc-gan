@@ -83,9 +83,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     #these are the parammeters to be fit
     dp = .1
 
-    J = theano.shared(J2.get_value() + dp*np.random.normal(0,1,(2,2)),name = "j")
-    D = theano.shared(D2.get_value() + dp*np.random.normal(0,1,(2,2)),name = "d")
-    S = theano.shared(S2.get_value() + dp*np.random.normal(0,1,(2,2)),name = "s")
+    J = theano.shared(J2.get_value() + dp*np.random.normal(0,1.,(2,2)),name = "j")
+    D = theano.shared(D2.get_value() + dp*np.random.normal(0,1.,(2,2)),name = "d")
+    S = theano.shared(S2.get_value() + dp*np.random.normal(0,1.,(2,2)),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
@@ -168,7 +168,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
 
-    convtest = True
+    convtest = False
     if convtest:
         zt = np.random.rand(1,2*N,2*N)
         wt = W_test(zt)[0]
@@ -389,25 +389,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         #This chunk of code generates samples from teh fitted model adn runs the G update
         #
         ###################
-        Ftest = []
-        Ztest = []
-        model_fail = 0
+        def Z_W_gen():
+            while True:
+                ztest = np.random.rand(1, 2*N, 2*N)
+                wtest, = W(ztest)
+                yield ztest[0], wtest
 
-        while len(Ftest) < NZ:
-            ztest = np.random.rand(1,2*N,2*N) 
-            wtest = W(ztest)
-            rates = [SSsolve.fixed_point(wtest[0],inp[i],r0 = rz,
-                                             k = coe_value, n = exp_value,io_type = IO_type)
-                     for i in range(len(inp))]
-
-            error = [s.success for s in rates]
-            rates = [s.x for s in rates]
-
-            if np.all(error):
-                Ftest.append(rates)
-                Ztest.append(ztest[0])
-            else:
-                model_fail += 1
+        Ztest, Ftest, info = SSsolve.find_fixed_points(
+            NZ, Z_W_gen(), inp,
+            r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
+        model_fail = info.rejections
 
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
@@ -429,27 +420,17 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         
         ##faketest
         if use_data == False:
-            Otrue = []
-            Ztrue = []
-            true_fail = 0
+            def Z_W_gen2():
+                while True:
+                    ztest2 = np.random.rand(1, 2*N, 2*N)
+                    wtest2, = W_test(ztest2)
+                    yield ztest2[0], wtest2
 
-            while len(Otrue) < NZ:
-                ztest2 = np.random.rand(1,2*N,2*N) 
-                
-                wtest2 = W_test(ztest2)
-                
-                rates = [SSsolve.fixed_point(wtest2[0],inp[i],r0 = rz,
-                                                 k = coe_value, n = exp_value,io_type = IO_type)
-                         for i in range(len(inp))]
+            Ztrue, Otrue, info = SSsolve.find_fixed_points(
+                NZ, Z_W_gen2(), inp,
+                r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
 
-                error = [s.success for s in rates]
-                rates = [s.x for s in rates]
-                
-                if np.all(error):
-                    Otrue.append(rates)
-                    Ztrue.append(ztest2[0])
-                else:
-                    true_fail += 1
+            true_fail = info.rejections
 
             Otrue = np.array(Otrue)
             Ztrue = np.array(Ztrue)

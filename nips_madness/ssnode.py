@@ -14,6 +14,29 @@ import scipy.optimize
 from .clib import libssnode, double_ptr
 
 
+class FixedPointResult(object):
+
+    message = None
+
+    def __init__(self, x, error):
+        self.x = x
+        self.error = error
+
+    @property
+    def success(self):
+        return self.error == 0
+
+    def to_exception(self):
+        return FixedPointError(self.message, self)
+
+
+class FixedPointError(Exception):
+
+    def __init__(self, message, result):
+        super(FixedPointError, self).__init__(message)
+        self.result = result
+
+
 @contextmanager
 def print_timing(header=''):
     pre = time.time()
@@ -48,7 +71,7 @@ def drdt(r, _t, ext, W, k, n, io_fun, tau):
     return fixed_point_equation(r, ext, W, k, n, io_fun) / tau
 
 
-def fixed_point(W, ext, r0, k, n, root_kwargs={}, **kwds):
+def fixed_point_root(W, ext, r0, k, n, root_kwargs={}, **kwds):
     """
     Find the fixed point of the SSN and return `OptimizeResult` object.
 
@@ -88,11 +111,18 @@ def io_atanh(v, r0, r1, v0, k, n):
     return numpy.where(v <= v0, r_pow, r_tanh)
 
 
-def solve_dynamics(
+def solve_dynamics(*args, **kwds):
+    sol = fixed_point(*args, **kwds)
+    if not sol.success:
+        print(sol.success)
+    return sol.x
+
+
+def fixed_point(
         W, ext, k, n, r0, tau=[.016, .002],
         max_iter=100000, atol=1e-8, dt=.0001,
         rate_soft_bound=100, rate_hard_bound=200,
-        io_type='asym_linear', solver='gsl'):
+        io_type='asym_linear', solver='gsl', check=False):
     """
     Solve ODE for the SSN until it converges to a fixed point.
 
@@ -139,8 +169,16 @@ def solve_dynamics(
 
     Returns
     -------
-    r : array of shape (2*N,)
-        A fixed point or something else if the ODE is failed to converge.
+    sol : FixedPointResult
+        It is an object with the following attributes:
+
+        x : array of shape (2*N,)
+            A fixed point (or something else if the ODE is failed to
+            converge).
+        success : bool
+            Whether or not a fixed point is found.
+        message : str
+            Error/success message.
 
     """
     if io_type not in ('asym_linear', 'asym_tanh'):
@@ -171,11 +209,18 @@ def solve_dynamics(
         dt, max_iter, atol,
         rate_soft_bound, rate_hard_bound,
     )
-    if error == 1:
-        print("SSN Convergence Failed")
-    elif error != 0:
-        raise RuntimeError("Error from libssnode: code={}".format(error))
-    return r0
+    sol = FixedPointResult(r0, error)
+    if error == 0:
+        sol.message = "Converged"
+    elif error == 1:
+        sol.message = "SSN Convergence Failed"
+    elif error > 900:
+        sol.message = "GSL error {}".format(error - 1000)
+    else:
+        sol.message = "Unknown error: code={}".format(error)
+    if check and not sol.success:
+        raise sol.to_exception()
+    return sol
 
 
 def make_io_fun(k, n,

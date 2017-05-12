@@ -8,7 +8,7 @@ from matplotlib import pyplot
 import numpy as np
 
 from ..gradient_expressions import make_w_batch
-from ..ssnode import solve_dynamics
+from ..ssnode import solve_dynamics, fixed_point
 import stimuli
 
 from ..gradient_expressions import make_w_batch as make_w
@@ -24,6 +24,7 @@ N = T.scalar("N", "int32")
 
 w_sym = make_w_batch.make_W_with_x(Z, J, D, S, N, X)
 w_fun = theano.function([Z, J, D, S, N, X], w_sym, allow_input_downcast=True)
+
 
 def numeric_w(Z, J, D, S):
     _, n, n2 = Z.shape
@@ -108,6 +109,15 @@ def test_tuning_curve_asym_linear(io_type='asym_linear'):
 
 def test_tuning_curve_asym_tanh():
     test_tuning_curve_asym_linear(io_type='asym_tanh')
+
+
+def test_inf():
+    sol = fixed_point(W=[[2, 0], [0, 0]], ext=[10, 10],
+                      k=1, n=1, r0=[0, 0],
+                      max_iter=10000000,
+                      io_type='asym_linear')
+    assert sol.message == "Reached to rate_stop_at"
+    assert sol.x[0] == numpy.inf
 
 
 def test_gradients():

@@ -10,7 +10,7 @@ from .tests.test_dynamics import numeric_w
 def make_bench_solve_dynamics(
         fun=solve_dynamics,
         bandwidth=8, smoothness=0.25/8, contrast=20,
-        N=51, k=0.01, n=2.2, io_type='asym_linear', **kwds):
+        N=101, k=0.01, n=2.2, io_type='asym_linear', **kwds):
 #    J = np.array([[.0957, .0638], [.1197, .0479]])
 #    D = np.array([[.7660, .5106], [.9575, .3830]])
 #    S = np.array([[.6667, .2], [1.333, .2]]) / 8
@@ -24,7 +24,7 @@ def make_bench_solve_dynamics(
         # activity diverges.
         J[:, 1] *= 1.7
 
-    np.random.seed(0)
+#    np.random.seed(0)
     Z = np.random.rand(1, 2*N, 2*N)
     W, = numeric_w(Z, J, D, S)
 
@@ -43,7 +43,7 @@ def make_bench_solve_dynamics(
     return stmt
 
 
-def run_benchmarks(repeat=3):
+def run_benchmarks(repeat=100):
     for name, target in [
             ('asym_linear (C)',
              make_bench_solve_dynamics()),

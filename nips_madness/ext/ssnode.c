@@ -32,7 +32,7 @@ double io_alin(double v, double r0, double r1, double v0, double k, double n) {
   } else if (v <= v0) {
     return k * pow(v, n);
   } else {
-    return r0 + k * (r0/v0) * n * (v - v0);
+    return r0 + pow(v0, n-1) * n * (v - v0);
   }
 }
 

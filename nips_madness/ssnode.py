@@ -10,7 +10,8 @@ import collections
 import itertools
 import time
 
-import numpy
+import numpy  # TODO: use np and be consistent
+import numpy as np
 import scipy.optimize
 
 from .clib import libssnode, double_ptr
@@ -125,7 +126,7 @@ def io_atanh(v, r0, r1, v0, k, n):
 def solve_dynamics(*args, **kwds):
     sol = fixed_point(*args, **kwds)
     if not sol.success:
-        print(sol.success)
+        print(sol.message)
     return sol.x
 
 
@@ -338,7 +339,7 @@ def plot_io_funs(k=0.01, n=2.2, r0=100, r1=200, xmin=-1, xmax=150):
     ax.legend(loc='best')
 
 
-def plot_trajectory(
+def make_solver_params(
         N=102,
         J=numpy.array([[.0957, .0638], [.1197, .0479]]),
         D=numpy.array([[.7660, .5106], [.9575, .3830]]),
@@ -346,35 +347,64 @@ def plot_trajectory(
         # io_type='asym_linear', seed=97,
         io_type='asym_tanh', seed=65,
         bandwidth=1, smoothness=0.25/8, contrast=20,
-        fp_solver_kwargs={},
-        tmax=3, tnum=300, plot_fp=False):
+        k=0.01, n=2.2):
     import stimuli
     from .tests.test_dynamics import numeric_w
-    from matplotlib import pyplot
 
-    np = numpy
-    J = np.array([[.0957, .0638], [.1197, .0479]])
-    D = np.array([[.7660, .5106], [.9575, .3830]])
-    S = np.array([[.6667, .2], [1.333, .2]]) / 8
+    if isinstance(seed, int):
+        rs = numpy.random.RandomState(seed)
+    else:
+        rs = seed
 
-    if io_type == 'asym_linear':
-        # Boost inhibition if io_type=='asym_linear'; otherwise the
-        # activity diverges.
-        J[:, 1] *= 1.7
-
-    rs = numpy.random.RandomState(seed)
     Z = rs.rand(1, 2*N, 2*N)
     W, = numeric_w(Z, J, D, S)
     X = numpy.linspace(-0.5, 0.5, N)
     ext, = stimuli.input([bandwidth], X, smoothness, contrast)
 
-    solver_kwargs = dict(
+    return dict(
         W=W,
         ext=ext,
         r0=numpy.zeros(W.shape[0]),
-        k=0.01, n=2.2,
+        k=k, n=n,
         io_type=io_type,
     )
+
+
+def sample_fixed_points(
+        NZ=30, seed=0, N=102,
+        J=numpy.array([[.0957, .0638], [.1197, .0479]]),
+        D=numpy.array([[.7660, .5106], [.9575, .3830]]),
+        S=numpy.array([[.6667, .2], [1.333, .2]]) / 8,
+        bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
+        smoothness=0.25/8, contrast=20,
+        io_type='asym_linear', k=0.01, n=2.2,
+        **solver_kwargs):
+    import stimuli
+    from .tests.test_dynamics import numeric_w
+
+    X = np.linspace(-0.5, 0.5, N)
+    exts = stimuli.input(bandwidths, X, smoothness, contrast)
+    rs = np.random.RandomState(seed)
+
+    def Z_W_gen():
+        while True:
+            z = rs.rand(1, 2*N, 2*N)
+            W, = numeric_w(z, J, D, S)
+            yield z[0], W
+
+    solver_kwargs.setdefault('r0', np.zeros(2 * N))
+    solver_kwargs.update(k=k, n=n, io_type=io_type)
+    return find_fixed_points(NZ, Z_W_gen(), exts, **solver_kwargs)
+
+
+def plot_trajectory(
+        fp_solver_kwargs={},
+        tmax=3, tnum=300, plot_fp=False,
+        **modelparams):
+    from matplotlib import pyplot
+
+    solver_kwargs = make_solver_params(**modelparams)
+    N = solver_kwargs['W'].shape[0] // 2
 
     t = numpy.linspace(0, tmax, tnum)
     with print_timing('Runtime (odeint):'):

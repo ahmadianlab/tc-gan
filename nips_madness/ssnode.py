@@ -169,7 +169,7 @@ def fixed_point(
         The I/O function is power-law below this point.
     rate_hard_bound : float
         The true maximum rate.  Used only when ``io_type='asym_tanh'``.
-    io_type : {'asym_linear', 'asym_tanh'}
+    io_type : {'asym_power', 'asym_linear', 'asym_tanh'}
         If ``'asym_linear'`` (default), the I/O function is linear after
         `rate_soft_bound`.  If ``'asym_tanh'``, the I/O function is
         tanh after `rate_soft_bound` and the rate is bounded by
@@ -197,7 +197,7 @@ def fixed_point(
             Error/success message.
 
     """
-    if io_type not in ('asym_linear', 'asym_tanh'):
+    if io_type not in ('asym_linear', 'asym_tanh', 'asym_power'):
         raise ValueError("Unknown I/O type: {}".format(io_type))
     if solver not in ('gsl', 'euler'):
         raise ValueError("Unknown solver: {}".format(solver))

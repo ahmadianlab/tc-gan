@@ -107,6 +107,10 @@ def test_tuning_curve_asym_linear(io_type='asym_linear'):
     numpy.testing.assert_allclose(E_Tuning_actual, E_Tuning_desired, rtol=0.1)
 
 
+def test_tuning_curve_asym_power():
+    test_tuning_curve_asym_linear(io_type='asym_power')
+
+
 def test_tuning_curve_asym_tanh():
     test_tuning_curve_asym_linear(io_type='asym_tanh')
 
@@ -262,6 +266,7 @@ def test_gradients():
 
 if __name__ == '__main__':
     test_weight()
+    test_tuning_curve_asym_power()
     test_tuning_curve_asym_linear()
     test_tuning_curve_asym_tanh()
     test_gradients()

@@ -55,11 +55,9 @@ double io_atanh(double v, double r0, double r1, double v0, double k, double n) {
 int dydt_asym_tanh(double t, const double y[], double dydt[], void *params) {
   const SSNParam *ssn = params;
   int dim = ssn->N * 2;
-#pragma omp parallel for schedule(static,1)
   for (int i = 0; i < ssn->N; ++i){
     dydt[i] = dYdT(io_atanh, ssn->tau_E);
   }
-#pragma omp parallel for schedule(static,1)
   for (int i = ssn->N; i < dim; ++i){
     dydt[i] = dYdT(io_atanh, ssn->tau_I);
   }
@@ -69,11 +67,9 @@ int dydt_asym_tanh(double t, const double y[], double dydt[], void *params) {
 int dydt_asym_linear(double t, const double y[], double dydt[], void *params) {
   const SSNParam *ssn = params;
   int dim = ssn->N * 2;
-#pragma omp parallel for schedule(static,1)
   for (int i = 0; i < ssn->N; ++i){
     dydt[i] = dYdT(io_alin, ssn->tau_E);
   }
-#pragma omp parallel for schedule(static,1)
   for (int i = ssn->N; i < dim; ++i){
     dydt[i] = dYdT(io_alin, ssn->tau_I);
   }
@@ -173,11 +169,9 @@ int solve_dynamics_asym_linear_euler(COMMON_ARG_DEF) {
   double v0 = rate_to_volt(rate_soft_bound, k, n);
 
   for (int step = 0; step < max_iter; ++step){
-#pragma omp parallel for schedule(static,1)
     for (int i = 0; i < N; ++i){
       ODE_STEP(io_alin, dt_E);
     }
-#pragma omp parallel for schedule(static,1)
     for (int i = N; i < dim; ++i){
       ODE_STEP(io_alin, dt_I);
     }
@@ -217,11 +211,9 @@ int solve_dynamics_asym_tanh_euler(COMMON_ARG_DEF) {
   double v0 = rate_to_volt(rate_soft_bound, k, n);
 
   for (int step = 0; step < max_iter; ++step){
-#pragma omp parallel for schedule(static,1)
     for (int i = 0; i < N; ++i){
       ODE_STEP(io_atanh, dt_E);
     }
-#pragma omp parallel for schedule(static,1)
     for (int i = N; i < dim; ++i){
       ODE_STEP(io_atanh, dt_I);
     }

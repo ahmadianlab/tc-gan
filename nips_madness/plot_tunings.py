@@ -8,7 +8,7 @@ from .ssnode import sample_fixed_points
 
 def plot_tunings(sample_sites=3,
                  bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
-                 linewidth=0.2, ylim=(-1, 25),
+                 linewidth=0.2, ylim=(None, None),
                  **sample_kwargs):
     sample_kwargs.update(bandwidths=bandwidths)
     _Zs, rates, _info = sample_fixed_points(**sample_kwargs)

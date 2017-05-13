@@ -11,7 +11,7 @@ def make_bench_solve_dynamics(
         fun=solve_dynamics,
         param_type='true', seed=0,
         bandwidth=1, smoothness=0.25/8, contrast=20,
-        N=51, k=0.01, n=2.2, io_type='asym_tanh', **kwds):
+        N=102, k=0.01, n=2.2, io_type='asym_linear', **kwds):
     if param_type == 'true':
         J = np.array([[.0957, .0638], [.1197, .0479]])
         D = np.array([[.7660, .5106], [.9575, .3830]])
@@ -22,11 +22,6 @@ def make_bench_solve_dynamics(
         S = np.array([[0.0483366, 0.0149695], [0.126188, 0.0149596]])
     else:
         raise ValueError("Unknown param_type: {}".format(param_type))
-
-    if io_type == 'asym_linear':
-        # Boost inhibition if io_type=='asym_linear'; otherwise the
-        # activity diverges.
-        J[:, 1] *= 1.7
 
     rs = np.random.RandomState(seed)
     Z = rs.rand(1, 2*N, 2*N)
@@ -49,11 +44,7 @@ def make_bench_solve_dynamics(
 
 def find_slow_seed(
         repeat=1, top=10,
-        # Bad seeds with: io_type='asym_linear'
-        # seeds=[322, 357, 795, 218, 265, 97],
-        # Bad seeds with: io_type='asym_tanh'
-        seeds=[65, 521, 154, 340, 334, 813, 736, 530, 198, 284, 707][:5],
-        # seeds=range(1000),
+        seeds=range(100),
         param_type='true', N=102, **kwds):
     kwds = dict(param_type=param_type, N=N, **kwds)
     data = []
@@ -72,10 +63,16 @@ def run_benchmarks(repeat=3):
     for name, target in [
             ('asym_linear (C)',
              make_bench_solve_dynamics()),
+            # ('asym_linear (GSL)',
+            #  make_bench_solve_dynamics(max_iter=300, atol=1e-8, dt=.0001,
+            #                            solver='gsl')),
             ('asym_linear (Py)',
              make_bench_solve_dynamics(solve_dynamics_python)),
             ('asym_tanh (C)',
              make_bench_solve_dynamics(io_type='asym_tanh')),
+            # ('asym_tanh (GSL)',
+            #  make_bench_solve_dynamics(max_iter=300, atol=1e-8, dt=.0001,
+            #                            solver='gsl', io_type='asym_tanh')),
             ('asym_tanh (Py)',
              make_bench_solve_dynamics(solve_dynamics_python,
                                        io_type='asym_tanh')),

@@ -126,7 +126,7 @@ def io_atanh(v, r0, r1, v0, k, n):
 def solve_dynamics(*args, **kwds):
     sol = fixed_point(*args, **kwds)
     if not sol.success:
-        print(sol.success)
+        print(sol.message)
     return sol.x
 
 

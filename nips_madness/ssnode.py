@@ -351,6 +351,7 @@ def find_fixed_points_serial(num, Z_W_gen, exts, **common_kwargs):
 
 def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
                                resubmit_threshold=0.1,
+                               deterministic=True,
                                **common_kwargs):
     # Revers exts to try large bandwidth first, as it is more likely
     # to produces diverging solution:
@@ -411,8 +412,9 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
                 break
 
     unused = nonlocals['consumed'] - num - sum(counter.values())
-    for _ in range(unused):
-        collect()
+    if deterministic:
+        for _ in range(unused):
+            collect()
 
     samples.sort(key=lambda x: x[0])
     samples = samples[:num]

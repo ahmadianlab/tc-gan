@@ -25,7 +25,7 @@ def main(args=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repeat', default=3, type=int)
     parser.add_argument('--resubmit-thresholds',
-                        default=[0, 0.05] + [i * 0.1 for i in range(1, 10)],
+                        default=[0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4],
                         type=eval)
     parser.add_argument('--deterministics',
                         default=[True, False],

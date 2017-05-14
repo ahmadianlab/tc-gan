@@ -303,7 +303,11 @@ FixedPointsInfo = collections.namedtuple('FixedPointsInfo', [
 
 
 def find_fixed_points(num, Z_W_gen, exts, **common_kwargs):
-    exts = list(exts)  # make sure it can be iterated multiple times
+    # Revers exts to try large bandwidth first, as it is more likely
+    # to produces diverging solution:
+    exts = list(exts)
+    exts.reverse()
+
     counter = collections.Counter()
 
     def infinite_solutions():
@@ -316,6 +320,8 @@ def find_fixed_points(num, Z_W_gen, exts, **common_kwargs):
                     break
                 solutions.append(sol)
             else:
+                # Reverse the solution back to the original order:
+                solutions.reverse()
                 yield Z, [s.x for s in solutions], solutions
 
     zs, xs, solutions = zip(*take(num, infinite_solutions()))

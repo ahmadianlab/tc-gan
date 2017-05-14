@@ -13,6 +13,7 @@ import nips_madness.gradient_expressions.make_w_batch as make_w
 import nips_madness.gradient_expressions.SS_grad as SSgrad
 import nips_madness.ssnode as SSsolve
 
+import os
 import time
 
 import stimuli
@@ -372,6 +373,19 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         f = open("./logfiles/" + F,"a")
         f.write(str(a) + "\n")
         f.close()
+
+    try:
+        os.makedirs('logfiles')
+    except IOError as err:
+        if err.errno != 17:
+            print("!! Unexpected exception !!")
+            print(err)
+
+    # Clear data in old log files
+    for filename in ["SSNGAN_log_{}.log",
+                     "D_parameters_{}.log",
+                     "parameters_{}.log"]:
+        open(os.path.join("logfiles", filename.format(tag)), 'w').close()
 
     log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,truth_convergence,model_unused,truth_unused")
 

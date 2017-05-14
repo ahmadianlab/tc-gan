@@ -8,7 +8,13 @@ except NameError:
 from contextlib import contextmanager
 import collections
 import itertools
+import multiprocessing.dummy
 import time
+
+try:
+    import Queue as queue
+except ImportError:
+    import queue
 
 import numpy as np
 import scipy.optimize
@@ -301,7 +307,18 @@ FixedPointsInfo = collections.namedtuple('FixedPointsInfo', [
 ])
 
 
-def find_fixed_points(num, Z_W_gen, exts, **common_kwargs):
+def find_fixed_points(num, Z_W_gen, exts, method='parallel', **common_kwargs):
+    if method == 'parallel':
+        finder = find_fixed_points_parallel
+    elif method == 'serial':
+        finder = find_fixed_points_serial
+    else:
+        raise ValueError('Unknown method: {}'.format(method))
+
+    return finder(num, Z_W_gen, exts, **common_kwargs)
+
+
+def find_fixed_points_serial(num, Z_W_gen, exts, **common_kwargs):
     # Revers exts to try large bandwidth first, as it is more likely
     # to produces diverging solution:
     exts = list(exts)
@@ -324,6 +341,62 @@ def find_fixed_points(num, Z_W_gen, exts, **common_kwargs):
                 yield Z, [s.x for s in solutions], solutions
 
     zs, xs, solutions = zip(*take(num, infinite_solutions()))
+    return zs, xs, FixedPointsInfo(
+        solutions,
+        counter,
+        sum(counter.values()),
+    )
+
+
+def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
+                               **common_kwargs):
+    # Revers exts to try large bandwidth first, as it is more likely
+    # to produces diverging solution:
+    exts = list(exts)
+    exts.reverse()
+
+    results = queue.Queue(0)
+    indices = itertools.count()
+
+    def worker(idx, Z, W):
+        solutions = []
+        for ext in exts:
+            sol = fixed_point(W, ext, **common_kwargs)
+            solutions.append(sol)
+            if not sol.success:
+                results.put((False, idx, Z, solutions))
+                return
+        results.put((True, idx, Z, solutions))
+
+    if no_pool:
+        def submit():
+            Z, W = next(Z_W_gen)
+            worker(next(indices), Z, W)
+    else:
+        pool = multiprocessing.dummy.Pool()
+
+        def submit():
+            Z, W = next(Z_W_gen)
+            worker, next(indices), Z, W
+            pool.apply_async(worker, (next(indices), Z, W))
+
+    for _ in range(num):
+        submit()
+
+    samples = []
+    counter = collections.Counter()
+    while len(samples) < num:
+        success, idx, Z, solutions = results.get()
+        if success:
+            solutions.reverse()
+            samples.append((idx, Z, solutions))
+        else:
+            submit()
+            counter[solutions[-1].error] += 1
+    samples.sort(key=lambda x: x[0])
+    _, zs, solutions = zip(*samples)
+    xs = [[s.x for s in sols] for sols in solutions]
+
     return zs, xs, FixedPointsInfo(
         solutions,
         counter,

@@ -515,7 +515,9 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        'datapath', default='training_data_TCs_Ne102.mat', nargs='?',
+        'datapath', nargs='?',
+        default=os.path.join(os.path.dirname(__file__),
+                             'training_data_TCs_Ne102.mat'),
         help='Path to MATLAB data file (default: %(default)s)')
     parser.add_argument(
         '--iterations', default=1000, type=int,

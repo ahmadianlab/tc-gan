@@ -8,7 +8,7 @@ from matplotlib import pyplot
 import numpy as np
 
 from ..gradient_expressions import make_w_batch
-from ..ssnode import solve_dynamics, fixed_point
+from ..ssnode import solve_dynamics, fixed_point, find_fixed_points
 import stimuli
 
 from ..gradient_expressions import make_w_batch as make_w
@@ -68,7 +68,7 @@ def asserting_div(num, divisor, desired_reminder):
     return got
 
 
-def test_tuning_curve_asym_linear(io_type='asym_linear'):
+def test_tuning_curve_asym_linear(io_type='asym_linear', method='parallel'):
     conn_param = scipy.io.loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
     model_param = scipy.io.loadmat('training_data_TCs_Ne51-Zs.mat')
 
@@ -90,11 +90,17 @@ def test_tuning_curve_asym_linear(io_type='asym_linear'):
     X = numpy.linspace(-0.5, 0.5, n_sites)
     BAND_IN = stimuli.input(bandwidths, X, smoothness, contrast)
 
-    fps = [solve_dynamics(W, ext, k=coe_value, n=exp_value,
-                          r0=numpy.zeros(2 * n_sites),
-                          check=True,
-                          io_type=io_type)
-           for ext in BAND_IN]
+    dummy_z = object()
+    (actual_z,), (fps,), info = find_fixed_points(
+        1, iter([(dummy_z, W)]), BAND_IN,
+        # Model parameters:
+        k=coe_value, n=exp_value,
+        r0=numpy.zeros(2 * n_sites),
+        io_type=io_type,
+        # Solver parameters:
+        method=method,
+        check=True,
+    )
     E_Tuning_actual = numpy.array([x[i_beg:i_end] for x in fps]).T
 
     if False:

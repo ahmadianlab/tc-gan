@@ -19,7 +19,9 @@ import time
 import stimuli
 
 
-def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01, loss = "CE", use_data = False, IO_type = "asym_tanh", layers = [],n_samples = 10,debug = True,rate_cost = 0):
+def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
+         loss, use_data, IO_type, layers, n_samples, debug, rate_cost,
+         rate_hard_bound, rate_soft_bound):
 
     ##Make the tag for the files
     #tag whether or not we use data
@@ -60,6 +62,15 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
+
+    ssn_params = dict(
+        rate_soft_bound=rate_soft_bound,
+        rate_hard_bound=rate_hard_bound,
+        io_type=IO_type,
+        k=coe_value,
+        n=exp_value,
+        r0=np.zeros(2 * n_sites),
+    )
 
     #defining all the parameters that we might want to train
 
@@ -161,9 +172,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     ivec = T.matrix("ivec","float32")
 
     #DrDth tensor expressions
-    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N,IO_type)
-    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N,IO_type)
-    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N,IO_type)
+    WRgrad_params = dict(
+        R=rvec, W=ww, I=ivec,
+        n=exp, k=coe, nz=NZ, nb=NB, N=N,
+        io_type=IO_type,
+        r0=rate_soft_bound,
+        r1=rate_hard_bound,
+    )
+    dRdJ_exp = SSgrad.WRgrad_batch(DW=dwdj, **WRgrad_params)
+    dRdD_exp = SSgrad.WRgrad_batch(DW=dwdd, **WRgrad_params)
+    dRdS_exp = SSgrad.WRgrad_batch(DW=dwds, **WRgrad_params)
 
     dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
@@ -176,7 +194,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         rz = np.zeros((2*N))
 
         for c in [1.,2.,4.,8.,16.]:
-            r  = SSsolve.fixed_point(wt,c*BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+            r  = SSsolve.fixed_point(wt,c*BAND_IN[-1], *ssn_params)
         
             print(np.max(r.x))
         exit()
@@ -191,7 +209,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
             rz = np.zeros((2*N))
 
             TT1 = time.time()
-            r  = SSsolve.fixed_point(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+            r  = SSsolve.fixed_point(wt,BAND_IN[-1], **ssn_params)
 
             total = time.time() - TT1
             print(total,r.success)
@@ -213,7 +231,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],coe_value,exp_value,np.zeros((2*N)),io_type = IO_type)[0].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b], *ssn_params)[0].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
 
         print(ssR.mean())
         print(wtest.mean())
@@ -257,7 +275,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         
         WW = W(Ztest)
                
-        rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IO_type)[0] for b in inp] for z in WW])
+        rr1 = np.array([[SSsolve.solve_dynamics(z,b, **ssn_params)[0] for b in inp] for z in WW])
 
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
@@ -269,7 +287,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
 
         WW = W(Ztest)
 
-        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],coe_value,exp_value,rr1[z,b],io_type = IO_type)[0] for b in range(len(inp))] for z in range(len(WW))])
+        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b], **dict(ssn_params, r0=rr1[z,b]))[0] for b in range(len(inp))] for z in range(len(WW))])
 
         print(rr2.max())
         print(rr2.min())
@@ -413,7 +431,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
 
         Ztest, Ftest, model_info = SSsolve.find_fixed_points(
             NZ, Z_W_gen(), inp,
-            r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
+            **ssn_params)
 
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
@@ -443,7 +461,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
 
             Ztrue, Otrue, true_info = SSsolve.find_fixed_points(
                 NZ, Z_W_gen2(), inp,
-                r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
+                **ssn_params)
 
             Otrue = np.array(Otrue)
             Ztrue = np.array(Ztrue)
@@ -552,7 +570,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '--rate_cost', default=0, type=float,
         help='The cost of having the rate be large (default: %(default)s)')
-
+    parser.add_argument(
+        '--rate_soft_bound', default=200, type=float,
+        help='rate_soft_bound=r0 (default: %(default)s)')
+    parser.add_argument(
+        '--rate_hard_bound', default=1000, type=float,
+        help='rate_hard_bound=r1 (default: %(default)s)')
 
     ns = parser.parse_args()
     ns.layers = eval(str(ns.layers))

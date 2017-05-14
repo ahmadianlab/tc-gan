@@ -83,6 +83,10 @@ def run_benchmarks(repeat=3):
             name, min(times), sum(times) / repeat))
 
 
+def main(_=None):
+    run_benchmarks()
+
+
 if __name__ == '__main__':
     # data = find_slow_seed()
-    run_benchmarks()
+    main()

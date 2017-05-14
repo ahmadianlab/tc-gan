@@ -21,5 +21,9 @@ def run_benchmarks(repeat=3, **kwargs):
                 io_type, method, min(times), sum(times) / repeat))
 
 
-if __name__ == '__main__':
+def main(_=None):
     run_benchmarks()
+
+
+if __name__ == '__main__':
+    main()

@@ -218,7 +218,7 @@ def fixed_point(
     assert W.ndim == 2
     assert (2 * N,) == r0.shape == ext.shape
 
-    if io_type == 'asym_linear':
+    if io_type in ('asym_power', 'asym_linear'):
         rate_hard_bound = rate_stop_at
 
     error = getattr(libssnode,

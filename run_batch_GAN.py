@@ -396,6 +396,13 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         os.makedirs('logfiles')
     except IOError as err:
         if err.errno != 17:
+            # If the error is "File exists" (errno=17) error, it means
+            # that the directory exists and it's fine to ignore the
+            # error.  It is slightly safer than checking existence of
+            # the directory since several processes may be creating it
+            # at the same time.  Maybe the error should be re-raised
+            # here but opening log file would fail anyway if there is
+            # something wrong.
             print("!! Unexpected exception !!")
             print(err)
 

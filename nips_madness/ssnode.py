@@ -350,6 +350,7 @@ def find_fixed_points_serial(num, Z_W_gen, exts, **common_kwargs):
 
 
 def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
+                               resubmit_threshold=0.1,
                                **common_kwargs):
     # Revers exts to try large bandwidth first, as it is more likely
     # to produces diverging solution:
@@ -398,10 +399,11 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
             counter[solutions[-1].error] += 1
         if len(samples) >= num:
             break
-        try:
-            submit()
-        except StopIteration:
-            break
+        if not success or len(samples) <= num * resubmit_threshold:
+            try:
+                submit()
+            except StopIteration:
+                break
     samples.sort(key=lambda x: x[0])
     _, zs, solutions = zip(*samples)
     xs = [[s.x for s in sols] for sols in solutions]

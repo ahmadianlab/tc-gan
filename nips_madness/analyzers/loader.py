@@ -80,5 +80,9 @@ class GANData(object):
         for log_JDS in zip(self.log_J, self.log_D, self.log_S):
             yield list(map(np.exp, log_JDS))
 
+    def to_dataframe(self):
+        import pandas
+        return pandas.DataFrame(self.main, columns=self.main_names)
+
 
 load_gandata = GANData.load

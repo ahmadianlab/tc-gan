@@ -3,8 +3,8 @@ import timeit
 import numpy as np
 
 import stimuli
-from .ssnode import solve_dynamics, solve_dynamics_python
-from .tests.test_dynamics import numeric_w
+from ..ssnode import solve_dynamics, solve_dynamics_python
+from ..tests.test_dynamics import numeric_w
 
 
 def make_bench_solve_dynamics(

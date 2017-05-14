@@ -1,6 +1,6 @@
 import timeit
 
-from .ssnode import sample_fixed_points
+from ..ssnode import sample_fixed_points
 
 
 def make_bench_find_fixed_points(**kwargs):

@@ -1,7 +1,7 @@
 import itertools
 import timeit
 
-from .benchmark_find_fixed_points import make_bench_find_fixed_points
+from .find_fixed_points import make_bench_find_fixed_points
 
 
 def run_benchmarks(repeat, resubmit_thresholds, io_types, deterministics,

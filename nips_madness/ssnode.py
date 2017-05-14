@@ -303,7 +303,7 @@ def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
 
 
 FixedPointsInfo = collections.namedtuple('FixedPointsInfo', [
-    'solutions', 'counter', 'rejections',
+    'solutions', 'counter', 'rejections', 'unused',
 ])
 
 
@@ -345,6 +345,7 @@ def find_fixed_points_serial(num, Z_W_gen, exts, **common_kwargs):
         solutions,
         counter,
         sum(counter.values()),
+        0,
     )
 
 
@@ -357,6 +358,7 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
 
     results = queue.Queue(0)
     indices = itertools.count()
+    nonlocals = {'consumed': 0}
 
     def worker(idx, Z, W):
         solutions = []
@@ -372,6 +374,7 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
         def submit():
             Z, W = next(Z_W_gen)
             worker(next(indices), Z, W)
+            nonlocals['consumed'] += 1
     else:
         pool = multiprocessing.dummy.Pool()
 
@@ -379,28 +382,36 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
             Z, W = next(Z_W_gen)
             worker, next(indices), Z, W
             pool.apply_async(worker, (next(indices), Z, W))
+            nonlocals['consumed'] += 1
 
     for _ in range(num):
         submit()
 
     samples = []
     counter = collections.Counter()
-    while len(samples) < num:
+    while True:
         success, idx, Z, solutions = results.get()
         if success:
             solutions.reverse()
             samples.append((idx, Z, solutions))
         else:
-            submit()
             counter[solutions[-1].error] += 1
+        if len(samples) >= num:
+            break
+        try:
+            submit()
+        except StopIteration:
+            break
     samples.sort(key=lambda x: x[0])
     _, zs, solutions = zip(*samples)
     xs = [[s.x for s in sols] for sols in solutions]
 
+    rejected = sum(counter.values())
     return zs, xs, FixedPointsInfo(
         solutions,
         counter,
-        sum(counter.values()),
+        rejected,
+        nonlocals['consumed'] - num - rejected,
     )
 
 

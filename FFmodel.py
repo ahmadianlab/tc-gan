@@ -4,6 +4,7 @@ import theano.tensor as T
 import numpy as np
 import discriminators.simple_discriminator as SD
 import math 
+import sys 
 
 niter = 20000
 np.random.seed(0)
@@ -47,7 +48,7 @@ def get_FF_output(S,mW,sW,mB,sB,w,b,x,inp,nsam,nx,ny,nz,nhid,ni):
     hidden_activations = (T.reshape((mW + sW*w),[nsam,1,nhid,-1])*input_activations).sum(axis = 3) + T.reshape((mB + sB*b),[nsam,1,nhid])#[nsam,ni,nhid]
     return hidden_activations
 
-def run_WGAN():
+def run_GAN(mode):
 
     box_width = 10
 
@@ -69,21 +70,16 @@ def run_WGAN():
     NI = ni.get_value()
     ###
 
-    XX = np.linspace(-1,1,NX)
-    YY = np.linspace(-1,1,NY)
-    ZZ = np.linspace(-1,1,NZ)
+    XX = np.linspace(-1,1,NX).astype("float32")
+    YY = np.linspace(-1,1,NY).astype("float32")
+    ZZ = np.linspace(-1,1,NZ).astype("float32")
       
     pos = theano.shared(np.array([[[[x,y,z] for z in ZZ] for y in YY] for x in XX]).astype("float32"))
-    
+
+    #generate the right shape 
     def generate_samples():
-        W = np.random.normal(mW.get_value(),np.exp(sW.get_value()),(NSAM,NHID,NX*NY*NZ)).astype("float32")
-        B = np.random.normal(mB.get_value(),np.exp(sB.get_value()),(NSAM,NHID)).astype("float32")
-
-        return W,B
-
-    def generate_data():
-        W = np.random.normal(mW_true.get_value(),np.exp(sW_true.get_value()),(NSAM,NHID,NX*NY*NZ)).astype("float32")
-        B = np.random.normal(mB_true.get_value(),np.exp(sB_true.get_value()),(NSAM,NHID)).astype("float32")
+        W = np.random.normal(0,1,(NSAM,NHID,NX*NY*NZ)).astype("float32")
+        B = np.random.normal(0,1,(NSAM,NHID)).astype("float32")
 
         return W,B
 
@@ -105,8 +101,7 @@ def run_WGAN():
     NOBS = 10
     INSHAPE = (NSAM,NI,NOBS)
 
-    loss = "WGAN"
-    layers = [128]
+    layers = [128,128]
     
     def make_mask():
         sel = np.random.choice(np.arange(NHID),NOBS)
@@ -125,22 +120,22 @@ def run_WGAN():
     get_DG_input = theano.function([weights,bias,stimulus],FOBS_sam,allow_input_downcast = True)
 
     #I need a function that returns training functions
-    D_train, G_train = make_train_funcs(FOBS_sam,[S,mW,sW,mB,sB],[weights,bias,stimulus],"WGAN",[128,128],(NSAM,NI,NOBS),mode = "GAN")
+    D_train, G_train = make_train_funcs(FOBS_sam,[S,mW,sW,mB,sB],[weights,bias,stimulus],[128,128],(NSAM,NI,NOBS),mode)
     
     #now define the actual values and test
 
     STIM = np.array([[0,.25*np.cos((2*math.pi*k)/NI),.25 * np.sin((2*math.pi*k)/NI)] for k in range(NI)])
 
-    train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,generate_data,STIM,mode = "GAN")
+    train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,STIM,mode = mode)
 
-def train(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test",mode = "WGAN"):
+def train(D_step,G_step,D_in,G_in,F_gen,STIM,mode = "WGAN",tag = "test"):
     
     if mode =="WGAN":
-        train_wgan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test")
+        train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag)
     elif mode =="GAN":
-        train_gan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test")
+        train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag)
 
-def train_wgan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
+def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag = "test"):
     
     NDstep = 5
     
@@ -162,7 +157,7 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
         for dstep in range(NDstep):
             #get the samples for training
             SS = F_gen()
-            DD = T_gen()
+            DD = F_gen()
 
             #get the data inputs
             data = D_in(DD[0],DD[1],STIM)
@@ -185,7 +180,7 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
         SS = F_gen()
         gloss = G_step(SS[0],SS[1],STIM)
 
-        F = open("./FF_logs/FF_WGAN_log_"+tag+".csv","a")
+        F = open("./FF_logs/FF_WGAN_losslog_"+tag+".csv","a")
         F.write("{},{}\n".format(gloss,dloss))
         F.close()
         
@@ -204,7 +199,8 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
             F.write(OUT + "\n")
             F.close()
 
-def train_gan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
+    
+def train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag = "test"):
         
     F = open("./FF_logs/FF_GAN_log_"+tag+".csv","w")
     F.write("dS\tdmW\tdsW\tdmB\tdsB\n")
@@ -222,7 +218,7 @@ def train_gan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
     for k in range(niter):
     
         SS = F_gen()
-        DD = T_gen()
+        DD = F_gen()
         
         #get the disc inputs
         data = D_in(DD[0],DD[1],STIM)
@@ -232,7 +228,7 @@ def train_gan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
         dloss = D_step(data,samples)
         gloss = G_step(SS[0],SS[1],STIM)
 
-        F = open("./FF_logs/FF_GAN_log_"+tag+".csv","a")
+        F = open("./FF_logs/FF_GAN_losslog_"+tag+".csv","a")
         F.write("{},{}\n".format(gloss,dloss))
         F.close()
         
@@ -251,20 +247,20 @@ def train_gan(D_step,G_step,D_in,G_in,F_gen,T_gen,STIM,tag = "test"):
             F.write(OUT + "\n")
             F.close()
 
-def make_train_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE,mode = "WGAN"):
+def make_train_funcs(generator, Gparams, Ginputs, layers, INSHAPE,mode = "WGAN"):
 
     if mode == "WGAN":
-        return make_WGAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE)
+        return make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE)
     elif mode =="GAN":
-        return make_GAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE)
+        return make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE)
 
-def make_WGAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE):
+def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
     
-    D_dat = SD.make_net(D_D_input,INSHAPE,loss,layers)
-    D_sam = SD.make_net(D_G_input,INSHAPE,loss,layers,params = lasagne.layers.get_all_layers(D_dat))
-    G_sam = SD.make_net(generator,INSHAPE,loss,layers,params = lasagne.layers.get_all_layers(D_dat))
+    D_dat = SD.make_net(D_D_input,INSHAPE,"WGAN",layers)
+    D_sam = SD.make_net(D_G_input,INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
+    G_sam = SD.make_net(generator,INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
     
     #get the outputs
     D_dat_out = lasagne.layers.get_output(D_dat)
@@ -275,14 +271,14 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE):
     
     D_grad_input = T.tensor3("D_sam","float32")
     
-    D_grad_net = SD.make_net(D_grad_input,INSHAPE,loss,layers,params = lasagne.layers.get_all_layers(D_dat))
+    D_grad_net = SD.make_net(D_grad_input,INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
 
     D_grad_out = lasagne.layers.get_output(D_grad_net)
 
     Dgrad = T.sqrt((T.jacobian(T.reshape(D_grad_out,[-1]),D_grad_input)**2).sum(axis = [1,2,3]))
     Dgrad_penalty = ((Dgrad - 1.)**2).mean()
 
-    lam = 1.
+    lam = 10.
 
     D_loss_exp = D_sam_out.mean() - D_dat_out.mean() + lam*Dgrad_penalty#discriminator loss
     G_loss_exp = - G_sam_out.mean()#generative loss
@@ -302,13 +298,13 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE):
 
     return D_train_func, G_train_func
 
-def make_GAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE):
+def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
     
-    D_dat = SD.make_net(D_D_input,INSHAPE,loss,layers)
-    D_sam = SD.make_net(D_G_input,INSHAPE,loss,layers,params = lasagne.layers.get_all_layers(D_dat))
-    G_sam = SD.make_net(generator,INSHAPE,loss,layers,params = lasagne.layers.get_all_layers(D_dat))
+    D_dat = SD.make_net(D_D_input,INSHAPE,"CE",layers)
+    D_sam = SD.make_net(D_G_input,INSHAPE,"CE",layers,params = lasagne.layers.get_all_layers(D_dat))
+    G_sam = SD.make_net(generator,INSHAPE,"CE",layers,params = lasagne.layers.get_all_layers(D_dat))
     
     #get the outputs
     D_dat_out = lasagne.layers.get_output(D_dat)
@@ -316,8 +312,7 @@ def make_GAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE):
     G_sam_out = lasagne.layers.get_output(G_sam)
     
     #make the loss functions
-    
-    D_loss_exp = - T.log(D_sam_out.mean()) - T.log(1. - D_dat_out.mean())#discriminator loss
+    D_loss_exp = - T.log(D_dat_out.mean()) - T.log(1. - D_sam_out.mean())#discriminator loss
     G_loss_exp = - T.log(G_sam_out.mean())#generative loss
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
@@ -336,4 +331,4 @@ def make_GAN_funcs(generator, Gparams, Ginputs, loss, layers, INSHAPE):
     return D_train_func, G_train_func
 
 if __name__ == "__main__":
-    run_WGAN()
+    run_GAN(sys.argv[1])

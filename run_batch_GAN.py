@@ -325,7 +325,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         print("Invalid loss specified")
         exit()
 
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(rvec - 100.).sum()
+    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(rvec - 200.).sum()
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), disc_learn_rate)#discriminator training function
@@ -499,7 +499,7 @@ if __name__ == "__main__":
         'datapath', default='training_data_TCs_Ne102.mat', nargs='?',
         help='Path to MATLAB data file (default: %(default)s)')
     parser.add_argument(
-        '--iterations', default=1000, type=int,
+        '--iterations', default=10000, type=int,
         help='Number of iterations (default: %(default)s)')
     parser.add_argument(
         '--seed', default=0, type=int,

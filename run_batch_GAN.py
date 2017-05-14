@@ -13,12 +13,15 @@ import nips_madness.gradient_expressions.make_w_batch as make_w
 import nips_madness.gradient_expressions.SS_grad as SSgrad
 import nips_madness.ssnode as SSsolve
 
+import os
 import time
 
 import stimuli
 
 
-def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01, loss = "CE", use_data = False, IO_type = "asym_tanh", layers = [],n_samples = 10,debug = True,rate_cost = 0):
+def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
+         loss, use_data, IO_type, layers, n_samples, debug, rate_cost,
+         rate_hard_bound, rate_soft_bound):
 
     ##Make the tag for the files
     #tag whether or not we use data
@@ -59,6 +62,15 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
+
+    ssn_params = dict(
+        rate_soft_bound=rate_soft_bound,
+        rate_hard_bound=rate_hard_bound,
+        io_type=IO_type,
+        k=coe_value,
+        n=exp_value,
+        r0=np.zeros(2 * n_sites),
+    )
 
     #defining all the parameters that we might want to train
 
@@ -160,9 +172,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     ivec = T.matrix("ivec","float32")
 
     #DrDth tensor expressions
-    dRdJ_exp = SSgrad.WRgrad_batch(rvec,ww,dwdj,ivec,exp,coe,NZ,NB,N,IO_type)
-    dRdD_exp = SSgrad.WRgrad_batch(rvec,ww,dwdd,ivec,exp,coe,NZ,NB,N,IO_type)
-    dRdS_exp = SSgrad.WRgrad_batch(rvec,ww,dwds,ivec,exp,coe,NZ,NB,N,IO_type)
+    WRgrad_params = dict(
+        R=rvec, W=ww, I=ivec,
+        n=exp, k=coe, nz=NZ, nb=NB, N=N,
+        io_type=IO_type,
+        r0=rate_soft_bound,
+        r1=rate_hard_bound,
+    )
+    dRdJ_exp = SSgrad.WRgrad_batch(DW=dwdj, **WRgrad_params)
+    dRdD_exp = SSgrad.WRgrad_batch(DW=dwdd, **WRgrad_params)
+    dRdS_exp = SSgrad.WRgrad_batch(DW=dwds, **WRgrad_params)
 
     dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
@@ -175,7 +194,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         rz = np.zeros((2*N))
 
         for c in [1.,2.,4.,8.,16.]:
-            r  = SSsolve.fixed_point(wt,c*BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+            r  = SSsolve.fixed_point(wt,c*BAND_IN[-1], *ssn_params)
         
             print(np.max(r.x))
         exit()
@@ -190,7 +209,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
             rz = np.zeros((2*N))
 
             TT1 = time.time()
-            r  = SSsolve.fixed_point(wt,BAND_IN[-1],r0 = rz,k = coe_value, n = exp_value,io_type = IO_type)
+            r  = SSsolve.fixed_point(wt,BAND_IN[-1], **ssn_params)
 
             total = time.time() - TT1
             print(total,r.success)
@@ -212,7 +231,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
         
         wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b],coe_value,exp_value,np.zeros((2*N)),io_type = IO_type)[0].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
+        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b], *ssn_params)[0].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
 
         print(ssR.mean())
         print(wtest.mean())
@@ -256,7 +275,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         
         WW = W(Ztest)
                
-        rr1 = np.array([[SSsolve.solve_dynamics(z,b,coe_value,exp_value,np.zeros((2*N)),io_type = IO_type)[0] for b in inp] for z in WW])
+        rr1 = np.array([[SSsolve.solve_dynamics(z,b, **ssn_params)[0] for b in inp] for z in WW])
 
         DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
                
@@ -268,7 +287,7 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
 
         WW = W(Ztest)
 
-        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b],coe_value,exp_value,rr1[z,b],io_type = IO_type)[0] for b in range(len(inp))] for z in range(len(WW))])
+        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b], **dict(ssn_params, r0=rr1[z,b]))[0] for b in range(len(inp))] for z in range(len(WW))])
 
         print(rr2.max())
         print(rr2.min())
@@ -365,13 +384,35 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     inp = BAND_IN
 
     def log(a,F = "SSNGAN_log_{}.log".format(tag),PRINT = True):
+        if isinstance(a, list):
+            a = ','.join(map(str, a))
         if PRINT:
             print(a)
         f = open("./logfiles/" + F,"a")
         f.write(str(a) + "\n")
         f.close()
 
-    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,truth_convergence")
+    try:
+        os.makedirs('logfiles')
+    except IOError as err:
+        if err.errno != 17:
+            # If the error is "File exists" (errno=17) error, it means
+            # that the directory exists and it's fine to ignore the
+            # error.  It is slightly safer than checking existence of
+            # the directory since several processes may be creating it
+            # at the same time.  Maybe the error should be re-raised
+            # here but opening log file would fail anyway if there is
+            # something wrong.
+            print("!! Unexpected exception !!")
+            print(err)
+
+    # Clear data in old log files
+    for filename in ["SSNGAN_log_{}.log",
+                     "D_parameters_{}.log",
+                     "parameters_{}.log"]:
+        open(os.path.join("logfiles", filename.format(tag)), 'w').close()
+
+    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,truth_convergence,model_unused,truth_unused")
 
     for k in range(iterations):
         TT = time.time()
@@ -395,10 +436,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                 wtest, = W(ztest)
                 yield ztest[0], wtest
 
-        Ztest, Ftest, info = SSsolve.find_fixed_points(
+        Ztest, Ftest, model_info = SSsolve.find_fixed_points(
             NZ, Z_W_gen(), inp,
-            r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
-        model_fail = info.rejections
+            **ssn_params)
 
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
@@ -426,18 +466,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                     wtest2, = W_test(ztest2)
                     yield ztest2[0], wtest2
 
-            Ztrue, Otrue, info = SSsolve.find_fixed_points(
+            Ztrue, Otrue, true_info = SSsolve.find_fixed_points(
                 NZ, Z_W_gen2(), inp,
-                r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
-
-            true_fail = info.rejections
+                **ssn_params)
 
             Otrue = np.array(Otrue)
             Ztrue = np.array(Ztrue)
             true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))                
  
         else:
-            true_fail = 0
+            true_info = SSsolve.null_FixedPointsInfo
 
         Tfinal = time.time()
 
@@ -447,7 +485,13 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         Gloss = G_train_func(rtest,inp,Ztest)
         Dloss = D_train_func(rtest,true)
         
-        log("{},{},{},{},{},{},{},{}".format(k,Gloss,Dloss,D_acc(rtest,true),Tfinal - TT,time.time() - Tfinal,model_fail,true_fail))
+        log([k, Gloss, Dloss, D_acc(rtest, true),
+             Tfinal - TT,
+             time.time() - Tfinal,
+             model_info.rejections,
+             true_info.rejections,
+             model_info.unused,
+             true_info.unused])
 
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)
@@ -496,7 +540,9 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        'datapath', default='training_data_TCs_Ne102.mat', nargs='?',
+        'datapath', nargs='?',
+        default=os.path.join(os.path.dirname(__file__),
+                             'training_data_TCs_Ne102.mat'),
         help='Path to MATLAB data file (default: %(default)s)')
     parser.add_argument(
         '--iterations', default=10000, type=int,
@@ -531,7 +577,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '--rate_cost', default=0, type=float,
         help='The cost of having the rate be large (default: %(default)s)')
-
+    parser.add_argument(
+        '--rate_soft_bound', default=200, type=float,
+        help='rate_soft_bound=r0 (default: %(default)s)')
+    parser.add_argument(
+        '--rate_hard_bound', default=1000, type=float,
+        help='rate_hard_bound=r1 (default: %(default)s)')
 
     ns = parser.parse_args()
     ns.layers = eval(str(ns.layers))

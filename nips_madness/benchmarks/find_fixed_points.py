@@ -1,6 +1,6 @@
 import timeit
 
-from .ssnode import sample_fixed_points
+from ..ssnode import sample_fixed_points
 
 
 def make_bench_find_fixed_points(**kwargs):
@@ -21,5 +21,9 @@ def run_benchmarks(repeat=3, **kwargs):
                 io_type, method, min(times), sum(times) / repeat))
 
 
-if __name__ == '__main__':
+def main(_=None):
     run_benchmarks()
+
+
+if __name__ == '__main__':
+    main()

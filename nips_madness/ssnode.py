@@ -22,6 +22,21 @@ import scipy.optimize
 from .clib import libssnode, double_ptr
 
 
+DEFAULT_PARAMS = dict(
+    N=102,
+    J=np.array([[.0957, .0638], [.1197, .0479]]),
+    D=np.array([[.7660, .5106], [.9575, .3830]]),
+    S=np.array([[.6667, .2], [1.333, .2]]) / 8,
+    bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
+    smoothness=0.25/8,
+    contrast=20,
+    io_type='asym_tanh',
+    k=0.01,
+    n=2.2,
+    rate_soft_bound=200, rate_hard_bound=1000,
+)
+
+
 class FixedPointResult(object):
 
     message = None
@@ -139,7 +154,8 @@ def fixed_point(
         W, ext, k, n, r0, tau=[.016, .002],
         # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
         max_iter=10000, atol=1e-10, dt=.001, solver='euler',
-        rate_soft_bound=200, rate_hard_bound=1000,
+        rate_soft_bound=DEFAULT_PARAMS['rate_soft_bound'],
+        rate_hard_bound=DEFAULT_PARAMS['rate_hard_bound'],
         rate_stop_at=np.inf,
         io_type='asym_tanh', check=False):
     """
@@ -218,7 +234,7 @@ def fixed_point(
     assert W.ndim == 2
     assert (2 * N,) == r0.shape == ext.shape
 
-    if io_type == 'asym_linear':
+    if io_type in ('asym_power', 'asym_linear'):
         rate_hard_bound = rate_stop_at
 
     error = getattr(libssnode,
@@ -303,8 +319,9 @@ def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
 
 
 FixedPointsInfo = collections.namedtuple('FixedPointsInfo', [
-    'solutions', 'counter', 'rejections',
+    'solutions', 'counter', 'rejections', 'unused',
 ])
+null_FixedPointsInfo = FixedPointsInfo(None, None, 0, 0)
 
 
 def find_fixed_points(num, Z_W_gen, exts, method='parallel', **common_kwargs):
@@ -345,10 +362,13 @@ def find_fixed_points_serial(num, Z_W_gen, exts, **common_kwargs):
         solutions,
         counter,
         sum(counter.values()),
+        0,
     )
 
 
 def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
+                               resubmit_threshold=0.1,
+                               deterministic=True,
                                **common_kwargs):
     # Revers exts to try large bandwidth first, as it is more likely
     # to produces diverging solution:
@@ -357,6 +377,7 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
 
     results = queue.Queue(0)
     indices = itertools.count()
+    nonlocals = {'consumed': 0}
 
     def worker(idx, Z, W):
         solutions = []
@@ -372,6 +393,7 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
         def submit():
             Z, W = next(Z_W_gen)
             worker(next(indices), Z, W)
+            nonlocals['consumed'] += 1
     else:
         pool = multiprocessing.dummy.Pool()
 
@@ -379,21 +401,40 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
             Z, W = next(Z_W_gen)
             worker, next(indices), Z, W
             pool.apply_async(worker, (next(indices), Z, W))
+            nonlocals['consumed'] += 1
 
     for _ in range(num):
         submit()
 
     samples = []
     counter = collections.Counter()
-    while len(samples) < num:
+
+    def collect():
         success, idx, Z, solutions = results.get()
         if success:
             solutions.reverse()
             samples.append((idx, Z, solutions))
         else:
-            submit()
             counter[solutions[-1].error] += 1
+        return success
+
+    while True:
+        success = collect()
+        if len(samples) >= num:
+            break
+        if not success or len(samples) <= num * resubmit_threshold:
+            try:
+                submit()
+            except StopIteration:
+                break
+
+    unused = nonlocals['consumed'] - num - sum(counter.values())
+    if deterministic:
+        for _ in range(unused):
+            collect()
+
     samples.sort(key=lambda x: x[0])
+    samples = samples[:num]
     _, zs, solutions = zip(*samples)
     xs = [[s.x for s in sols] for sols in solutions]
 
@@ -401,6 +442,7 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
         solutions,
         counter,
         sum(counter.values()),
+        unused,
     )
 
 
@@ -473,6 +515,17 @@ def sample_fixed_points(
     solver_kwargs.setdefault('r0', np.zeros(2 * N))
     solver_kwargs.update(k=k, n=n, io_type=io_type)
     return find_fixed_points(NZ, Z_W_gen(), exts, **solver_kwargs)
+
+
+def sample_tuning_curves(sample_sites=3, **kwargs):
+    _, rates, _ = sample = sample_fixed_points(**kwargs)
+    rates = np.array(rates)
+    N = rates.shape[-1] // 2
+    i_beg = N // 2 - sample_sites // 3
+    i_end = i_beg + sample_sites + 1
+    tunings = rates[:, :, i_beg:i_end].swapaxes(0, 1)
+    tunings = tunings.reshape((tunings.shape[0], -1))
+    return tunings, sample
 
 
 def plot_trajectory(

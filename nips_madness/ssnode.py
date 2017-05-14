@@ -10,7 +10,6 @@ import collections
 import itertools
 import time
 
-import numpy  # TODO: use np and be consistent
 import numpy as np
 import scipy.optimize
 
@@ -61,11 +60,11 @@ def make_neu_vec(N, E, I):
     """
     Create 2N-dim vector (neural vector) from E/I population-level quantity.
     """
-    return numpy.array([E] * N + [I] * N)
+    return np.array([E] * N + [I] * N)
 
 
 def any_to_neu_vec(N, vec):
-    vec = numpy.asarray(vec)
+    vec = np.asarray(vec)
     if len(vec) == 2:
         vec = make_neu_vec(N, *vec)
     return vec
@@ -76,7 +75,7 @@ def thlin(x):
 
 
 def fixed_point_equation(r, ext, W, k, n, io_fun):
-    return -r + io_fun(numpy.dot(W, r) + ext)
+    return -r + io_fun(np.dot(W, r) + ext)
 
 
 def drdt(r, _t, ext, W, k, n, io_fun, tau):
@@ -103,10 +102,10 @@ def rate_to_volt(rate, k, n):
 
 
 def io_alin(v, volt_max, k, n):
-    vc = numpy.clip(v, 0, volt_max)
+    vc = np.clip(v, 0, volt_max)
     rate = k * (vc**n)
     linear = k * (volt_max**(n-1)) * n * (v - volt_max)
-    return numpy.where(v <= volt_max, rate, rate + linear)
+    return np.where(v <= volt_max, rate, rate + linear)
 
 
 def io_power(v, k, n):
@@ -115,12 +114,12 @@ def io_power(v, k, n):
 
 
 def io_atanh(v, r0, r1, v0, k, n):
-    v_pow = numpy.clip(v, 0, v0)
+    v_pow = np.clip(v, 0, v0)
     r_pow = k * (v_pow**n)
-    r_tanh = r0 + (r1 - r0) * numpy.tanh(
+    r_tanh = r0 + (r1 - r0) * np.tanh(
         n * r0 / (r1 - r0) * (v - v0) / v0
     )
-    return numpy.where(v <= v0, r_pow, r_tanh)
+    return np.where(v <= v0, r_pow, r_tanh)
 
 
 def solve_dynamics(*args, **kwds):
@@ -135,7 +134,7 @@ def fixed_point(
         # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
         max_iter=10000, atol=1e-10, dt=.001, solver='euler',
         rate_soft_bound=100, rate_hard_bound=200,
-        rate_stop_at=numpy.inf,
+        rate_stop_at=np.inf,
         io_type='asym_tanh', check=False):
     """
     Solve ODE for the SSN until it converges to a fixed point.
@@ -202,10 +201,10 @@ def fixed_point(
     if solver not in ('gsl', 'euler'):
         raise ValueError("Unknown solver: {}".format(solver))
 
-    W = numpy.asarray(W, dtype='double')
-    ext = numpy.asarray(ext, dtype='double')
-    r0 = numpy.array(r0, dtype='double')  # copied, as it will be modified
-    r1 = numpy.empty_like(r0)
+    W = np.asarray(W, dtype='double')
+    ext = np.asarray(ext, dtype='double')
+    r0 = np.array(r0, dtype='double')  # copied, as it will be modified
+    r1 = np.empty_like(r0)
     tau_E, tau_I = tau
 
     N = W.shape[0] // 2
@@ -230,7 +229,7 @@ def fixed_point(
     )
     sol = FixedPointResult(r0, error)
     if error == 0:
-        if numpy.isfinite(r0).all():
+        if np.isfinite(r0).all():
             sol.message = "Converged"
         else:
             sol.error = 1
@@ -278,9 +277,9 @@ def solve_dynamics_python(
     rr = r0
 
     for _ in range(max_iter):
-        dr = (- rr + io_fun(numpy.dot(W, rr) + ext))/tau
+        dr = (- rr + io_fun(np.dot(W, rr) + ext))/tau
         rr = rr + dt * dr
-        if numpy.abs(dr).max() < atol:
+        if np.abs(dr).max() < atol:
             break
     else:
         print("SSN Convergence Failed")
@@ -336,7 +335,7 @@ def plot_io_funs(k=0.01, n=2.2, r0=100, r1=200, xmin=-1, xmax=150):
     from matplotlib import pyplot
 
     fig, ax = pyplot.subplots()
-    x = numpy.linspace(xmin, xmax)
+    x = np.linspace(xmin, xmax)
     v0 = rate_to_volt(r0, k, n)
     ax.plot(x, k * (thlin(x)**n), label='power-law')
     ax.plot(x, io_alin(x, v0, k, n), label='asym_linear')
@@ -347,9 +346,9 @@ def plot_io_funs(k=0.01, n=2.2, r0=100, r1=200, xmin=-1, xmax=150):
 
 def make_solver_params(
         N=102,
-        J=numpy.array([[.0957, .0638], [.1197, .0479]]),
-        D=numpy.array([[.7660, .5106], [.9575, .3830]]),
-        S=numpy.array([[.6667, .2], [1.333, .2]]) / 8,
+        J=np.array([[.0957, .0638], [.1197, .0479]]),
+        D=np.array([[.7660, .5106], [.9575, .3830]]),
+        S=np.array([[.6667, .2], [1.333, .2]]) / 8,
         # io_type='asym_linear', seed=97,
         io_type='asym_tanh', seed=65,
         bandwidth=1, smoothness=0.25/8, contrast=20,
@@ -358,19 +357,19 @@ def make_solver_params(
     from .tests.test_dynamics import numeric_w
 
     if isinstance(seed, int):
-        rs = numpy.random.RandomState(seed)
+        rs = np.random.RandomState(seed)
     else:
         rs = seed
 
     Z = rs.rand(1, 2*N, 2*N)
     W, = numeric_w(Z, J, D, S)
-    X = numpy.linspace(-0.5, 0.5, N)
+    X = np.linspace(-0.5, 0.5, N)
     ext, = stimuli.input([bandwidth], X, smoothness, contrast)
 
     return dict(
         W=W,
         ext=ext,
-        r0=numpy.zeros(W.shape[0]),
+        r0=np.zeros(W.shape[0]),
         k=k, n=n,
         io_type=io_type,
     )
@@ -378,9 +377,9 @@ def make_solver_params(
 
 def sample_fixed_points(
         NZ=30, seed=0, N=102,
-        J=numpy.array([[.0957, .0638], [.1197, .0479]]),
-        D=numpy.array([[.7660, .5106], [.9575, .3830]]),
-        S=numpy.array([[.6667, .2], [1.333, .2]]) / 8,
+        J=np.array([[.0957, .0638], [.1197, .0479]]),
+        D=np.array([[.7660, .5106], [.9575, .3830]]),
+        S=np.array([[.6667, .2], [1.333, .2]]) / 8,
         bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
         smoothness=0.25/8, contrast=20,
         io_type='asym_linear', k=0.01, n=2.2,
@@ -412,7 +411,7 @@ def plot_trajectory(
     solver_kwargs = make_solver_params(**modelparams)
     N = solver_kwargs['W'].shape[0] // 2
 
-    t = numpy.linspace(0, tmax, tnum)
+    t = np.linspace(0, tmax, tnum)
     with print_timing('Runtime (odeint):'):
         r = odeint(t, **solver_kwargs)
 

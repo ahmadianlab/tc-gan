@@ -83,9 +83,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     #these are the parammeters to be fit
     dp = .1
 
-    J = theano.shared(J2.get_value() + dp*np.random.normal(0,1.,(2,2)),name = "j")
-    D = theano.shared(D2.get_value() + dp*np.random.normal(0,1.,(2,2)),name = "d")
-    S = theano.shared(S2.get_value() + dp*np.random.normal(0,1.,(2,2)),name = "s")
+    J = theano.shared(J2.get_value() + dp*np.array([[1,1],[1,1]]),name = "j")
+    D = theano.shared(D2.get_value() + dp*np.array([[1,1],[1,1]]),name = "d")
+    S = theano.shared(S2.get_value() + dp*np.array([[1,1],[1,1]]),name = "s")
 
 #    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")

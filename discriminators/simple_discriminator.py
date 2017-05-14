@@ -14,6 +14,8 @@ def make_net(input_variable,in_shape,LOSS,layers = [],params = None):
             net = L.DenseLayer(net,1,nonlinearity = NL.linear)
         elif LOSS == "CE":
             net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid)
+        elif LOSS == "WGAN":
+            net = L.DenseLayer(net,1,nonlinearity = NL.linear)
         else:
             print("Invaid LOSS specified")
             exit()
@@ -26,6 +28,8 @@ def make_net(input_variable,in_shape,LOSS,layers = [],params = None):
             net = L.DenseLayer(net,1,nonlinearity = NL.linear,W = params[len(layers)+1].W,b = params[len(layers)+1].b)
         elif LOSS == "CE":
             net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid,W = params[len(layers)+1].W,b = params[len(layers)+1].b)
+        elif LOSS == "WGAN":
+            net = L.DenseLayer(net,1,nonlinearity = NL.linear,W = params[len(layers)+1].W,b = params[len(layers)+1].b)
         else:
             print("Invaid LOSS specified")
             exit()

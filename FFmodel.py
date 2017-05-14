@@ -5,7 +5,11 @@ import numpy as np
 import discriminators.simple_discriminator as SD
 import math 
 
-niter = 10000
+niter = 20000
+np.random.seed(0)
+
+#tag = "debug"
+tag = ""
 
 def get_FF_output(S,mW,sW,mB,sB,w,b,x,inp,nsam,nx,ny,nz,nhid,ni):
 
@@ -23,22 +27,25 @@ def get_FF_output(S,mW,sW,mB,sB,w,b,x,inp,nsam,nx,ny,nz,nhid,ni):
 
     """
 
-    pos = T.reshape(x,[-1,1,3])    
-    dist_sq = ((pos - T.transpose(pos,[1,0,2]))**2).sum(axis = 2)
-    input_activations = T.reshape((T.reshape(T.exp(-dist_sq/(2*(S**6))),[1,nx*ny*nz,nx*ny*nz])*T.reshape(inp,[ni,1,-1])).sum(axis = 2),[1,ni,1,-1])#[1,ni,1,nx*ny*nz]
+    pos = T.reshape(x,[1,-1,3])    
+    stim = T.reshape(inp,[ni,1,3])
+    dist_sq = ((pos - stim)**2).sum(axis = 2)#[ni,nx*ny*nz]
+    input_activations = T.reshape(T.exp(-dist_sq/(2*(S**6))),[1,ni,1,-1])#[1,ni,nx*ny*nz]
     hidden_activations = (T.reshape((mW + sW*w),[nsam,1,nhid,-1])*input_activations).sum(axis = 3) + T.reshape((mB + sB*b),[nsam,1,nhid])#[nsam,ni,nhid]
     return hidden_activations
 
 def run_GAN():
 
+    box_width = 10
+
     nsam = theano.shared(10)
-    nx = theano.shared(5)
-    ny = theano.shared(5)
-    nz = theano.shared(5)
+    nx = theano.shared(box_width)
+    ny = theano.shared(box_width)
+    nz = theano.shared(box_width)
 
     nhid = theano.shared(100)
 
-    ni = theano.shared(10)
+    ni = theano.shared(box_width)
     
     ###
     NX = nx.get_value()
@@ -49,19 +56,24 @@ def run_GAN():
     NI = ni.get_value()
     ###
 
-    S = theano.shared(np.float32(0),name = "RF_s")
-    mW = theano.shared(np.float32(0),name = "mean_W")
-    sW = theano.shared(np.float32(0),name = "s_W")
-    mB = theano.shared(np.float32(0),name = "mean_b")
-    sB = theano.shared(np.float32(0),name = "s_b")
+    S = theano.shared(np.float32(-1),name = "RF_s")
+    mW = theano.shared(np.float32(.5),name = "mean_W")
+    sW = theano.shared(np.float32(-1),name = "s_W")
+    mB = theano.shared(np.float32(-.5),name = "mean_b")
+    sB = theano.shared(np.float32(.5),name = "s_b")
 
-    S_true = theano.shared(np.float32(-.5))
-    mW_true = theano.shared(np.float32(.2))
-    sW_true = theano.shared(np.float32(.5))
-    mB_true = theano.shared(np.float32(-.3))
-    sB_true = theano.shared(np.float32(.2))
+    S_true = theano.shared(np.float32(-2.))
+    mW_true = theano.shared(np.float32(0))
+    sW_true = theano.shared(np.float32(0))
+    mB_true = theano.shared(np.float32(0))
+    sB_true = theano.shared(np.float32(0))
+
+    XX = np.linspace(-1,1,NX)
+    YY = np.linspace(-1,1,NY)
+    ZZ = np.linspace(-1,1,NZ)
       
-    pos = theano.shared(np.array([[[[x,y,z] for z in range(nz.get_value())] for y in range(ny.get_value())] for x in range(nx.get_value())]).astype("float32"))
+    pos = theano.shared(np.array([[[[x,y,z] for z in ZZ] for y in YY] for x in XX]).astype("float32"))
+
     
     def generate_samples():
         W = np.random.normal(mW.get_value(),np.exp(sW.get_value()),(NSAM,NHID,NX*NY*NZ)).astype("float32")
@@ -75,7 +87,7 @@ def run_GAN():
 
         return W,B
 
-    stimulus = T.tensor4("input","float32")
+    stimulus = T.matrix("input","float32")
     weights = T.tensor3("weights","float32")
     bias = T.matrix("bias","float32")
 
@@ -90,7 +102,7 @@ def run_GAN():
     
     #done defining the output function
 
-    NOBS = 10
+    NOBS = 20
     INSHAPE = (NSAM,NI,NOBS)
 
     loss = "CE"
@@ -131,9 +143,9 @@ def run_GAN():
     
     #now define the actualy values and test
 
-    STIM = np.random.randint(2,size = (NI,NX,NY,NZ))
+    STIM = np.array([[0,.25*np.cos((2*math.pi*k)/NI),.25 * np.sin((2*math.pi*k)/NI)] for k in range(NI)])
 
-    F = open("./FF_GAN_log.csv","w")
+    F = open("./FF_GAN_log"+tag+".csv","w")
     F.write("dS\tdmW\tdsW\tdmB\tdsB\n")
     F.close()
 
@@ -157,21 +169,23 @@ def run_GAN():
 
             if k%100 == 0:
                 print(OUT)
-            F = open("./FF_GAN_log.csv","a")
+            F = open("./FF_GAN_log"+tag+".csv","a")
             F.write(OUT + "\n")
             F.close()
 
 
 def run_WGAN():
 
-    nsam = theano.shared(100)
-    nx = theano.shared(5)
-    ny = theano.shared(5)
-    nz = theano.shared(5)
+    box_width = 10
+
+    nsam = theano.shared(10)
+    nx = theano.shared(box_width)
+    ny = theano.shared(box_width)
+    nz = theano.shared(box_width)
 
     nhid = theano.shared(100)
 
-    ni = theano.shared(10)
+    ni = theano.shared(box_width)
     
     ###
     NX = nx.get_value()
@@ -182,19 +196,23 @@ def run_WGAN():
     NI = ni.get_value()
     ###
 
-    S = theano.shared(np.float32(0),name = "RF_s")
-    mW = theano.shared(np.float32(0),name = "mean_W")
-    sW = theano.shared(np.float32(0),name = "s_W")
-    mB = theano.shared(np.float32(0),name = "mean_b")
-    sB = theano.shared(np.float32(0),name = "s_b")
+    S = theano.shared(np.float32(-1),name = "RF_s")
+    mW = theano.shared(np.float32(.5),name = "mean_W")
+    sW = theano.shared(np.float32(-1),name = "s_W")
+    mB = theano.shared(np.float32(-.5),name = "mean_b")
+    sB = theano.shared(np.float32(.5),name = "s_b")
 
-    S_true = theano.shared(np.float32(-.5))
-    mW_true = theano.shared(np.float32(.2))
-    sW_true = theano.shared(np.float32(.5))
-    mB_true = theano.shared(np.float32(-.3))
-    sB_true = theano.shared(np.float32(.2))
+    S_true = theano.shared(np.float32(-2.))
+    mW_true = theano.shared(np.float32(0))
+    sW_true = theano.shared(np.float32(0))
+    mB_true = theano.shared(np.float32(0))
+    sB_true = theano.shared(np.float32(0))
+
+    XX = np.linspace(-1,1,NX)
+    YY = np.linspace(-1,1,NY)
+    ZZ = np.linspace(-1,1,NZ)
       
-    pos = theano.shared(np.array([[[[x,y,z] for z in range(nz.get_value())] for y in range(ny.get_value())] for x in range(nx.get_value())]).astype("float32"))
+    pos = theano.shared(np.array([[[[x,y,z] for z in ZZ] for y in YY] for x in XX]).astype("float32"))
     
     def generate_samples():
         W = np.random.normal(mW.get_value(),np.exp(sW.get_value()),(NSAM,NHID,NX*NY*NZ)).astype("float32")
@@ -208,7 +226,7 @@ def run_WGAN():
 
         return W,B
 
-    stimulus = T.tensor4("input","float32")
+    stimulus = T.matrix("input","float32")
     weights = T.tensor3("weights","float32")
     bias = T.matrix("bias","float32")
 
@@ -285,22 +303,11 @@ def run_WGAN():
     
     #now define the actualy values and test
 
-    STIM = np.random.randint
-
-    def make_inp(p):
-        PP = pos.get_value()
-
-        PNT = np.reshape(p,[1,1,1,3])
-
-        return np.exp(-((PP - PNT)**2).sum(axis = 3)/(2*(.5)**6))
-
-    locs = np.array([[.5,.5 + .25*np.cos((2*math.pi*k)/NI),.5 + .25*np.sin((2*math.pi*k)/NI)] for k in range(NI)])
-
-    STIM = np.array([make_inp(p) for p in locs])
+    STIM = np.array([[0,.25*np.cos((2*math.pi*k)/NI),.25 * np.sin((2*math.pi*k)/NI)] for k in range(NI)])
 
     NDstep = 5
 
-    F = open("./FF_log.csv","w")
+    F = open("./FF_log"+tag+".csv","w")
     F.write("dS\tdmW\tdsW\tdmB\tdsB\n")
     F.close()
 
@@ -340,9 +347,9 @@ def run_WGAN():
 
             print(OUT)
 
-            F = open("./FF_log.csv","a")
+            F = open("./FF_log"+tag+".csv","a")
             F.write(OUT + "\n")
             F.close()
 
 if __name__ == "__main__":
-    run_GAN()
+    run_WGAN()

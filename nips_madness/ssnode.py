@@ -33,6 +33,7 @@ DEFAULT_PARAMS = dict(
     io_type='asym_tanh',
     k=0.01,
     n=2.2,
+    rate_soft_bound=200, rate_hard_bound=1000,
 )
 
 
@@ -153,7 +154,8 @@ def fixed_point(
         W, ext, k, n, r0, tau=[.016, .002],
         # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
         max_iter=10000, atol=1e-10, dt=.001, solver='euler',
-        rate_soft_bound=200, rate_hard_bound=1000,
+        rate_soft_bound=DEFAULT_PARAMS['rate_soft_bound'],
+        rate_hard_bound=DEFAULT_PARAMS['rate_hard_bound'],
         rate_stop_at=np.inf,
         io_type='asym_tanh', check=False):
     """

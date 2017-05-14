@@ -4,7 +4,7 @@ import lasagne as L
 import numpy as np
 
 from ..weight_gen import weight, generate_weight
-from ..ssnode import rate_to_volt
+from ..ssnode import rate_to_volt, DEFAULT_PARAMS
 
 #what I need is: to write an expression that takes a variable R and matrix W (ss response and weight matrix) and returns the gradient.
 #Now I need functions that take the parameters and compute Wgrads w.r.t. the parameters
@@ -12,7 +12,10 @@ from ..ssnode import rate_to_volt
 def rectify(x):
     return .5*(x + abs(x))
 
-def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N,io_type = "asym_tanh",r0 = 100.,r1 = 200.):
+def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N,
+                 io_type=DEFAULT_PARAMS['io_type'],
+                 r0=DEFAULT_PARAMS['rate_soft_bound'],
+                 r1=DEFAULT_PARAMS['rate_hard_bound']):
     '''
 
     Implementation with no cutoff. Powerlaw nonlinearity extends to infinity

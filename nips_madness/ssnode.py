@@ -390,13 +390,18 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
 
     samples = []
     counter = collections.Counter()
-    while True:
+
+    def collect():
         success, idx, Z, solutions = results.get()
         if success:
             solutions.reverse()
             samples.append((idx, Z, solutions))
         else:
             counter[solutions[-1].error] += 1
+        return success
+
+    while True:
+        success = collect()
         if len(samples) >= num:
             break
         if not success or len(samples) <= num * resubmit_threshold:
@@ -404,16 +409,21 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
                 submit()
             except StopIteration:
                 break
+
+    unused = nonlocals['consumed'] - num - sum(counter.values())
+    for _ in range(unused):
+        collect()
+
     samples.sort(key=lambda x: x[0])
+    samples = samples[:num]
     _, zs, solutions = zip(*samples)
     xs = [[s.x for s in sols] for sols in solutions]
 
-    rejected = sum(counter.values())
     return zs, xs, FixedPointsInfo(
         solutions,
         counter,
-        rejected,
-        nonlocals['consumed'] - num - rejected,
+        sum(counter.values()),
+        unused,
     )
 
 

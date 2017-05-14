@@ -305,6 +305,7 @@ def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
 FixedPointsInfo = collections.namedtuple('FixedPointsInfo', [
     'solutions', 'counter', 'rejections', 'unused',
 ])
+null_FixedPointsInfo = FixedPointsInfo(None, None, 0, 0)
 
 
 def find_fixed_points(num, Z_W_gen, exts, method='parallel', **common_kwargs):

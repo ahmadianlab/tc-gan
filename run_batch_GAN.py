@@ -365,13 +365,15 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
     inp = BAND_IN
 
     def log(a,F = "SSNGAN_log_{}.log".format(tag),PRINT = True):
+        if isinstance(a, list):
+            a = ','.join(map(str, a))
         if PRINT:
             print(a)
         f = open("./logfiles/" + F,"a")
         f.write(str(a) + "\n")
         f.close()
 
-    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,truth_convergence")
+    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,truth_convergence,model_unused,truth_unused")
 
     for k in range(iterations):
         TT = time.time()
@@ -395,10 +397,9 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                 wtest, = W(ztest)
                 yield ztest[0], wtest
 
-        Ztest, Ftest, info = SSsolve.find_fixed_points(
+        Ztest, Ftest, model_info = SSsolve.find_fixed_points(
             NZ, Z_W_gen(), inp,
             r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
-        model_fail = info.rejections
 
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
@@ -426,18 +427,16 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
                     wtest2, = W_test(ztest2)
                     yield ztest2[0], wtest2
 
-            Ztrue, Otrue, info = SSsolve.find_fixed_points(
+            Ztrue, Otrue, true_info = SSsolve.find_fixed_points(
                 NZ, Z_W_gen2(), inp,
                 r0=rz, k=coe_value, n=exp_value, io_type=IO_type)
-
-            true_fail = info.rejections
 
             Otrue = np.array(Otrue)
             Ztrue = np.array(Ztrue)
             true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))                
  
         else:
-            true_fail = 0
+            true_info = SSsolve.null_FixedPointsInfo
 
         Tfinal = time.time()
 
@@ -447,7 +446,13 @@ def main(datapath, iterations, seed=1, gen_learn_rate=0.01, disc_learn_rate=0.01
         Gloss = G_train_func(rtest,inp,Ztest)
         Dloss = D_train_func(rtest,true)
         
-        log("{},{},{},{},{},{},{},{}".format(k,Gloss,Dloss,D_acc(rtest,true),Tfinal - TT,time.time() - Tfinal,model_fail,true_fail))
+        log([k, Gloss, Dloss, D_acc(rtest, true),
+             Tfinal - TT,
+             time.time() - Tfinal,
+             model_info.rejections,
+             true_info.rejections,
+             model_info.unused,
+             true_info.unused])
 
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)

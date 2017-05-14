@@ -1,23 +1,15 @@
 from __future__ import print_function, division
 
 from matplotlib import pyplot
-import numpy as np
 
-from .ssnode import sample_fixed_points
+from .ssnode import sample_tuning_curves, DEFAULT_PARAMS
 
 
-def plot_tunings(sample_sites=3,
-                 bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
+def plot_tunings(bandwidths=DEFAULT_PARAMS['bandwidths'],
                  linewidth=0.2, ylim=(None, None),
                  **sample_kwargs):
     sample_kwargs.update(bandwidths=bandwidths)
-    _Zs, rates, _info = sample_fixed_points(**sample_kwargs)
-    rates = np.array(rates)
-    N = rates.shape[-1] // 2
-    i_beg = N // 2 - sample_sites // 3
-    i_end = i_beg + sample_sites + 1
-    tunings = rates[:, :, i_beg:i_end].swapaxes(0, 1)
-    tunings = tunings.reshape((tunings.shape[0], -1))
+    tunings, sample = sample_tuning_curves(**sample_kwargs)
 
     fig, ax = pyplot.subplots()
     ax.plot(bandwidths, tunings, color='C0', linewidth=linewidth)
@@ -26,3 +18,12 @@ def plot_tunings(sample_sites=3,
     ax.set_ylim(*ylim)
 
     return locals()
+
+
+def main(args=None):
+    plot_tunings()
+    pyplot.show()
+
+
+if __name__ == '__main__':
+    main()

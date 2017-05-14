@@ -22,6 +22,20 @@ import scipy.optimize
 from .clib import libssnode, double_ptr
 
 
+DEFAULT_PARAMS = dict(
+    N=102,
+    J=np.array([[.0957, .0638], [.1197, .0479]]),
+    D=np.array([[.7660, .5106], [.9575, .3830]]),
+    S=np.array([[.6667, .2], [1.333, .2]]) / 8,
+    bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
+    smoothness=0.25/8,
+    contrast=20,
+    io_type='asym_tanh',
+    k=0.01,
+    n=2.2,
+)
+
+
 class FixedPointResult(object):
 
     message = None
@@ -499,6 +513,17 @@ def sample_fixed_points(
     solver_kwargs.setdefault('r0', np.zeros(2 * N))
     solver_kwargs.update(k=k, n=n, io_type=io_type)
     return find_fixed_points(NZ, Z_W_gen(), exts, **solver_kwargs)
+
+
+def sample_tuning_curves(sample_sites=3, **kwargs):
+    _, rates, _ = sample = sample_fixed_points(**kwargs)
+    rates = np.array(rates)
+    N = rates.shape[-1] // 2
+    i_beg = N // 2 - sample_sites // 3
+    i_end = i_beg + sample_sites + 1
+    tunings = rates[:, :, i_beg:i_end].swapaxes(0, 1)
+    tunings = tunings.reshape((tunings.shape[0], -1))
+    return tunings, sample
 
 
 def plot_trajectory(

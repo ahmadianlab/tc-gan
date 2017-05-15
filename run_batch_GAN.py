@@ -93,7 +93,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     Sp2 = T.exp(S2)
 
     #these are the parammeters to be fit
-    dp = .1
+    dp = .5
 
     J = theano.shared(J2.get_value() + dp*np.array([[1,1],[1,1]]),name = "j")
     D = theano.shared(D2.get_value() + dp*np.array([[1,1],[1,1]]),name = "d")

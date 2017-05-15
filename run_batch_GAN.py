@@ -8,11 +8,13 @@ import lasagne
 import numpy as np
 import scipy.io
 
+from nips_madness import utils
 import discriminators.simple_discriminator as SD
 import nips_madness.gradient_expressions.make_w_batch as make_w
 import nips_madness.gradient_expressions.SS_grad as SSgrad
 import nips_madness.ssnode as SSsolve
 
+import json
 import os
 import time
 
@@ -21,7 +23,9 @@ import stimuli
 
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          loss, use_data, IO_type, layers, n_samples, debug, rate_cost,
-         rate_hard_bound, rate_soft_bound):
+         rate_hard_bound, rate_soft_bound,
+         run_config):
+    meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
     ##Make the tag for the files
     #tag whether or not we use data
@@ -406,6 +410,12 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             print("!! Unexpected exception !!")
             print(err)
 
+    with open(os.path.join('logfiles', 'info_{}.json'.format(tag)), 'w') as fp:
+        json.dump(dict(
+            run_config=run_config,
+            meta_info=meta_info,
+        ), fp)
+
     # Clear data in old log files
     for filename in ["SSNGAN_log_{}.log",
                      "D_parameters_{}.log",
@@ -588,4 +598,8 @@ if __name__ == "__main__":
     ns.layers = eval(str(ns.layers))
     ns.n_samples = eval(str(ns.n_samples))
 
-    main(**vars(ns))
+    # Collect all arguments/options in a dictionary, in order to save
+    # it elsewhere:
+    run_config = vars(ns)
+    # ...then use it as keyword arguments
+    main(run_config=run_config, **run_config)

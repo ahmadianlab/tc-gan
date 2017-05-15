@@ -52,8 +52,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         tag = tag + "_" + str(l)
 
     #tag the rate cost
-    if rate_cost > 0:
-        tag = tag + "_" + str(int(rate_cost))
+    if float(rate_cost) > 0:
+        tag = tag + "_" + str(rate_cost)
+    rate_cost = float(rate_cost)
 
     if WGAN:
         tag = tag + "_WGAN"
@@ -757,7 +758,7 @@ if __name__ == "__main__":
         '--n_samples', default=10,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
-        '--rate_cost', default=0, type=float,
+        '--rate_cost', default='0',
         help='The cost of having the rate be large (default: %(default)s)')
     parser.add_argument(
         '--rate_soft_bound', default=200, type=float,

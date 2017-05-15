@@ -438,6 +438,10 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
     _, zs, solutions = zip(*samples)
     xs = [[s.x for s in sols] for sols in solutions]
 
+    if not no_pool:
+        pool.terminate()
+        pool.join()
+
     return zs, xs, FixedPointsInfo(
         solutions,
         counter,

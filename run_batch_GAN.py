@@ -322,7 +322,11 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
  
         exit()
     
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(rvec,M,NZ,NB,NB,loss,layers,disc_learn_rate,gen_learn_rate,rate_cost,ivec,Z,J,D,S,N,[dRdJ_exp,dRdD_exp,dRdS_exp])
+    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
+        rate_vector=rvec, mask=M, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
+        d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
+        ivec=ivec, Z=Z, J=J, D=D, S=S, N=N,
+        R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp])
 
     #Now we set up values to use in testing.
 
@@ -553,7 +557,7 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     
     return Dloss,Gloss,rtest,true,model_info,true_info
     
-def make_RGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grads):
+def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
     ###Now I need to make the GAN
     ###
     ###
@@ -614,9 +618,9 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cos
     fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,NB,2*N,1,1])
 
     #putthem together and sum of the z,b,and N axes to get a [2,2] tensor that is the gradient of the loss w.r.t. parameters
-    dLdJ_exp = (fake_dis_grad_expanded*R_grads[0]).sum(axis = (0,1,2))
-    dLdD_exp = (fake_dis_grad_expanded*R_grads[1]).sum(axis = (0,1,2))
-    dLdS_exp = (fake_dis_grad_expanded*R_grads[2]).sum(axis = (0,1,2))
+    dLdJ_exp = (fake_dis_grad_expanded*R_grad[0]).sum(axis = (0,1,2))
+    dLdD_exp = (fake_dis_grad_expanded*R_grad[1]).sum(axis = (0,1,2))
+    dLdS_exp = (fake_dis_grad_expanded*R_grad[2]).sum(axis = (0,1,2))
 
     dLdJ = theano.function([rate_vector,ivec,Z],dLdJ_exp,allow_input_downcast = True)
     dLdD = theano.function([rate_vector,ivec,Z],dLdD_exp,allow_input_downcast = True)
@@ -632,7 +636,7 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cos
 
     return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true
 
-def make_WGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
+def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 

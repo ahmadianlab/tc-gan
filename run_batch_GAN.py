@@ -487,7 +487,7 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         ###################################
         ###################################
 
-        eps = np.random.rand(NZ,NB)
+        eps = np.random.rand(NZ, 1)
         
         Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 

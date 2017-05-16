@@ -1,0 +1,52 @@
+Guide to LalazarEtAlPLOS_TuningCruves.mat:
+Note that for the CSV files (in LalazarEtAlPLOS_TuningCruves.zip),
+I wrote every matrix described below in one .dat file.
+B/c I couldn't find (in finite time) how to easily write 3D arrays to csv, I broke 3D
+arrays above into various 2D arrays, and each separately to a csv file. The names (+ the guide below) should tell you clearly what they are. 
+
+
+
+
+TuningCruves  has shape [Ncells, Npos, 2]
+
+where 
+	  Ncells = # of neurons
+           Npos = # of hand position-conditions (= 3^3 = 27)
+           2      = 1 for supination, 2 for pronation (or vice versa!)
+           
+So first index is cell index, and second index is position-condition index, etc.            
+           
+Different neurons came from different experimental sessions, and
+the position grid in 3D space were different in different sessions. 
+
+So to give the actual 3D positions for each of 1 to 27 conditions I give you
+the corresponding 3D positions for each condition for each neuron (b/c you don't know which neuron came from which session):
+
+XYZCells  has  shape [Ncells, Npos, 3]
+
+So XYZcells(:,:,1) gives the x's for position-conditions for all cells
+So XYZcells(:,:,2) gives the y's for position-conditions for all cells
+So XYZcells(:,:,3) gives the z's for position-conditions for all cells
+
+
+The order of position-conditions is the lexicographic order. As you will note
+So first Z increments in increasing order, when Z goes over its range once, then Y increments one, ..., when Y goes over its range once, then X increments, etc. 
+
+
+
+Now, not all 27x2 conditions were tried in every session (therefore not every neuron had all 54 conditions tested). Conditions not tried have NaN's (python's None) in above matrices (at least in TuningCurves they do).
+
+But some sessions did go over all 54 conditions. I have separated these into  separate matrices:
+
+TuningCruvesFull
+and
+XYZcellsFull
+
+These differ from above by having smaller Ncells (first dimension length), but 
+having no  NaN's/None's.
+
+
+
+--------------------------------------
+
+

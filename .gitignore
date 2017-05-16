@@ -2,5 +2,6 @@
 *.pyc
 *.mat
 *.so
+*.csv
 python
 /logfiles

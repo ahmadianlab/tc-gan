@@ -59,7 +59,7 @@ def run_GAN(mode):
 
     nhid = theano.shared(100)
 
-    ni = theano.shared(box_width)
+    ni = theano.shared(10)
     
     ###
     NX = nx.get_value()
@@ -95,7 +95,18 @@ def run_GAN(mode):
 
     FFout_dat = get_FF_output(T.exp(S_true),mW_true,T.exp(sW_true),mB_true,T.exp(sB_true),weights_true,bias_true,pos,stimulus,nsam,nx,ny,nz,nhid,ni)
     output_dat = theano.function([weights_true,bias_true,stimulus],FFout_dat,allow_input_downcast = True)
-    
+
+    STIM = np.array([[0,.25*np.cos((2*math.pi*k)/NI),.25 * np.sin((2*math.pi*k)/NI)] for k in range(NI)])
+
+    ##print out some sample tuning curves
+    sam = generate_samples()
+   
+    TC1 = np.reshape(output_dat(sam[0],sam[1],STIM),[100,100])
+    TC2 = np.reshape(output_sam(sam[0],sam[1],STIM),[100,100])
+
+    np.savetxt("./FF_tuning_curves_dat.csv",TC1)
+    np.savetxt("./FF_tuning_curves_sam.csv",TC2)
+    exit()
     #done defining the output function
 
     NOBS = 10
@@ -123,8 +134,6 @@ def run_GAN(mode):
     D_train, G_train = make_train_funcs(FOBS_sam,[S,mW,sW,mB,sB],[weights,bias,stimulus],[128,128],(NSAM,NI,NOBS),mode)
     
     #now define the actual values and test
-
-    STIM = np.array([[0,.25*np.cos((2*math.pi*k)/NI),.25 * np.sin((2*math.pi*k)/NI)] for k in range(NI)])
 
     train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,STIM,mode = mode)
 

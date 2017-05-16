@@ -7,11 +7,12 @@ import math
 import sys 
 import time
 
-niter = 1000
+niter = 10000
+
 np.random.seed(0)
 
-tag = "debug"
-#tag = ""
+#tag = "debug"
+tag = ""
 
 RF_low = theano.shared(np.float32(-3),name = "RF_s")
 RF_del = theano.shared(np.float32(-4),name = "mean_W")
@@ -135,7 +136,6 @@ def run_GAN(mode):
 
     PARAM = [RF_low,RF_del,THR,THR_del,Js]
 
-   
     FFout_sam = get_FF_output(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),receptive_widths,feedforward_conn,feedforward_strn,feedforward_thrs,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
 
     GINP = [feedforward_conn,feedforward_strn,receptive_widths,feedforward_thrs,stimulus]
@@ -194,12 +194,12 @@ def run_GAN(mode):
     D_train, G_train = make_train_funcs(FOBS_sam,PARAM,GINP,[128,128],(NSAM,NI,NOBS),mode)
     
     #now define the actual values and test
-    train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,STIM,mode = mode,tag = "ll_" + str(box_width))
+    train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,STIM,mode = mode,tag = tag + str(box_width))
 
 def train(D_step,G_step,D_in,G_in,F_gen,STIM,mode = "WGAN",tag = "ll"):
     
     if mode =="WGAN":
-        train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag = tag)
+        train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag)
     elif mode =="GAN":
         train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag)
 
@@ -208,12 +208,13 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
     NDstep = 5
     
     F = open("./FF_logs/FF_WGAN_log_"+tag+".csv","w")
-    F.write("{}l\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
-                                       T_RF_del.get_value(),
-                                       T_Js.get_value(),
-                                       T_THR.get_value(),
-                                       T_THR_del.get_value()))
-    F.write("RFl\tRFd\tJ\tth\tth_d\n")
+    F.write("{}\t{}\t{}\t{}\t{}\n".format(
+            T_RF_low.get_value(),
+            T_RF_del.get_value(),
+            T_Js.get_value(),
+            T_THR.get_value(),
+            T_THR_del.get_value()))
+    F.write("RF\tRFd\tJ\tth\tth_d\n")
     F.close()
 
     F = open("./FF_logs/FF_WGAN_losslog_"+tag+".csv","w")
@@ -221,19 +222,19 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
     F.close()
 
 
-    print("{}l\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
+    print("{}\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
                                        T_RF_del.get_value(),
                                        T_Js.get_value(),
                                        T_THR.get_value(),
                                        T_THR_del.get_value()))
    
-    print("{}l\t{}\t{}\t{}\t{}\n".format(RF_low.get_value(),
+    print("{}\t{}\t{}\t{}\t{}\n".format(RF_low.get_value(),
                                        RF_del.get_value(),
                                        Js.get_value(),
                                        THR.get_value(),
                                        THR_del.get_value()))
    
-    print("dRFl\tdRFd\tdJ\tdth\tth_d")
+    print("dRF\tdRFd\tdJ\tdth\tth_d")
 
     gloss = 10.
     dloss = 10.
@@ -290,31 +291,31 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
 def train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
         
     F = open("./FF_logs/FF_GAN_log_"+tag+".csv","w")
-    F.write("{}l\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
+    F.write("{}\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
                                        T_RF_del.get_value(),
                                        T_Js.get_value(),
                                        T_THR.get_value(),
                                        T_THR_del.get_value()))
-    F.write("dS\tdRFl\tdRFd\tdJ\tdth\n")
+    F.write("\tdRF\tdRFd\tdJ\tth\tdth\n")
     F.close()
 
     F = open("./FF_logs/FF_GAN_losslog_"+tag+".csv","w")
     F.write("gloss,dloss\n")
     F.close()
 
-    print("{}l\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
+    print("{}\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
                                        T_RF_del.get_value(),
                                        T_Js.get_value(),
                                        T_THR.get_value(),
                                        T_THR_del.get_value()))
 
-    print("{}l\t{}\t{}\t{}\t{}\n".format(RF_low.get_value(),
+    print("{}\t{}\t{}\t{}\t{}\n".format(RF_low.get_value(),
                                        RF_del.get_value(),
                                        Js.get_value(),
                                        THR.get_value(),
                                        THR_del.get_value()))
 
-    print("dRFl\tdRFd\tdJ\tdth")
+    print("dRF\tdRFd\tdJ\tdth")
 
     gloss = 10.
     dloss = 10.
@@ -388,7 +389,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     G_loss_exp = - G_sam_out.mean()#generative loss
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    lr = .001
+    lr = .01
     
     b1 = .5
     b2 = .9
@@ -416,8 +417,8 @@ def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     G_sam_out = lasagne.layers.get_output(G_sam)
     
     #make the loss functions
-    D_loss_exp = - T.log(D_dat_out.mean()) - T.log(1. - D_sam_out.mean())#discriminator loss
-    G_loss_exp = - T.log(G_sam_out.mean())#generative loss
+    D_loss_exp = - T.log(.001+D_dat_out.mean()) - T.log(1.001 - D_sam_out.mean())#discriminator loss
+    G_loss_exp = - T.log(.001+G_sam_out.mean())#generative loss
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     lr = .001

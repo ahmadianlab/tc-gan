@@ -735,10 +735,10 @@ if __name__ == "__main__":
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')
     parser.add_argument(
-        '--true_IO_type', default="",
+        '--true_IO_type', default="asym_power",
         help='''Same as --IO_type but for training data generation.
         --IO_type is used if this option is not given or an empty
-        string is passed.''')
+        string is passed. (default: %(default)s)''')
     parser.add_argument(
         '--truth_size', default=1000, type=int,
         help='''Number of SSNs to be used to generate ground truth

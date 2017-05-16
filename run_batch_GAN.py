@@ -20,7 +20,9 @@ import nips_madness.ssnode as SSsolve
 
 import json
 import os
+import pdb
 import time
+import traceback
 
 import stimuli
 
@@ -756,11 +758,24 @@ if __name__ == "__main__":
     parser.add_argument(
         '--WGAN', default=False, action='store_true',
         help='Use WGAN (default: %(default)s)')
+    parser.add_argument(
+        '--pdb', action='store_true',
+        help='Drop into the Python debugger PDB on an exception.')
 
     ns = parser.parse_args()
+    use_pdb = ns.pdb
+    del ns.pdb
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:
     run_config = vars(ns)
     # ...then use it as keyword arguments
-    main(run_config=run_config, **run_config)
+    try:
+        main(run_config=run_config, **run_config)
+    except Exception:
+        if use_pdb:
+            traceback.print_exc()
+            print()
+            pdb.post_mortem()
+        else:
+            raise

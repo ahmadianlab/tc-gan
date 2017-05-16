@@ -772,7 +772,7 @@ if __name__ == "__main__":
         help='rate_hard_bound=r1 (default: %(default)s)')
     parser.add_argument(
         '--WGAN', default=False, action='store_true',
-        help='rate_hard_bound=r1 (default: %(default)s)')
+        help='Use WGAN (default: %(default)s)')
 
     ns = parser.parse_args()
     ns.layers = eval(str(ns.layers))

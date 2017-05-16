@@ -456,7 +456,7 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     # generator does not change in the loop over updates of the
     # discriminator, we generate the whole samples at once.  This
     # gives us 40% speedup in asym_tanh case:
-    with SSsolve_time():
+    with SSsolve_time:
         z_batch, r_batch, model_info = SSsolve.find_fixed_points(
             NZ * WG_repeat, Z_W_gen(), inp,
             **ssn_params)
@@ -476,13 +476,13 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         eps = np.random.rand(NZ, 1)
 
         rtest = r_batch[NZ*rep:NZ*(rep+1)]
-        with gradient_time():
+        with gradient_time:
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
     #end D loop
 
     Ztest = z_batch[-NZ:]
-    with gradient_time():
+    with gradient_time:
         Gloss = G_train_func(rtest,inp,Ztest)
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
@@ -510,7 +510,7 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             wtest, = W(ztest)
             yield ztest[0], wtest
 
-    with SSsolve_time():
+    with SSsolve_time:
         Ztest, Ftest, model_info = SSsolve.find_fixed_points(
             NZ, Z_W_gen(), inp,
             **ssn_params)
@@ -522,7 +522,7 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         ###################################
         ###################################
 
-    with gradient_time():
+    with gradient_time:
         Dloss = D_train_func(rtest,true)
         Gloss = G_train_func(rtest,inp,Ztest)
 

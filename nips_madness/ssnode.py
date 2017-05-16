@@ -358,6 +358,8 @@ def find_fixed_points_serial(num, Z_W_gen, exts, **common_kwargs):
                 yield Z, [s.x for s in solutions], solutions
 
     zs, xs, solutions = zip(*take(num, infinite_solutions()))
+    zs = np.array(zs)
+    xs = np.array(xs)
     return zs, xs, FixedPointsInfo(
         solutions,
         counter,
@@ -442,6 +444,8 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
         pool.terminate()
         pool.join()
 
+    zs = np.array(zs)
+    xs = np.array(xs)
     return zs, xs, FixedPointsInfo(
         solutions,
         counter,

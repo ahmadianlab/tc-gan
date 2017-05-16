@@ -448,6 +448,21 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
 
+    def Z_W_gen():
+        while True:
+            ztest = np.random.rand(1, 2*N, 2*N)
+            wtest, = W(ztest)
+            yield ztest[0], wtest
+
+    # Generate "fake" samples from the fitted model.  Since the
+    # generator does not change in the loop over updates of the
+    # discriminator, we generate the whole samples at once.  This
+    # gives us 40% speedup in asym_tanh case:
+    with SSsolve_time():
+        z_batch, r_batch, model_info = SSsolve.find_fixed_points(
+            NZ * WG_repeat, Z_W_gen(), inp,
+            **ssn_params)
+
     for rep in range(WG_repeat):
         ####
         np.random.shuffle(data)
@@ -458,34 +473,17 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             
         #generated samples
         #
-        #This chunk of code generates samples from teh fitted model adn runs the G update
-        #
-        ###################
-        def Z_W_gen():
-            while True:
-                ztest = np.random.rand(1, 2*N, 2*N)
-                wtest, = W(ztest)
-                yield ztest[0], wtest
-
-        with SSsolve_time():
-            Ztest, Ftest, model_info = SSsolve.find_fixed_points(
-                NZ, Z_W_gen(), inp,
-                **ssn_params)
-
-        Ftest = np.array(Ftest)
-        Ztest = np.array(Ztest)
-        rtest = np.array([[c for c in TC] for TC in Ftest])
-
-        ###################################
-        ###################################
+        # Update discriminator/critic given NZ true and fake samples:
 
         eps = np.random.rand(NZ, 1)
 
+        rtest = r_batch[NZ*rep:NZ*(rep+1)]
         with gradient_time():
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
     #end D loop
 
+    Ztest = z_batch[-NZ:]
     with gradient_time():
         Gloss = G_train_func(rtest,inp,Ztest)
 

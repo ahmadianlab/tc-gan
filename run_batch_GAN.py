@@ -4,6 +4,8 @@ Run SSN-GAN learning given a MATLAB data file.
 
 """
 
+from __future__ import print_function
+
 import theano
 import theano.tensor as T
 import lasagne
@@ -18,14 +20,17 @@ import nips_madness.ssnode as SSsolve
 
 import json
 import os
+import pdb
 import time
+import traceback
 
 import stimuli
 
 
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-         loss, use_data, IO_type, layers, n_samples, debug, rate_cost, WGAN,
-         rate_hard_bound, rate_soft_bound,
+         loss, use_data, layers, n_samples, debug, rate_cost, WGAN,
+         N, IO_type, rate_hard_bound, rate_soft_bound,
+         true_IO_type, truth_size, truth_seed,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
@@ -52,8 +57,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         tag = tag + "_" + str(l)
 
     #tag the rate cost
-    if rate_cost > 0:
-        tag = tag + "_" + str(int(rate_cost))
+    if float(rate_cost) > 0:
+        tag = tag + "_" + str(rate_cost)
+    rate_cost = float(rate_cost)
 
     if WGAN:
         tag = tag + "_WGAN"
@@ -82,6 +88,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
 
+    if N > 0:
+        n_sites = N
+
     ssn_params = dict(
         rate_soft_bound=rate_soft_bound,
         rate_hard_bound=rate_hard_bound,
@@ -90,6 +99,22 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         n=exp_value,
         r0=np.zeros(2 * n_sites),
     )
+
+    if not use_data:
+        if not true_IO_type:
+            true_IO_type = IO_type
+        print("Generating the truth...")
+        data, (_, _, true_info) = SSsolve.sample_tuning_curves(
+            sample_sites=1,
+            NZ=truth_size,
+            seed=truth_seed,
+            bandwidths=bandwidths,
+            smoothness=smoothness,
+            contrast=contrast,
+            N=n_sites,
+            **dict(ssn_params, io_type=true_IO_type))
+        print("DONE")
+        data = np.array(data.T)      # shape: (N_data, nb)
 
     #defining all the parameters that we might want to train
 
@@ -210,7 +235,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     if convtest:
         zt = np.random.rand(1,2*N,2*N)
         wt = W_test(zt)[0]
-        rz = np.zeros((2*N))
 
         for c in [1.,2.,4.,8.,16.]:
             r  = SSsolve.fixed_point(wt,c*BAND_IN[-1], *ssn_params)
@@ -225,7 +249,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         for k in range(100):
             zt = np.random.rand(1,2*N,2*N)
             wt = W_test(zt)[0]
-            rz = np.zeros((2*N))
 
             TT1 = time.time()
             r  = SSsolve.fixed_point(wt,BAND_IN[-1], **ssn_params)
@@ -321,7 +344,11 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
  
         exit()
     
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(rvec,M,NZ,NB,NB,loss,layers,disc_learn_rate,gen_learn_rate,rate_cost,ivec,Z,J,D,S,N,[dRdJ_exp,dRdD_exp,dRdS_exp])
+    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
+        rate_vector=rvec, mask=M, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
+        d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
+        ivec=ivec, Z=Z, J=J, D=D, S=S, N=N,
+        R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp])
 
     #Now we set up values to use in testing.
 
@@ -367,16 +394,11 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     
     for k in range(iterations):
-        TT = time.time()
-        rz = np.zeros([2*N])
-
-        Dloss,Gloss,rtest,true,model_info,true_info = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,use_data,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5)
-
-        Tfinal = time.time()
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5)
 
         log([k, Gloss, Dloss, D_acc(rtest, true),
-             Tfinal - TT,
-             time.time() - Tfinal,
+             SSsolve_time,
+             gradient_time,
              model_info.rejections,
              true_info.rejections,
              model_info.unused,
@@ -424,8 +446,26 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
             log(string,F = "./parameters_{}.log".format(tag),PRINT = False)
 
- 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,use_data,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+
+    SSsolve_time = utils.StopWatch()
+    gradient_time = utils.StopWatch()
+
+    def Z_W_gen():
+        while True:
+            ztest = np.random.rand(1, 2*N, 2*N)
+            wtest, = W(ztest)
+            yield ztest[0], wtest
+
+    # Generate "fake" samples from the fitted model.  Since the
+    # generator does not change in the loop over updates of the
+    # discriminator, we generate the whole samples at once.  This
+    # gives us 40% speedup in asym_tanh case:
+    with SSsolve_time:
+        z_batch, r_batch, model_info = SSsolve.find_fixed_points(
+            NZ * WG_repeat, Z_W_gen(), inp,
+            **ssn_params)
 
     for rep in range(WG_repeat):
         ####
@@ -437,62 +477,26 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             
         #generated samples
         #
-        #This chunk of code generates samples from teh fitted model adn runs the G update
-        #
-        ###################
-        def Z_W_gen():
-            while True:
-                ztest = np.random.rand(1, 2*N, 2*N)
-                wtest, = W(ztest)
-                yield ztest[0], wtest
-                    
-        Ztest, Ftest, model_info = SSsolve.find_fixed_points(
-            NZ, Z_W_gen(), inp,
-            **ssn_params)
-        
-        Ftest = np.array(Ftest)
-        Ztest = np.array(Ztest)
-        rtest = np.array([[c for c in TC] for TC in Ftest])
+        # Update discriminator/critic given NZ true and fake samples:
 
-        #True model generator and D train
-        #
-        #This part generates the "true" TC and updates D
-        #
-        #################################
+        eps = np.random.rand(NZ, 1)
 
-        if use_data == False:
-            def Z_W_gen2():
-                while True:
-                    ztest2 = np.random.rand(1, 2*N, 2*N)
-                    wtest2, = W_test(ztest2)
-                    yield ztest2[0], wtest2
-                    
-            Ztrue, Otrue, true_info = SSsolve.find_fixed_points(
-                NZ, Z_W_gen2(), inp,
-                **ssn_params)
-            
-            Otrue = np.array(Otrue)
-            Ztrue = np.array(Ztrue)
-            true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))                
-            
-        else:
-            true_info = SSsolve.null_FixedPointsInfo
-            
-
-        ###################################
-        ###################################
-
-        eps = np.random.rand(NZ,NB)
-        
-        Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
+        rtest = r_batch[NZ*rep:NZ*(rep+1)]
+        with gradient_time:
+            Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
     #end D loop
 
-    Gloss = G_train_func(rtest,inp,Ztest)
-    
-    return Dloss,Gloss,rtest,true,model_info,true_info
+    Ztest = z_batch[-NZ:]
+    with gradient_time:
+        Gloss = G_train_func(rtest,inp,Ztest)
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,use_data,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
+
+def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+
+    SSsolve_time = utils.StopWatch()
+    gradient_time = utils.StopWatch()
 
         ####
     np.random.shuffle(data)
@@ -511,48 +515,26 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             ztest = np.random.rand(1, 2*N, 2*N)
             wtest, = W(ztest)
             yield ztest[0], wtest
-                    
-    Ztest, Ftest, model_info = SSsolve.find_fixed_points(
-        NZ, Z_W_gen(), inp,
-        **ssn_params)
-        
+
+    with SSsolve_time:
+        Ztest, Ftest, model_info = SSsolve.find_fixed_points(
+            NZ, Z_W_gen(), inp,
+            **ssn_params)
+
     Ftest = np.array(Ftest)
     Ztest = np.array(Ztest)
     rtest = np.array([[c for c in TC] for TC in Ftest])
-    
-        #True model generator and D train
-        #
-        #This part generates the "true" TC and updates D
-        #
-        #################################
 
-    if use_data == False:
-        def Z_W_gen2():
-            while True:
-                ztest2 = np.random.rand(1, 2*N, 2*N)
-                wtest2, = W_test(ztest2)
-                yield ztest2[0], wtest2
-                
-        Ztrue, Otrue, true_info = SSsolve.find_fixed_points(
-            NZ, Z_W_gen2(), inp,
-            **ssn_params)
-        
-        Otrue = np.array(Otrue)
-        Ztrue = np.array(Ztrue)
-        true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))                
-        
-    else:
-        true_info = SSsolve.null_FixedPointsInfo
-        
         ###################################
         ###################################
 
-    Dloss = D_train_func(rtest,true)
-    Gloss = G_train_func(rtest,inp,Ztest)
-    
-    return Dloss,Gloss,rtest,true,model_info,true_info
-    
-def make_RGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grads):
+    with gradient_time:
+        Dloss = D_train_func(rtest,true)
+        Gloss = G_train_func(rtest,inp,Ztest)
+
+    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
+
+def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
     ###Now I need to make the GAN
     ###
     ###
@@ -613,9 +595,9 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cos
     fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,NB,2*N,1,1])
 
     #putthem together and sum of the z,b,and N axes to get a [2,2] tensor that is the gradient of the loss w.r.t. parameters
-    dLdJ_exp = (fake_dis_grad_expanded*R_grads[0]).sum(axis = (0,1,2))
-    dLdD_exp = (fake_dis_grad_expanded*R_grads[1]).sum(axis = (0,1,2))
-    dLdS_exp = (fake_dis_grad_expanded*R_grads[2]).sum(axis = (0,1,2))
+    dLdJ_exp = (fake_dis_grad_expanded*R_grad[0]).sum(axis = (0,1,2))
+    dLdD_exp = (fake_dis_grad_expanded*R_grad[1]).sum(axis = (0,1,2))
+    dLdS_exp = (fake_dis_grad_expanded*R_grad[2]).sum(axis = (0,1,2))
 
     dLdJ = theano.function([rate_vector,ivec,Z],dLdJ_exp,allow_input_downcast = True)
     dLdD = theano.function([rate_vector,ivec,Z],dLdD_exp,allow_input_downcast = True)
@@ -631,7 +613,7 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cos
 
     return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true
 
-def make_WGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
+def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -658,7 +640,7 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cos
     true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
     fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
 
-    D_acc = theano.function([rate_vector,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
+    D_acc = theano.function([rate_vector,red_R_true],fake_dis_out.mean() - true_dis_out.mean(),allow_input_downcast = True)
 
     #make the loss functions
     
@@ -667,11 +649,11 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,NI,LOSS,LAYERS,d_lr,g_lr,rate_cos
     
     D_red_grad_net = SD.make_net(in_for_grad,INSHAPE,"WGAN",LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
     for_grad_out = lasagne.layers.get_output(D_red_grad_net)
-    
-    lam = 10000.
-    
-    DGRAD = (T.jacobian(T.reshape(for_grad_out,[-1]),red_fake_for_grad)**2).sum(axis = [1,2])#the norm of the gradient
-        
+
+    lam = 10.
+
+    DGRAD = T.jacobian(T.reshape(for_grad_out,[-1]),red_fake_for_grad).norm(2, axis = [1,2])#the norm of the gradient
+
     true_loss_exp = fake_dis_out.mean() - true_dis_out.mean() + lam*((DGRAD - 1)**2).mean()#discriminator loss
     fake_loss_exp = -fake_dis_out.mean()#generative loss
     
@@ -745,19 +727,36 @@ if __name__ == "__main__":
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')
     parser.add_argument(
+        '--N', '-N', default=0, type=int,
+        help='''Number of excitatory neurons in SSN. If 0, use the
+        value recorded in the MATLAB file at `datapath`. (default:
+        %(default)s)''')
+    parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')
+    parser.add_argument(
+        '--true_IO_type', default="asym_power",
+        help='''Same as --IO_type but for training data generation.
+        --IO_type is used if this option is not given or an empty
+        string is passed. (default: %(default)s)''')
+    parser.add_argument(
+        '--truth_size', default=1000, type=int,
+        help='''Number of SSNs to be used to generate ground truth
+        data (default: %(default)s)''')
+    parser.add_argument(
+        '--truth_seed', default=42, type=int,
+        help='Seed for generating ground truth data (default: %(default)s)')
     parser.add_argument(
         '--loss', default="CE",
         help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')
     parser.add_argument(
-        '--layers', default=[],
+        '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
-        '--n_samples', default=10,
+        '--n_samples', default=10, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
-        '--rate_cost', default=0, type=float,
+        '--rate_cost', default='0',
         help='The cost of having the rate be large (default: %(default)s)')
     parser.add_argument(
         '--rate_soft_bound', default=200, type=float,
@@ -767,14 +766,25 @@ if __name__ == "__main__":
         help='rate_hard_bound=r1 (default: %(default)s)')
     parser.add_argument(
         '--WGAN', default=False, action='store_true',
-        help='rate_hard_bound=r1 (default: %(default)s)')
+        help='Use WGAN (default: %(default)s)')
+    parser.add_argument(
+        '--pdb', action='store_true',
+        help='Drop into the Python debugger PDB on an exception.')
 
     ns = parser.parse_args()
-    ns.layers = eval(str(ns.layers))
-    ns.n_samples = eval(str(ns.n_samples))
+    use_pdb = ns.pdb
+    del ns.pdb
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:
     run_config = vars(ns)
     # ...then use it as keyword arguments
-    main(run_config=run_config, **run_config)
+    try:
+        main(run_config=run_config, **run_config)
+    except Exception:
+        if use_pdb:
+            traceback.print_exc()
+            print()
+            pdb.post_mortem()
+        else:
+            raise

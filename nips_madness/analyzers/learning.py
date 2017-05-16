@@ -1,5 +1,8 @@
 from matplotlib import pyplot
+import matplotlib
+import numpy as np
 
+from ..ssnode import DEFAULT_PARAMS
 from .loader import load_gandata
 
 
@@ -13,6 +16,50 @@ def plot_learning(data):
     df.plot('epoch', ['model_convergence', 'truth_convergence'], ax=axes[1, 1])
     fig.suptitle(data.tag)
     return fig
+
+
+def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
+                          linewidth=0.3, ylim='auto',
+                          xlabel='Bandwidths',
+                          ylabel='Average Firing Rate'):
+    if ax is None:
+        _, ax = pyplot.subplots()
+
+    start = 0
+    if epochs is None:
+        stop = len(data.tuning)
+    elif isinstance(epochs, int):
+        stop = epochs
+    else:
+        start, stop = epochs
+
+    cmap = matplotlib.cm.get_cmap(cmap)
+    norm = matplotlib.colors.Normalize(start, stop)
+    mappable = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
+    mappable.set_array([])
+    fig = ax.get_figure()
+    cb = fig.colorbar(mappable, ax=ax)
+    cb.set_label('epochs')
+
+    bandwidths = np.asarray(DEFAULT_PARAMS['bandwidths'])
+    for i in range(start, stop):
+        ax.plot(bandwidths, data.model_tuning[i], color=cmap(norm(i)),
+                linewidth=linewidth)
+    if ylim == 'auto':
+        y = data.model_tuning[start:stop]
+        q3 = np.percentile(y, 75)
+        q1 = np.percentile(y, 25)
+        iqr = q3 - q1
+        yamp = y[y < q3 + 1.5 * iqr].max()
+        ax.set_ylim(- yamp * 0.05, yamp * 1.2)
+    elif ylim:
+        ax.set_ylim(ylim)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+
+    return ax
 
 
 def analyze_learning(logpath, show, figpath):

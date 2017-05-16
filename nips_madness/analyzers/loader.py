@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -53,21 +54,34 @@ class GANData(object):
         tag = suffix[:-len('.log')]
 
         gen_logpath = os.path.join(dirname, 'parameters_' + suffix)
-        disc_logpath = os.path.join(dirname, 'D_parameters_' + suffix)
+        tuning_logpath = os.path.join(dirname, 'D_parameters_' + suffix)
 
         main_names, main = load_logfile(logpath)
         gen_names, gen = load_logfile(gen_logpath)
-        disc_names, disc = load_logfile(disc_logpath)
+        tuning_names, tuning = load_logfile(tuning_logpath)
+
+        try:
+            parsed_tag = parse_tag(tag)
+        except Exception as err:       # FIXME: don't catch everything!
+            parsed_tag = {'error': err}
+
+        info_path = os.path.join(dirname, 'info_' + tag + '.json')
+        if os.path.exists(info_path):
+            with open(info_path) as file:
+                info = json.load(file)
+        else:
+            info = {}
 
         return cls(
             tag=tag,
             main_logpath=logpath,
             gen_logpath=gen_logpath,
-            disc_logpath=disc_logpath,
+            tuning_logpath=tuning_logpath,
             main=main, main_names=main_names,
             gen=gen, gen_names=gen_names,
-            disc=disc, disc_names=disc_names,
-            **parse_tag(tag))
+            tuning=tuning, tuning_names=tuning_names,
+            parsed_tag=parsed_tag,
+            info=info)
 
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
@@ -76,9 +90,21 @@ class GANData(object):
         self.log_J, self.log_D, self.log_S = \
             self.gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
 
-    def iter_gen_params(self):
-        for log_JDS in zip(self.log_J, self.log_D, self.log_S):
+    def iter_gen_params(self, indices=None):
+        if indices is None:
+            indices = slice(None)
+        for log_JDS in zip(self.log_J[indices],
+                           self.log_D[indices],
+                           self.log_S[indices]):
             yield list(map(np.exp, log_JDS))
+
+    @property
+    def model_tuning(self):
+        return self.tuning[:, :8]
+
+    @property
+    def true_tuning(self):
+        return self.tuning[:, 8:16]
 
     def to_dataframe(self):
         import pandas

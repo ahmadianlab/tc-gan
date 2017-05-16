@@ -663,7 +663,7 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,i
     true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
     fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
 
-    D_acc = theano.function([rate_vector,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
+    D_acc = theano.function([rate_vector,red_R_true],fake_dis_out.mean() - true_dis_out.mean(),allow_input_downcast = True)
 
     #make the loss functions
     

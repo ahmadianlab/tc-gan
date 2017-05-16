@@ -756,10 +756,10 @@ if __name__ == "__main__":
         '--loss', default="CE",
         help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')
     parser.add_argument(
-        '--layers', default=[],
+        '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
-        '--n_samples', default=10,
+        '--n_samples', default=10, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
         '--rate_cost', default='0',
@@ -775,8 +775,6 @@ if __name__ == "__main__":
         help='Use WGAN (default: %(default)s)')
 
     ns = parser.parse_args()
-    ns.layers = eval(str(ns.layers))
-    ns.n_samples = eval(str(ns.n_samples))
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:

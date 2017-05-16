@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -59,6 +60,18 @@ class GANData(object):
         gen_names, gen = load_logfile(gen_logpath)
         tuning_names, tuning = load_logfile(tuning_logpath)
 
+        try:
+            parsed_tag = parse_tag(tag)
+        except Exception as err:       # FIXME: don't catch everything!
+            parsed_tag = {'error': err}
+
+        info_path = os.path.join(dirname, 'info_' + tag + '.json')
+        if os.path.exists(info_path):
+            with open(info_path) as file:
+                info = json.load(file)
+        else:
+            info = {}
+
         return cls(
             tag=tag,
             main_logpath=logpath,
@@ -67,7 +80,8 @@ class GANData(object):
             main=main, main_names=main_names,
             gen=gen, gen_names=gen_names,
             tuning=tuning, tuning_names=tuning_names,
-            **parse_tag(tag))
+            parsed_tag=parsed_tag,
+            info=info)
 
     def __init__(self, **kwds):
         self.__dict__.update(kwds)

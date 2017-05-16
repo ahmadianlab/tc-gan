@@ -229,7 +229,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     if convtest:
         zt = np.random.rand(1,2*N,2*N)
         wt = W_test(zt)[0]
-        rz = np.zeros((2*N))
 
         for c in [1.,2.,4.,8.,16.]:
             r  = SSsolve.fixed_point(wt,c*BAND_IN[-1], *ssn_params)
@@ -244,7 +243,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         for k in range(100):
             zt = np.random.rand(1,2*N,2*N)
             wt = W_test(zt)[0]
-            rz = np.zeros((2*N))
 
             TT1 = time.time()
             r  = SSsolve.fixed_point(wt,BAND_IN[-1], **ssn_params)

@@ -103,6 +103,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             sample_sites=1,
             NZ=truth_size,
             seed=truth_seed,
+            bandwidths=bandwidths,
+            smoothness=smoothness,
+            contrast=contrast,
             **dict(ssn_params, io_type=true_IO_type))
         print("DONE")
         data = np.array(data.T)      # shape: (N_data, nb)

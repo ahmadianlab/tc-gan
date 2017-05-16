@@ -672,11 +672,11 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,i
     
     D_red_grad_net = SD.make_net(in_for_grad,INSHAPE,"WGAN",LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
     for_grad_out = lasagne.layers.get_output(D_red_grad_net)
-    
-    lam = 10000.
-    
-    DGRAD = (T.jacobian(T.reshape(for_grad_out,[-1]),red_fake_for_grad)**2).sum(axis = [1,2])#the norm of the gradient
-        
+
+    lam = 10.
+
+    DGRAD = T.jacobian(T.reshape(for_grad_out,[-1]),red_fake_for_grad).norm(2, axis = [1,2])#the norm of the gradient
+
     true_loss_exp = fake_dis_out.mean() - true_dis_out.mean() + lam*((DGRAD - 1)**2).mean()#discriminator loss
     fake_loss_exp = -fake_dis_out.mean()#generative loss
     

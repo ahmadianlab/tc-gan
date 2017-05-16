@@ -4,6 +4,8 @@ Run SSN-GAN learning given a MATLAB data file.
 
 """
 
+from __future__ import print_function
+
 import theano
 import theano.tensor as T
 import lasagne
@@ -26,6 +28,7 @@ import stimuli
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          loss, use_data, IO_type, layers, n_samples, debug, rate_cost, WGAN,
          rate_hard_bound, rate_soft_bound,
+         true_IO_type, truth_size, truth_seed,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
@@ -91,6 +94,18 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         n=exp_value,
         r0=np.zeros(2 * n_sites),
     )
+
+    if not use_data:
+        if not true_IO_type:
+            true_IO_type = IO_type
+        print("Generating the truth...")
+        data, (_, _, true_info) = SSsolve.sample_tuning_curves(
+            sample_sites=1,
+            NZ=truth_size,
+            seed=truth_seed,
+            **dict(ssn_params, io_type=true_IO_type))
+        print("DONE")
+        data = np.array(data.T)      # shape: (N_data, nb)
 
     #defining all the parameters that we might want to train
 
@@ -375,7 +390,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         TT = time.time()
         rz = np.zeros([2*N])
 
-        Dloss,Gloss,rtest,true,model_info,true_info = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,use_data,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5)
+        Dloss,Gloss,rtest,true,model_info = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5)
 
         Tfinal = time.time()
 
@@ -429,8 +444,8 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
             log(string,F = "./parameters_{}.log".format(tag),PRINT = False)
 
- 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,use_data,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
 
     for rep in range(WG_repeat):
         ####
@@ -459,31 +474,6 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         Ztest = np.array(Ztest)
         rtest = np.array([[c for c in TC] for TC in Ftest])
 
-        #True model generator and D train
-        #
-        #This part generates the "true" TC and updates D
-        #
-        #################################
-
-        if use_data == False:
-            def Z_W_gen2():
-                while True:
-                    ztest2 = np.random.rand(1, 2*N, 2*N)
-                    wtest2, = W_test(ztest2)
-                    yield ztest2[0], wtest2
-                    
-            Ztrue, Otrue, true_info = SSsolve.find_fixed_points(
-                NZ, Z_W_gen2(), inp,
-                **ssn_params)
-            
-            Otrue = np.array(Otrue)
-            Ztrue = np.array(Ztrue)
-            true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))                
-            
-        else:
-            true_info = SSsolve.null_FixedPointsInfo
-            
-
         ###################################
         ###################################
 
@@ -494,10 +484,10 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     #end D loop
 
     Gloss = G_train_func(rtest,inp,Ztest)
-    
-    return Dloss,Gloss,rtest,true,model_info,true_info
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,use_data,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+    return Dloss,Gloss,rtest,true,model_info
+
+def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
 
         ####
     np.random.shuffle(data)
@@ -524,39 +514,15 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     Ftest = np.array(Ftest)
     Ztest = np.array(Ztest)
     rtest = np.array([[c for c in TC] for TC in Ftest])
-    
-        #True model generator and D train
-        #
-        #This part generates the "true" TC and updates D
-        #
-        #################################
 
-    if use_data == False:
-        def Z_W_gen2():
-            while True:
-                ztest2 = np.random.rand(1, 2*N, 2*N)
-                wtest2, = W_test(ztest2)
-                yield ztest2[0], wtest2
-                
-        Ztrue, Otrue, true_info = SSsolve.find_fixed_points(
-            NZ, Z_W_gen2(), inp,
-            **ssn_params)
-        
-        Otrue = np.array(Otrue)
-        Ztrue = np.array(Ztrue)
-        true = get_reduced(np.array([[O for O in TC] for TC in Otrue]))                
-        
-    else:
-        true_info = SSsolve.null_FixedPointsInfo
-        
         ###################################
         ###################################
 
     Dloss = D_train_func(rtest,true)
     Gloss = G_train_func(rtest,inp,Ztest)
-    
-    return Dloss,Gloss,rtest,true,model_info,true_info
-    
+
+    return Dloss,Gloss,rtest,true,model_info
+
 def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
     ###Now I need to make the GAN
     ###
@@ -752,6 +718,18 @@ if __name__ == "__main__":
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')
+    parser.add_argument(
+        '--true_IO_type', default="",
+        help='''Same as --IO_type but for training data generation.
+        --IO_type is used if this option is not given or an empty
+        string is passed.''')
+    parser.add_argument(
+        '--truth_size', default=1000, type=int,
+        help='''Number of SSNs to be used to generate ground truth
+        data (default: %(default)s)''')
+    parser.add_argument(
+        '--truth_seed', default=42, type=int,
+        help='Seed for generating ground truth data (default: %(default)s)')
     parser.add_argument(
         '--loss', default="CE",
         help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')

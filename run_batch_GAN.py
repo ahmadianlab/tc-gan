@@ -28,8 +28,8 @@ import stimuli
 
 
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-         loss, use_data, IO_type, layers, n_samples, debug, rate_cost, WGAN,
-         rate_hard_bound, rate_soft_bound,
+         loss, use_data, layers, n_samples, debug, rate_cost, WGAN,
+         N, IO_type, rate_hard_bound, rate_soft_bound,
          true_IO_type, truth_size, truth_seed,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
@@ -88,6 +88,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
 
+    if N > 0:
+        n_sites = N
+
     ssn_params = dict(
         rate_soft_bound=rate_soft_bound,
         rate_hard_bound=rate_hard_bound,
@@ -108,6 +111,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             bandwidths=bandwidths,
             smoothness=smoothness,
             contrast=contrast,
+            N=n_sites,
             **dict(ssn_params, io_type=true_IO_type))
         print("DONE")
         data = np.array(data.T)      # shape: (N_data, nb)
@@ -722,6 +726,11 @@ if __name__ == "__main__":
     parser.add_argument(
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')
+    parser.add_argument(
+        '--N', '-N', default=0, type=int,
+        help='''Number of excitatory neurons in SSN. If 0, use the
+        value recorded in the MATLAB file at `datapath`. (default:
+        %(default)s)''')
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')

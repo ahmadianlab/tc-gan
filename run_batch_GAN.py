@@ -390,16 +390,11 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     
     for k in range(iterations):
-        TT = time.time()
-        rz = np.zeros([2*N])
-
-        Dloss,Gloss,rtest,true,model_info = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5)
-
-        Tfinal = time.time()
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5)
 
         log([k, Gloss, Dloss, D_acc(rtest, true),
-             Tfinal - TT,
-             time.time() - Tfinal,
+             SSsolve_time,
+             gradient_time,
              model_info.rejections,
              true_info.rejections,
              model_info.unused,
@@ -450,6 +445,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
 
+    SSsolve_time = utils.StopWatch()
+    gradient_time = utils.StopWatch()
+
     for rep in range(WG_repeat):
         ####
         np.random.shuffle(data)
@@ -468,11 +466,12 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
                 ztest = np.random.rand(1, 2*N, 2*N)
                 wtest, = W(ztest)
                 yield ztest[0], wtest
-                    
-        Ztest, Ftest, model_info = SSsolve.find_fixed_points(
-            NZ, Z_W_gen(), inp,
-            **ssn_params)
-        
+
+        with SSsolve_time():
+            Ztest, Ftest, model_info = SSsolve.find_fixed_points(
+                NZ, Z_W_gen(), inp,
+                **ssn_params)
+
         Ftest = np.array(Ftest)
         Ztest = np.array(Ztest)
         rtest = np.array([[c for c in TC] for TC in Ftest])
@@ -481,16 +480,21 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         ###################################
 
         eps = np.random.rand(NZ, 1)
-        
-        Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
+
+        with gradient_time():
+            Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
     #end D loop
 
-    Gloss = G_train_func(rtest,inp,Ztest)
+    with gradient_time():
+        Gloss = G_train_func(rtest,inp,Ztest)
 
-    return Dloss,Gloss,rtest,true,model_info
+    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
 def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+
+    SSsolve_time = utils.StopWatch()
+    gradient_time = utils.StopWatch()
 
         ####
     np.random.shuffle(data)
@@ -509,11 +513,12 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             ztest = np.random.rand(1, 2*N, 2*N)
             wtest, = W(ztest)
             yield ztest[0], wtest
-                    
-    Ztest, Ftest, model_info = SSsolve.find_fixed_points(
-        NZ, Z_W_gen(), inp,
-        **ssn_params)
-        
+
+    with SSsolve_time():
+        Ztest, Ftest, model_info = SSsolve.find_fixed_points(
+            NZ, Z_W_gen(), inp,
+            **ssn_params)
+
     Ftest = np.array(Ftest)
     Ztest = np.array(Ztest)
     rtest = np.array([[c for c in TC] for TC in Ftest])
@@ -521,10 +526,11 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         ###################################
         ###################################
 
-    Dloss = D_train_func(rtest,true)
-    Gloss = G_train_func(rtest,inp,Ztest)
+    with gradient_time():
+        Dloss = D_train_func(rtest,true)
+        Gloss = G_train_func(rtest,inp,Ztest)
 
-    return Dloss,Gloss,rtest,true,model_info
+    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
 def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
     ###Now I need to make the GAN

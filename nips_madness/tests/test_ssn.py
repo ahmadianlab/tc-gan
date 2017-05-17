@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from ..clib import libssnode
 from .. import ssnode
@@ -37,3 +38,13 @@ def test_rate_to_volt(k=ssnode.DEFAULT_PARAMS['k'],
     ys_py = ssnode.rate_to_volt(xs, k=k, n=n)
     ys_c = np.array([libssnode.rate_to_volt(x, k, n) for x in xs])
     np.testing.assert_allclose(ys_py, ys_c, rtol=0, atol=1e-12)
+
+
+@pytest.mark.parametrize('seed', range(10))
+def test_fixed_point_c_vs_py(seed):
+    kwargs = ssnode.make_solver_params(seed=seed, io_type='asym_tanh')
+    kwargs.update(atol=1e-10, tau=(.016, .002))
+    sol = ssnode.fixed_point(**kwargs)
+    kwargs2 = dict(kwargs, r0=sol.x)
+    xpy = ssnode.solve_dynamics_python(**kwargs2)
+    np.testing.assert_allclose(sol.x, xpy, rtol=0, atol=1e-7)

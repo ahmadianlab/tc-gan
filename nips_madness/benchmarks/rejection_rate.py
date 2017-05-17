@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from .. import utils
 from ..ssnode import sample_fixed_points
 from ..tests import test_dynamics  # ..to emit the warnings here
@@ -16,7 +18,7 @@ def run_benchmarks(NZ=30, **kwargs):
             _zs, _xs, info = sample_fixed_points(
                 NZ=NZ, dt=dt, max_iter=max_iter, **kwargs)
 
-        print('{:<10.4g} {:<7} {:<7.1%} {:<10.4g} {}'.format(
+        print('{:<10.4g} {:<7} {:<7.2%} {:<10.4g} {}'.format(
             dt,
             info.rejections,
             info.rejections / (info.rejections + NZ),

@@ -61,6 +61,7 @@ class StopWatch(object):
 
     def __enter__(self):
         self.pre = time.time()
+        return self
 
     def __exit__(self, type, value, traceback):
         self.times.append(time.time() - self.pre)

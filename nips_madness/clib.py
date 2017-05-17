@@ -30,3 +30,6 @@ for fun in [libssnode.solve_dynamics_asym_linear_gsl,
 for fun in [libssnode.io_pow, libssnode.io_alin, libssnode.io_atanh]:
     fun.argtypes = [c_double] * 6
     fun.restype = c_double
+
+libssnode.rate_to_volt.argtypes = [c_double] * 3
+libssnode.rate_to_volt.restype = c_double

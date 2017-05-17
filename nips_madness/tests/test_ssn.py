@@ -29,3 +29,11 @@ def test_io_alin():
 
 def test_io_power():
     check_io_fun('asym_power', libssnode.io_pow)
+
+
+def test_rate_to_volt(k=ssnode.DEFAULT_PARAMS['k'],
+                      n=ssnode.DEFAULT_PARAMS['n']):
+    xs = np.linspace(0, 1000, 1000)
+    ys_py = ssnode.rate_to_volt(xs, k=k, n=n)
+    ys_c = np.array([libssnode.rate_to_volt(x, k, n) for x in xs])
+    np.testing.assert_allclose(ys_py, ys_c, rtol=0, atol=1e-12)

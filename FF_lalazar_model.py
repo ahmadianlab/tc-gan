@@ -7,24 +7,53 @@ import math
 import sys 
 import time
 
-niter = 10000
+def read_dat(F):
+    f = open(F,"r")
 
-np.random.seed(0)
+    out = []
+    for l in f:
+        temp = l.split(",")
+        temp[-1] = temp[-1][:-1]
 
-#tag = "debug"
-tag = ""
+        out.append([float(t) for t in temp])
+    f.close()
+        
+    return np.array(out)
 
-RF_low = theano.shared(np.float32(-3),name = "RF_s")
-RF_del = theano.shared(np.float32(-4),name = "mean_W")
-THR = theano.shared(np.float32(3.),name = "s_W")
+niter = 20000
+
+np.random.seed(1)
+
+MODE = sys.argv[1]
+DATA = bool(sys.argv[2])
+box_width = int(sys.argv[3])
+
+if MODE not in ["WGAN","GAN"]:
+    print("Mode not recognized")
+    exit()
+
+tag = MODE + "_" + str(DATA)
+
+#import the data
+curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
+curves = curves + np.random.rand(curves.shape[0],curves.shape[1])
+
+X_pos = read_dat("lalazar_data/XCellsFull.dat")
+Y_pos = read_dat("lalazar_data/YCellsFull.dat")
+Z_pos = read_dat("lalazar_data/ZCellsFull.dat")
+#done importing
+
+RF_low = theano.shared(np.float32(np.log(.25)),name = "RF_s")
+RF_del = theano.shared(np.float32(np.log(.25)),name = "mean_W")
+THR = theano.shared(np.float32(-.5),name = "s_W")
 THR_del = theano.shared(np.float32(np.log(.5)),name = "s_W")
-Js = theano.shared(np.float32(6),name = "mean_b")
+Js = theano.shared(np.float32(np.log(7.)),name = "mean_b")
 
-T_RF_low = theano.shared(np.float32(-2),name = "RF_s")
-T_RF_del = theano.shared(np.float32(-3),name = "mean_W")
-T_THR = theano.shared(np.float32(2.),name = "s_W")
-T_THR_del = theano.shared(np.float32(np.log(1.)),name = "s_W")
-T_Js = theano.shared(np.float32(7),name = "mean_b")
+T_RF_low = theano.shared(np.float32(np.log(.5)),name = "RF_s")
+T_RF_del = theano.shared(np.float32(np.log(.1)),name = "mean_W")
+T_THR = theano.shared(np.float32(0.),name = "s_W")
+T_THR_del = theano.shared(np.float32(np.log(.1)),name = "s_W")
+T_Js = theano.shared(np.float32(np.log(10.)),name = "mean_b")
 
 #The full model takes RF widths from a uniform dist
 #The full model takes the FF weights to be unifrom in [0,1] after sparsifying
@@ -70,9 +99,7 @@ def get_FF_output(RF_l,RF_d,TH,TH_d,J,RF_w,FF_con,FF_str,TH_sam,x,inp,nsam,nx,ny
 
     return hidden_activations
 
-def run_GAN(mode):
-
-    box_width = 30
+def run_GAN(mode = MODE):
 
     dx = 1./box_width
 
@@ -155,21 +182,18 @@ def run_GAN(mode):
     TT = time.time()
     sam = generate_samples()
     
-    TC1 = np.reshape(output_dat(sam[0],sam[1],sam[2],sam[3],STIM),[NSAM*NI,NHID])
-    TC2 = np.reshape(output_sam(sam[0],sam[1],sam[2],sam[3],STIM),[NSAM*NI,NHID])
+    TC1 = output_dat(sam[0],sam[1],sam[2],sam[3],STIM)
+    TC2 = output_sam(sam[0],sam[1],sam[2],sam[3],STIM)
 
-    print(time.time() - TT)
-    print(TC1.max())
-    print(TC1.min())
-    print(TC1.mean())
+    TC1 = np.reshape(np.transpose(TC1,[0,2,1]),[-1,NI])
+    TC2 = np.reshape(np.transpose(TC2,[0,2,1]),[-1,NI])
 
-
-    np.savetxt("./FF_ll_tuning_curves_dat.csv",TC1)
-    np.savetxt("./FF_ll_tuning_curves_sam.csv",TC2)
+    np.savetxt("./FF_tuning_curve_samples/FF_ll_tuning_curves_dat.csv",TC1)
+    np.savetxt("./FF_tuning_curve_samples/FF_ll_tuning_curves_sam.csv",TC2)
     
     #done defining the output function
 
-    NOBS = 10
+    NOBS = 1
     INSHAPE = (NSAM,NI,NOBS)
 
     layers = [128,128]
@@ -191,23 +215,30 @@ def run_GAN(mode):
     get_DG_input = theano.function(GINP,FOBS_sam,allow_input_downcast = True)
 
     #I need a function that returns training functions
-    D_train, G_train = make_train_funcs(FOBS_sam,PARAM,GINP,[128,128],(NSAM,NI,NOBS),mode)
-    
-    #now define the actual values and test
-    train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,STIM,mode = mode,tag = tag + str(box_width))
+    D_train, G_train, DOUT = make_train_funcs(FOBS_sam,PARAM,GINP,[128,128],(NSAM,NI,NOBS),mode)
 
-def train(D_step,G_step,D_in,G_in,F_gen,STIM,mode = "WGAN",tag = "ll"):
+    print tag
+
+    #now define the actual values and test
+    train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,STIM,(NSAM,NI,NOBS),mode,tag + str(box_width),DATA)
+
+def train(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,mode,tag,data):
     
     if mode =="WGAN":
-        train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag)
+        train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,data)
     elif mode =="GAN":
-        train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag)
+        train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,data)
 
-def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
-    
+def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,use_data):
+   
+    print("Trainign WGAN")
+ 
     NDstep = 5
-    
-    F = open("./FF_logs/FF_WGAN_log_"+tag+".csv","w")
+
+    LOG = "./FF_logs/FF_log_"+tag+".csv"
+    LOSS = "./FF_logs/FF_losslog_"+tag+".csv"
+ 
+    F = open(LOG,"w")
     F.write("{}\t{}\t{}\t{}\t{}\n".format(
             T_RF_low.get_value(),
             T_RF_del.get_value(),
@@ -217,7 +248,7 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
     F.write("RF\tRFd\tJ\tth\tth_d\n")
     F.close()
 
-    F = open("./FF_logs/FF_WGAN_losslog_"+tag+".csv","w")
+    F = open(LOSS,"w")
     F.write("gloss,dloss\n")
     F.close()
 
@@ -247,7 +278,12 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
             DD = F_gen()
 
             #get the data inputs
-            data = D_in(DD[0],DD[1],DD[2],DD[3],STIM)
+
+            if use_data:
+                data = np.reshape(curves[np.random.choice(np.arange(len(curves)),INSHAPE[0])],INSHAPE)
+            else:
+                data = D_in(DD[0],DD[1],DD[2],DD[3],STIM)
+
             samples = G_in(SS[0],SS[1],SS[2],SS[3],STIM)
 
             SHAPE = samples.shape
@@ -255,12 +291,12 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
             #generate random numbers for interpolation
             #nsam,nin,nhid
             EE = np.random.rand(SHAPE[0],1,1)
-            gradpoints = EE*data + (1. - EE)*samples            
+            gradpoints = EE*data + (1. - EE)*samples
 
             #compute the update
             dloss = D_step(data,samples,gradpoints)
 
-            F = open("./FF_logs/FF_WGAN_losslog_"+tag+".csv","a")
+            F = open(LOSS,"a")
             F.write("{},{}\n".format(gloss,dloss))
             F.close()
 
@@ -268,7 +304,7 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
         SS = F_gen()
         gloss = G_step(SS[0],SS[1],SS[2],SS[3],STIM)
 
-        F = open("./FF_logs/FF_WGAN_losslog_"+tag+".csv","a")
+        F = open(LOSS,"a")
         F.write("{},{}\n".format(gloss,dloss))
         F.close()
         
@@ -283,14 +319,19 @@ def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
 
             print(OUT)
 
-            F = open("./FF_logs/FF_WGAN_log_"+tag+".csv","a")
+            F = open(LOG,"a")
             F.write(OUT + "\n")
             F.close()
 
     
-def train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
+def train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,use_data):
+
+    print("Training RGAN")
         
-    F = open("./FF_logs/FF_GAN_log_"+tag+".csv","w")
+    LOG = "./FF_logs/FF_log_"+tag+".csv"
+    LOSS = "./FF_logs/FF_losslog_"+tag+".csv"
+
+    F = open(LOG,"w")
     F.write("{}\t{}\t{}\t{}\t{}\n".format(T_RF_low.get_value(),
                                        T_RF_del.get_value(),
                                        T_Js.get_value(),
@@ -299,7 +340,8 @@ def train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
     F.write("\tdRF\tdRFd\tdJ\tth\tdth\n")
     F.close()
 
-    F = open("./FF_logs/FF_GAN_losslog_"+tag+".csv","w")
+
+    F = open(LOSS,"w")
     F.write("gloss,dloss\n")
     F.close()
 
@@ -320,20 +362,26 @@ def train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
     gloss = 10.
     dloss = 10.
 
+    print("DATA {}".format(use_data))
+
     for k in range(niter):
     
         SS = F_gen()
         DD = F_gen()
         
         #get the disc inputs
-        data = D_in(DD[0],DD[1],DD[2],DD[3],STIM)
+        if use_data:
+            data = np.reshape(curves[np.random.choice(np.arange(len(curves)),INSHAPE[0])],INSHAPE)
+        else:
+            data = D_in(DD[0],DD[1],DD[2],DD[3],STIM)
+
         samples = G_in(SS[0],SS[1],SS[2],SS[3],STIM)
 
         #compute the update
         dloss = D_step(data,samples)
         gloss = G_step(SS[0],SS[1],SS[2],SS[3],STIM)
 
-        F = open("./FF_logs/FF_GAN_losslog_"+tag+".csv","a")
+        F = open(LOSS,"a")
         F.write("{},{}\n".format(gloss,dloss))
         F.close()
         
@@ -348,11 +396,11 @@ def train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,tag):
 
             print(OUT)
 
-            F = open("./FF_logs/FF_GAN_log_"+tag+".csv","a")
+            F = open(LOG,"a")
             F.write(OUT + "\n")
             F.close()
 
-def make_train_funcs(generator, Gparams, Ginputs, layers, INSHAPE,mode = "WGAN"):
+def make_train_funcs(generator, Gparams, Ginputs, layers, INSHAPE,mode):
 
     if mode == "WGAN":
         return make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE)
@@ -363,9 +411,9 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
     
-    D_dat = SD.make_net(D_D_input,INSHAPE,"WGAN",layers)
-    D_sam = SD.make_net(D_G_input,INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
-    G_sam = SD.make_net(generator,INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
+    D_dat = SD.make_net(np.log(1. + D_D_input),INSHAPE,"WGAN",layers)
+    D_sam = SD.make_net(np.log(1. + D_G_input),INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
+    G_sam = SD.make_net(np.log(1. + generator),INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
     
     #get the outputs
     D_dat_out = lasagne.layers.get_output(D_dat)
@@ -375,7 +423,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     #make the loss functions
     
     D_grad_input = T.tensor3("D_sam","float32")
-    
+
     D_grad_net = SD.make_net(D_grad_input,INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
 
     D_grad_out = lasagne.layers.get_output(D_grad_net)
@@ -385,11 +433,12 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     lam = 100.
 
+    Wdist = D_sam_out.mean() - D_dat_out.mean()
     D_loss_exp = D_sam_out.mean() - D_dat_out.mean() + lam*Dgrad_penalty#discriminator loss
     G_loss_exp = - G_sam_out.mean()#generative loss
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    lr = .01
+    lr = .001
     
     b1 = .5
     b2 = .9
@@ -398,10 +447,11 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     G_updates = lasagne.updates.adam(G_loss_exp, Gparams, lr,beta1 = b1,beta2 = b2)
 
     G_train_func = theano.function(Ginputs,G_loss_exp,updates = G_updates,allow_input_downcast = True,on_unused_input = 'ignore')
+    D_train_func = theano.function([D_D_input,D_G_input,D_grad_input],Wdist,updates = D_updates,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    D_train_func = theano.function([D_D_input,D_G_input,D_grad_input],Dgrad_penalty,updates = D_updates,allow_input_downcast = True,on_unused_input = 'ignore')
+    Dout_func = theano.function([D_D_input,D_G_input],[D_sam_out,D_dat_out],allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return D_train_func, G_train_func
+    return D_train_func, G_train_func,Dout_func
 
 def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
@@ -417,8 +467,12 @@ def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     G_sam_out = lasagne.layers.get_output(G_sam)
     
     #make the loss functions
-    D_loss_exp = - T.log(.001+D_dat_out.mean()) - T.log(1.001 - D_sam_out.mean())#discriminator loss
-    G_loss_exp = - T.log(.001+G_sam_out.mean())#generative loss
+
+    eps = .0001
+    m1 = 1.-eps
+
+    D_loss_exp = - T.log(eps + m1*D_dat_out.mean()) - T.log(1. -  m1*D_sam_out.mean())#discriminator loss
+    G_loss_exp = - T.log(eps + m1*G_sam_out.mean())#generative loss
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     lr = .001
@@ -433,7 +487,10 @@ def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     D_train_func = theano.function([D_D_input,D_G_input],D_loss_exp,updates = D_updates,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return D_train_func, G_train_func
+    Dout_func = theano.function([D_D_input,D_G_input],[D_sam_out,D_dat_out],updates = D_updates,allow_input_downcast = True,on_unused_input = 'ignore')
+
+    return D_train_func, G_train_func, Dout_func
 
 if __name__ == "__main__":
-    run_GAN(sys.argv[1])
+
+    run_GAN()

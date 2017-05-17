@@ -1,5 +1,6 @@
 import lasagne.layers as L
 import lasagne.nonlinearities as NL
+import lasagne
 
 def make_net(input_variable,in_shape,LOSS,layers = [],params = None):
 
@@ -8,14 +9,14 @@ def make_net(input_variable,in_shape,LOSS,layers = [],params = None):
     if params == None:        
 
         for l in range(len(layers)):
-            net = L.DenseLayer(net,layers[l])
+            net = L.DenseLayer(net,layers[l],b=lasagne.init.Normal(.01,0))
                 
         if LOSS == "LS":
-            net = L.DenseLayer(net,1,nonlinearity = NL.linear)
+            net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
         elif LOSS == "CE":
-            net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid)
+            net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid,b=lasagne.init.Normal(.01,0))
         elif LOSS == "WGAN":
-            net = L.DenseLayer(net,1,nonlinearity = NL.linear)
+            net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
         else:
             print("Invaid LOSS specified")
             exit()

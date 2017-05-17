@@ -6,14 +6,55 @@ from ..ssnode import DEFAULT_PARAMS
 from .loader import load_gandata
 
 
+def plot_errors(data, legend=True, ax=None):
+    if ax is None:
+        _, ax = pyplot.subplots()
+    from numpy.linalg import norm
+    import matplotlib.patheffects as pe
+
+    model = data.model_tuning
+    true = data.true_tuning
+    per_stim_error = abs(model - true) / abs(true)
+    total_error = norm(model - true, axis=-1) / norm(true, axis=-1)
+
+    per_stim_lines = ax.plot(per_stim_error)
+    total_error_lines = ax.plot(
+        total_error,
+        path_effects=[pe.Stroke(linewidth=10, foreground='white'),
+                      pe.Normal()])
+
+    if legend:
+        leg = ax.legend(
+            total_error_lines + per_stim_lines,
+            ['rel. l2 error'] + list(range(len(per_stim_lines))),
+            loc='upper left')
+        leg.set_frame_on(True)
+        leg.get_frame().set_facecolor('white')
+
+    return dict(
+        ax=ax,
+        per_stim_error=per_stim_error,
+        per_stim_lines=per_stim_lines,
+        total_error=total_error,
+        total_error_lines=total_error_lines,
+    )
+
+
 def plot_learning(data):
     df = data.to_dataframe()
-    fig, axes = pyplot.subplots(nrows=2, ncols=2,
+    fig, axes = pyplot.subplots(nrows=3, ncols=2,
+                                sharex=True,
                                 squeeze=False, figsize=(9, 6))
     df.plot('epoch', ['Gloss', 'Dloss'], ax=axes[0, 0])
     df.plot('epoch', ['Daccuracy'], ax=axes[0, 1])
     df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0])
     df.plot('epoch', ['model_convergence', 'truth_convergence'], ax=axes[1, 1])
+
+    plot_errors(data, ax=axes[2, 0])
+    plot_errors(data, ax=axes[2, 1], legend=False)
+    axes[2, 0].set_ylim(0, 1)
+    axes[2, 1].set_yscale('log')
+
     fig.suptitle(data.tag)
     return fig
 

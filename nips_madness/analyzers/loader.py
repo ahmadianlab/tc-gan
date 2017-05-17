@@ -110,5 +110,15 @@ class GANData(object):
         import pandas
         return pandas.DataFrame(self.main, columns=self.main_names)
 
+    def __repr__(self):
+        tag = getattr(self, 'tag', 'UNKNOWN TAG')
+        try:
+            epochs = len(self.main)
+        except AttributeError:
+            epochs = 'UNKNOWN'
+        return '<{} {tag} epochs={epochs}>'.format(
+            self.__class__.__name__,
+            **locals())
+
 
 load_gandata = GANData.load

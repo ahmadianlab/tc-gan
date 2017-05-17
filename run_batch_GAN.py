@@ -28,7 +28,8 @@ import stimuli
 
 
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-         loss, use_data, layers, n_samples, debug, rate_cost, WGAN,
+         loss, use_data, layers, n_samples, debug, WGAN,
+         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
          N, IO_type, rate_hard_bound, rate_soft_bound, dt,
          true_IO_type, truth_size, truth_seed,
          run_config):
@@ -348,6 +349,8 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
         rate_vector=rvec, mask=M, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
+        rate_penalty_threshold=rate_penalty_threshold,
+        rate_penalty_no_I=rate_penalty_no_I,
         ivec=ivec, Z=Z, J=J, D=D, S=S, N=N,
         R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp])
 
@@ -533,7 +536,7 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
+def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad):
     ###Now I need to make the GAN
     ###
     ###
@@ -576,7 +579,11 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,i
         print("Invalid loss specified")
         exit()
 
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((rate_vector - 200.)/10).sum()**2
+    if rate_penalty_no_I:
+        penalized_rate = rate_vector[:, :, :N]
+    else:
+        penalized_rate = rate_vector
+    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((penalized_rate - rate_penalty_threshold)/10).sum()**2
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), d_lr)#discriminator training function
@@ -612,7 +619,7 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,i
 
     return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true
 
-def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,ivec,Z,J,D,S,N,R_grad):
+def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad):
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -655,8 +662,12 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,i
 
     true_loss_exp = fake_dis_out.mean() - true_dis_out.mean() + lam*((DGRAD - 1)**2).mean()#discriminator loss
     fake_loss_exp = -fake_dis_out.mean()#generative loss
-    
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((rate_vector - 150.)/10).sum()**2
+
+    if rate_penalty_no_I:
+        penalized_rate = rate_vector[:, :, :N]
+    else:
+        penalized_rate = rate_vector
+    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((penalized_rate - rate_penalty_threshold)/10).sum()**2
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector,red_fake_for_grad],true_loss_exp,allow_input_downcast = True)
@@ -761,6 +772,14 @@ if __name__ == "__main__":
     parser.add_argument(
         '--rate_cost', default='0',
         help='The cost of having the rate be large (default: %(default)s)')
+    parser.add_argument(
+        '--rate_penalty_threshold', default=150.0, type=float,
+        help='''The point at which the rate penalty cost kicks in
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--rate_penalty_no_I', action='store_true', default=False,
+        help='''If specified, do not penalize large inhibitory rate.
+        (default: %(default)s)''')
     parser.add_argument(
         '--rate_soft_bound', default=200, type=float,
         help='rate_soft_bound=r0 (default: %(default)s)')

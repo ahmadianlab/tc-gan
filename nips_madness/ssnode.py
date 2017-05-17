@@ -500,13 +500,17 @@ def make_solver_params(
 
 
 def sample_fixed_points(
-        NZ=30, seed=0, N=102,
-        J=np.array([[.0957, .0638], [.1197, .0479]]),
-        D=np.array([[.7660, .5106], [.9575, .3830]]),
-        S=np.array([[.6667, .2], [1.333, .2]]) / 8,
-        bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
-        smoothness=0.25/8, contrast=20,
-        io_type='asym_linear', k=0.01, n=2.2,
+        NZ=30, seed=0,
+        N=DEFAULT_PARAMS['N'],
+        J=DEFAULT_PARAMS['J'],
+        D=DEFAULT_PARAMS['D'],
+        S=DEFAULT_PARAMS['S'],
+        bandwidths=DEFAULT_PARAMS['bandwidths'],
+        smoothness=DEFAULT_PARAMS['smoothness'],
+        contrast=DEFAULT_PARAMS['contrast'],
+        io_type=DEFAULT_PARAMS['io_type'],
+        k=DEFAULT_PARAMS['k'],
+        n=DEFAULT_PARAMS['n'],
         **solver_kwargs):
     import stimuli
     from .tests.test_dynamics import numeric_w

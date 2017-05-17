@@ -469,14 +469,18 @@ def plot_io_funs(k=0.01, n=2.2, r0=100, r1=200, xmin=-1, xmax=150):
 
 
 def make_solver_params(
-        N=102,
-        J=np.array([[.0957, .0638], [.1197, .0479]]),
-        D=np.array([[.7660, .5106], [.9575, .3830]]),
-        S=np.array([[.6667, .2], [1.333, .2]]) / 8,
-        # io_type='asym_linear', seed=97,
-        io_type='asym_tanh', seed=65,
-        bandwidth=1, smoothness=0.25/8, contrast=20,
-        k=0.01, n=2.2):
+        N=DEFAULT_PARAMS['N'],
+        J=DEFAULT_PARAMS['J'],
+        D=DEFAULT_PARAMS['D'],
+        S=DEFAULT_PARAMS['S'],
+        io_type=DEFAULT_PARAMS['io_type'],
+        seed=65,
+        bandwidth=1,
+        smoothness=DEFAULT_PARAMS['smoothness'],
+        contrast=DEFAULT_PARAMS['contrast'],
+        k=DEFAULT_PARAMS['k'],
+        n=DEFAULT_PARAMS['n'],
+        ):
     import stimuli
     from .tests.test_dynamics import numeric_w
 

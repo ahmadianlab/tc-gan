@@ -3,6 +3,11 @@ import os
 
 import numpy as np
 
+try:
+    string_types = (str, unicode)
+except NameError:
+    string_types = (str,)
+
 
 def load_logfile(path):
     with open(path, 'rt') as file:
@@ -90,6 +95,9 @@ class GANData(object):
         self.log_J, self.log_D, self.log_S = \
             self.gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
 
+    def gen_param(self, name):
+        return np.exp(getattr(self, 'log_' + name))
+
     def iter_gen_params(self, indices=None):
         if indices is None:
             indices = slice(None)
@@ -110,15 +118,69 @@ class GANData(object):
         import pandas
         return pandas.DataFrame(self.main, columns=self.main_names)
 
+    @property
+    def gan_type(self):
+        try:
+            WGAN = self.info['run_config']['WGAN']
+            loss = self.info['run_config']['loss']
+        except (AttributeError, KeyError):
+            try:
+                loss = self.parsed_tag['loss']
+            except (AttributeError, KeyError):
+                return None
+        else:
+            if WGAN:
+                return 'WGAN'
+        if loss == 'CE':
+            return 'RGAN'
+        elif loss == 'LS':
+            return 'LSGAN'
+        return '{}-GAN'.format(loss)
+
+    def params(self):
+        try:
+            params = self.info['run_config']
+        except (AttributeError, KeyError):
+            try:
+                params = self.parsed_tag['loss']
+            except (AttributeError, KeyError):
+                params = {}
+        params = dict(params, gan_type=self.gan_type)
+        for key in []:
+            if key in params:
+                params[key.lower()] = params[key]
+        return params
+
+    def param_values(self, keys, default=None):
+        params = self.params()
+        return tuple(params.get(k, default) for k in keys)
+
+    DEFAULT_SPEC_KEYS = ('io_type', 'N', 'rate_cost', 'layers')
+    DEFAULT_SORT_KEYS = ('gan_type',) + DEFAULT_SPEC_KEYS
+
+    def pretty_spec(self, keys=DEFAULT_SPEC_KEYS):
+        params = self.params()
+        if 'layers' in params:
+            params['layers'] = ','.join(map(str, params['layers']))
+        keyvals = ' '.join('{}={}'.format(k, params[k]) for k in keys
+                           if k in params)
+        return '{}: {}'.format(params['gan_type'], keyvals)
+
     def __repr__(self):
-        tag = getattr(self, 'tag', 'UNKNOWN TAG')
+        spec = self.pretty_spec()
         try:
             epochs = len(self.main)
         except AttributeError:
             epochs = 'UNKNOWN'
-        return '<{} {tag} epochs={epochs}>'.format(
+        return '<{} {spec} epochs={epochs}>'.format(
             self.__class__.__name__,
             **locals())
 
 
-load_gandata = GANData.load
+def load_gandata(paths, sort=GANData.DEFAULT_SORT_KEYS):
+    if isinstance(paths, string_types):
+        return GANData.load(paths)
+    gans = list(map(GANData.load, paths))
+    if sort:
+        gans.sort(key=lambda data: data.param_values(sort))
+    return gans

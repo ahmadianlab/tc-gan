@@ -1,3 +1,5 @@
+import itertools
+
 from matplotlib import pyplot
 import matplotlib
 import numpy as np
@@ -27,7 +29,7 @@ def plot_errors(data, legend=True, ax=None):
         leg = ax.legend(
             total_error_lines + per_stim_lines,
             ['rel. l2 error'] + list(range(len(per_stim_lines))),
-            loc='upper left')
+            loc='center left')
         leg.set_frame_on(True)
         leg.get_frame().set_facecolor('white')
 
@@ -40,22 +42,47 @@ def plot_errors(data, legend=True, ax=None):
     )
 
 
+def plot_gen_params(data, axes=None):
+    if axes is None:
+        _, axes = pyplot.subplots(ncols=3, sharex=True, figsize=(9, 3))
+    for column, name in enumerate('JDS'):
+        true_param = DEFAULT_PARAMS[name]
+        fake_param = data.gen_param(name)
+        for c, ((i, p), (j, q)) in enumerate(itertools.product(
+                enumerate('EI'), enumerate('EI'))):
+            color = 'C{}'.format(c)
+            axes[column].axhline(
+                true_param[i, j],
+                linestyle='--',
+                color=color)
+            axes[column].plot(
+                fake_param[:, i, j],
+                label='${}_{{{}{}}}$'.format(name, p, q),
+                color=color)
+        leg = axes[column].legend(loc='best')
+        leg.set_frame_on(True)
+        leg.get_frame().set_facecolor('white')
+    return axes
+
+
 def plot_learning(data):
     df = data.to_dataframe()
-    fig, axes = pyplot.subplots(nrows=3, ncols=2,
+    fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))
-    df.plot('epoch', ['Gloss', 'Dloss'], ax=axes[0, 0])
+    df.plot('epoch', ['Gloss', 'Dloss'], ax=axes[0, 0], alpha=0.8)
     df.plot('epoch', ['Daccuracy'], ax=axes[0, 1])
     df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0])
-    df.plot('epoch', ['model_convergence', 'truth_convergence'], ax=axes[1, 1])
+    df.plot('epoch', ['model_convergence'], ax=axes[1, 1])
 
-    plot_errors(data, ax=axes[2, 0])
-    plot_errors(data, ax=axes[2, 1], legend=False)
-    axes[2, 0].set_ylim(0, 1)
-    axes[2, 1].set_yscale('log')
+    err1 = plot_errors(data, ax=axes[0, 2])
+    err2 = plot_errors(data, ax=axes[1, 2], legend=False)
+    err1['ax'].set_ylim(0, 1)
+    err2['ax'].set_yscale('log')
 
-    fig.suptitle(data.tag)
+    plot_gen_params(data, axes=axes[2, :])
+
+    fig.suptitle(data.pretty_spec())
     return fig
 
 

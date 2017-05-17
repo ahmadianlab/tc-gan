@@ -270,8 +270,9 @@ def fixed_point(
 
 
 def make_io_fun(k, n,
-                rate_soft_bound=100, rate_hard_bound=200,
-                io_type='asym_tanh'):
+                rate_soft_bound=DEFAULT_PARAMS['rate_soft_bound'],
+                rate_hard_bound=DEFAULT_PARAMS['rate_hard_bound'],
+                io_type=DEFAULT_PARAMS['io_type']):
     v0 = rate_to_volt(rate_soft_bound, k, n)
     if io_type == 'asym_linear':
         def io_fun(v):

@@ -104,7 +104,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         if not true_IO_type:
             true_IO_type = IO_type
         print("Generating the truth...")
-        data, (_, _, true_info) = SSsolve.sample_tuning_curves(
+        data, _ = SSsolve.sample_tuning_curves(
             sample_sites=1,
             NZ=truth_size,
             seed=truth_seed,
@@ -390,7 +390,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
                      "parameters_{}.log"]:
         open(os.path.join("logfiles", filename.format(tag)), 'w').close()
 
-    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,truth_convergence,model_unused,truth_unused")
+    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
     
     for k in range(iterations):
@@ -400,9 +400,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
              SSsolve_time,
              gradient_time,
              model_info.rejections,
-             true_info.rejections,
-             model_info.unused,
-             true_info.unused])
+             model_info.unused])
 
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)

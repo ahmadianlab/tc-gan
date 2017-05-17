@@ -24,7 +24,6 @@ double rate_to_volt(double rate, double k, double n) {
   return pow(rate / k, 1 / n);
 }
 
-inline
 double io_pow(double v, double r0, double r1, double v0, double k, double n) {
   /* unused args for just to match calling convention with io_atanh */
   if (v <= 0) {
@@ -34,7 +33,6 @@ double io_pow(double v, double r0, double r1, double v0, double k, double n) {
   }
 }
 
-inline
 double io_alin(double v, double r0, double r1, double v0, double k, double n) {
   /* r1 is not used; it's just to match calling convention with io_atanh */
   if (v <= 0) {
@@ -42,11 +40,10 @@ double io_alin(double v, double r0, double r1, double v0, double k, double n) {
   } else if (v <= v0) {
     return k * pow(v, n);
   } else {
-    return r0 + pow(v0, n-1) * n * (v - v0);
+    return r0 + k * pow(v0, n-1) * n * (v - v0);
   }
 }
 
-inline
 double io_atanh(double v, double r0, double r1, double v0, double k, double n) {
   if (v <= 0) {
     return 0;

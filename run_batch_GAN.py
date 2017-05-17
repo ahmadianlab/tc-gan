@@ -29,7 +29,7 @@ import stimuli
 
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          loss, use_data, layers, n_samples, debug, rate_cost, WGAN,
-         N, IO_type, rate_hard_bound, rate_soft_bound,
+         N, IO_type, rate_hard_bound, rate_soft_bound, dt,
          true_IO_type, truth_size, truth_seed,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
@@ -92,6 +92,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         n_sites = N
 
     ssn_params = dict(
+        dt=dt,
         rate_soft_bound=rate_soft_bound,
         rate_hard_bound=rate_hard_bound,
         io_type=IO_type,
@@ -729,6 +730,10 @@ if __name__ == "__main__":
         help='''Number of excitatory neurons in SSN. If 0, use the
         value recorded in the MATLAB file at `datapath`. (default:
         %(default)s)''')
+    parser.add_argument(
+        '--dt', default=0.0008, type=float,
+        help='''Time step used for SSN fixed point finder.
+        (default: %(default)s)''')
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')

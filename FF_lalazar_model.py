@@ -6,6 +6,7 @@ import discriminators.simple_discriminator as SD
 import math 
 import sys 
 import time
+import FF_functions.lalazar_func as IO_func
 
 def read_dat(F):
     f = open(F,"r")
@@ -16,6 +17,26 @@ def read_dat(F):
         temp[-1] = temp[-1][:-1]
 
         out.append([float(t) for t in temp])
+    f.close()
+        
+    return np.array(out)
+
+def read_log(F):
+    f = open(F,"r")
+
+    out = []
+    n = 0
+    for l in f:
+        temp = l.split(",")
+        temp[-1] = temp[-1][:-1]
+
+        if n != 1:
+            out.append([float(t) for t in temp])
+        else:
+            out.append([t for t in temp])
+        
+        n += 1
+
     f.close()
         
     return np.array(out)
@@ -32,22 +53,29 @@ if MODE not in ["WGAN","GAN"]:
     print("Mode not recognized")
     exit()
 
-tag = MODE + "_" + str(DATA)
+tag = MODE + "_" + str(DATA) + "_MEAN_"
+
+#if len(sys.argv) == 5:
+#    LOG = read_log(sys.argv[4])
+#    start_params = LOG[-1]
+#else:
+#    start_params = [np.log(.25),np.log(50),np.log(.25),.1]
+    
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
-curves = curves + np.random.rand(curves.shape[0],curves.shape[1])
+curves = np.array([c/(np.mean(c) + .0001) for c in curves])
 
 X_pos = read_dat("lalazar_data/XCellsFull.dat")
 Y_pos = read_dat("lalazar_data/YCellsFull.dat")
 Z_pos = read_dat("lalazar_data/ZCellsFull.dat")
 #done importing
 
-RF_low = theano.shared(np.float32(np.log(.25)),name = "RF_s")
-RF_del = theano.shared(np.float32(np.log(.25)),name = "mean_W")
-THR = theano.shared(np.float32(10),name = "s_W")
-THR_del = theano.shared(np.float32(np.log(5.)),name = "s_W")
-Js = theano.shared(np.float32(np.log(5000.)),name = "mean_b")
+RF_low = theano.shared(np.float32(start_params[0]),name = "RF_s")
+RF_del = theano.shared(np.float32(start_params[1]),name = "mean_W")
+THR = theano.shared(np.float32(start_params[3]),name = "s_W")
+THR_del = theano.shared(np.float32(start_params[4]),name = "s_W")
+Js = theano.shared(np.float32(start_params[2]),name = "mean_b")
 
 T_RF_low = theano.shared(np.float32(np.log(.5)),name = "RF_s")
 T_RF_del = theano.shared(np.float32(np.log(.1)),name = "mean_W")
@@ -69,35 +97,6 @@ T_Js = theano.shared(np.float32(np.log(10.)),name = "mean_b")
 # - RF width (uniform [0,1]) - [nsam,nx,ny,nz]
 # - FF connections (discreete {0,1}) - [nsam,nhid,nx*ny*nz]
 # - FF strengths (uniform [0,1]) - [nsam,nhid,nx*ny*nz]
-
-def rectify(x):
-    return .5*(x + abs(x))
-
-def get_FF_output(RF_l,RF_d,TH,TH_d,J,RF_w,FF_con,FF_str,TH_sam,x,inp,nsam,nx,ny,nz,nhid,ni,dx):
-
-    """
-
-    RF_l - low end of the RF width distribution
-    RF_d - width of RF distribuion
-    TH   - threshold
-
-    """
-
-    pos = T.reshape(x,[1,-1,3])    
-    stim = T.reshape(inp,[ni,1,3])
-    dist_sq = T.reshape(((pos - stim)**2).sum(axis = 2),[1,ni,nx*ny*nz]) 
-    widths = T.reshape(RF_w,[nsam,1,nx*ny*nz])
- 
-    exponent = dist_sq/(2*(widths*RF_d + RF_l)**2)#[nsam,ni,nx*y*nz]
-#    input_activations = (dx**3)*T.reshape(T.exp(-exponent)/T.sqrt(((2*math.pi)**3)*(widths*RF_d + RF_l)**6),[nsam,ni,1,nx*ny*nz])
-    input_activations = T.reshape(T.exp(-exponent),[nsam,ni,1,nx*ny*nz])
-    input_activations = input_activations/T.sum(input_activations,axis = 3,keepdims = True)
-
-    weights = T.reshape(J*FF_con*FF_str,[nsam,1,nhid,nx*ny*nz])
-    
-    hidden_activations = rectify((input_activations*weights).sum(axis = 3) - T.reshape((TH + TH_sam*TH_d),[nsam,1,nhid]))#[nsam,ni,nhid]
-
-    return hidden_activations
 
 def run_GAN(mode = MODE):
 
@@ -163,7 +162,7 @@ def run_GAN(mode = MODE):
 
     PARAM = [RF_low,RF_del,THR,THR_del,Js]
 
-    FFout_sam = get_FF_output(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),receptive_widths,feedforward_conn,feedforward_strn,feedforward_thrs,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
+    FFout_sam = IO_func.get_FF_output(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),receptive_widths,feedforward_conn,feedforward_strn,feedforward_thrs,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
 
     GINP = [feedforward_conn,feedforward_strn,receptive_widths,feedforward_thrs,stimulus]
 
@@ -171,7 +170,7 @@ def run_GAN(mode = MODE):
 
 
 
-    FFout_dat = get_FF_output(T.exp(T_RF_low),T.exp(T_RF_del),T_THR,T.exp(T_THR_del),T.exp(T_Js),receptive_widths_true,feedforward_conn_true,feedforward_strn_true,feedforward_thrs_true,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
+    FFout_dat = IO_func.get_FF_output(T.exp(T_RF_low),T.exp(T_RF_del),T_THR,T.exp(T_THR_del),T.exp(T_Js),receptive_widths_true,feedforward_conn_true,feedforward_strn_true,feedforward_thrs_true,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
     
     DINP = [feedforward_conn_true,feedforward_strn_true,receptive_widths_true,feedforward_thrs_true,stimulus]
 

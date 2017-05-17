@@ -1,3 +1,4 @@
+import collections
 import json
 import os
 
@@ -155,15 +156,21 @@ class GANData(object):
         params = self.params()
         return tuple(params.get(k, default) for k in keys)
 
-    DEFAULT_SPEC_KEYS = ('io_type', 'N', 'rate_cost', 'layers')
-    DEFAULT_SORT_KEYS = ('gan_type',) + DEFAULT_SPEC_KEYS
+    default_spec_keys = ('io_type', 'N', 'rate_cost', 'layers')
 
-    def pretty_spec(self, keys=DEFAULT_SPEC_KEYS):
+    def pretty_spec(self, keys=None):
+        if keys is None:
+            keys = self.default_spec_keys
         params = self.params()
         if 'layers' in params:
             params['layers'] = ','.join(map(str, params['layers']))
         keyvals = ' '.join('{}={}'.format(k, params[k]) for k in keys
                            if k in params)
+        if params.get('N', None) == 0:
+            for N in [51, 101, 102]:
+                if params.get('datapath', '').endswith('Ne{}.mat'.format(N)):
+                    params['N'] = N
+                    break
         return '{}: {}'.format(params['gan_type'], keyvals)
 
     def __repr__(self):
@@ -177,10 +184,53 @@ class GANData(object):
             **locals())
 
 
-def load_gandata(paths, sort=GANData.DEFAULT_SORT_KEYS):
+class GANGrid(object):
+
+    def __init__(self, gans, sort_by='key_order'):
+        gans = list(gans)
+        self.diff = shallow_diff_dicts(data.params() for data in gans)
+        if sort_by:
+            if sort_by == 'key_order':
+                sort_by = list(self.diff)
+                for data in gans:
+                    data.default_spec_keys = tuple(k for k in sort_by
+                                                   if k != 'gan_type')
+            gans.sort(key=lambda data: data.param_values(sort_by))
+        self.gans = gans
+
+    def to_dataframe(self):
+        import pandas
+        df = pandas.DataFrame(self.diff, columns=list(self.diff))
+        df.loc[:, 'GANData'] = self.gans
+        return df
+
+    def __repr__(self):
+        return '<{} axes={}>'.format(
+            self.__class__.__name__,
+            ','.join(map(str, self.diff)))
+
+
+def shallow_diff_dicts(dicts):
+    dicts = list(dicts)  # in case it is just an iterable
+    keys = set()
+    for d in dicts:
+        keys |= set(d)
+    keys = sorted(keys)
+
+    def to_hashable(v):
+        if isinstance(v, list):
+            return tuple(v)
+        return v
+
+    missing = object()
+    values = {k: [to_hashable(d.get(k, missing)) for d in dicts]
+              for k in keys}
+    hasdiff = {k: len(set(vs)) > 1 or missing in vs
+               for k, vs in values.items()}
+    return collections.OrderedDict((k, values[k]) for k in keys if hasdiff[k])
+
+
+def load_gandata(paths, **kwds):
     if isinstance(paths, string_types):
         return GANData.load(paths)
-    gans = list(map(GANData.load, paths))
-    if sort:
-        gans.sort(key=lambda data: data.param_values(sort))
-    return gans
+    return GANGrid(map(GANData.load, paths), **kwds)

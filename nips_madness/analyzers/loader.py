@@ -143,8 +143,8 @@ class GANData(object):
             params = self.info['run_config']
         except (AttributeError, KeyError):
             try:
-                params = self.parsed_tag['loss']
-            except (AttributeError, KeyError):
+                params = self.parsed_tag
+            except AttributeError:
                 params = {}
         params = dict(params, gan_type=self.gan_type)
         for key in []:

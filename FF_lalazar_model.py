@@ -180,16 +180,21 @@ def run_GAN(mode = MODE):
 
     ##print out some sample tuning curves
     TT = time.time()
-    sam = generate_samples()
+
+    out = []
+
+    for k in range(1):
+        print(k)
+        sam = generate_samples()
     
-    TC1 = output_dat(sam[0],sam[1],sam[2],sam[3],STIM)
-    TC2 = output_sam(sam[0],sam[1],sam[2],sam[3],STIM)
+        TC2 = output_sam(sam[0],sam[1],sam[2],sam[3],STIM)
 
-    TC1 = np.reshape(np.transpose(TC1,[0,2,1]),[-1,NI])
-    TC2 = np.reshape(np.transpose(TC2,[0,2,1]),[-1,NI])
+        TC2 = np.reshape(np.transpose(TC2,[0,2,1]),[-1,NI])
 
-    np.savetxt("./FF_tuning_curve_samples/FF_ll_tuning_curves_dat.csv",TC1)
-    np.savetxt("./FF_tuning_curve_samples/FF_ll_tuning_curves_sam.csv",TC2)
+        out.append(TC2)
+
+    out = np.concatenate(out)
+    np.savetxt("./FF_tuning_curve_samples/FF_ll_tuning_curves_sam.csv",out)
     
     #done defining the output function
 

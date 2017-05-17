@@ -657,7 +657,7 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,i
     true_loss_exp = fake_dis_out.mean() - true_dis_out.mean() + lam*((DGRAD - 1)**2).mean()#discriminator loss
     fake_loss_exp = -fake_dis_out.mean()#generative loss
     
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((rate_vector - 200.)/10).sum()**2
+    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((rate_vector - 150.)/10).sum()**2
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector,red_fake_for_grad],true_loss_exp,allow_input_downcast = True)
@@ -709,16 +709,16 @@ if __name__ == "__main__":
                              'training_data_TCs_Ne102.mat'),
         help='Path to MATLAB data file (default: %(default)s)')
     parser.add_argument(
-        '--iterations', default=10000, type=int,
+        '--iterations', default=100000, type=int,
         help='Number of iterations (default: %(default)s)')
     parser.add_argument(
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
     parser.add_argument(
-        '--gen-learn-rate', default=0.0001, type=float,
+        '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')
     parser.add_argument(
-        '--disc-learn-rate', default=0.0001, type=float,
+        '--disc-learn-rate', default=0.001, type=float,
         help='Learning rate for discriminator (default: %(default)s)')
     parser.add_argument(
         '--use-data', default=False, action='store_true',

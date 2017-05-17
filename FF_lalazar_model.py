@@ -45,9 +45,9 @@ Z_pos = read_dat("lalazar_data/ZCellsFull.dat")
 
 RF_low = theano.shared(np.float32(np.log(.25)),name = "RF_s")
 RF_del = theano.shared(np.float32(np.log(.25)),name = "mean_W")
-THR = theano.shared(np.float32(-.5),name = "s_W")
-THR_del = theano.shared(np.float32(np.log(.5)),name = "s_W")
-Js = theano.shared(np.float32(np.log(7.)),name = "mean_b")
+THR = theano.shared(np.float32(10),name = "s_W")
+THR_del = theano.shared(np.float32(np.log(5.)),name = "s_W")
+Js = theano.shared(np.float32(np.log(5000.)),name = "mean_b")
 
 T_RF_low = theano.shared(np.float32(np.log(.5)),name = "RF_s")
 T_RF_del = theano.shared(np.float32(np.log(.1)),name = "mean_W")
@@ -183,7 +183,7 @@ def run_GAN(mode = MODE):
 
     out = []
 
-    for k in range(1):
+    for k in range(10):
         print(k)
         sam = generate_samples()
     

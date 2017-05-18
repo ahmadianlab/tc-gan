@@ -196,6 +196,7 @@ class GANGrid(object):
                     data.default_spec_keys = tuple(k for k in sort_by
                                                    if k != 'gan_type')
             gans.sort(key=lambda data: data.param_values(sort_by))
+            self.diff = shallow_diff_dicts(data.params() for data in gans)
         self.gans = gans
 
     def to_dataframe(self):

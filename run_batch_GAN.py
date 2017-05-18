@@ -28,7 +28,7 @@ import stimuli
 
 
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-         loss, use_data, layers, n_samples, debug, WGAN,
+         loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
          rate_cost, rate_penalty_threshold, rate_penalty_no_I,
          N, IO_type, rate_hard_bound, rate_soft_bound, dt,
          true_IO_type, truth_size, truth_seed,
@@ -36,7 +36,8 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
     if WGAN:
-        make_functions = make_WGAN_functions
+        def make_functions(**kwds):
+            return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
         train_update = WGAN_update
     else:
         make_functions = make_RGAN_functions
@@ -619,7 +620,7 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,r
 
     return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true
 
-def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad):
+def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,WGAN_lambda):
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -656,7 +657,7 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,r
     D_red_grad_net = SD.make_net(in_for_grad,INSHAPE,"WGAN",LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
     for_grad_out = lasagne.layers.get_output(D_red_grad_net)
 
-    lam = 10.
+    lam = WGAN_lambda
 
     DGRAD = T.jacobian(T.reshape(for_grad_out,[-1]),red_fake_for_grad).norm(2, axis = [1,2])#the norm of the gradient
 
@@ -795,6 +796,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--WGAN', default=False, action='store_true',
         help='Use WGAN (default: %(default)s)')
+    parser.add_argument(
+        '--WGAN_lambda', default=10.0, type=float,
+        help='The complexity penalty for the D (default: %(default)s)')
     parser.add_argument(
         '--pdb', action='store_true',
         help='Drop into the Python debugger PDB on an exception.')

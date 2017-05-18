@@ -108,12 +108,19 @@ class GANData(object):
             yield list(map(np.exp, log_JDS))
 
     @property
+    def n_bandwidths(self):
+        try:
+            return self.info['run_config']['n_bandwidths']
+        except (AttributeError, KeyError):
+            return 8
+
+    @property
     def model_tuning(self):
-        return self.tuning[:, :8]
+        return self.tuning[:, :self.n_bandwidths]
 
     @property
     def true_tuning(self):
-        return self.tuning[:, 8:16]
+        return self.tuning[:, self.n_bandwidths:self.n_bandwidths*2]
 
     def to_dataframe(self):
         import pandas

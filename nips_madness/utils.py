@@ -28,15 +28,17 @@ def git_output(args):
 
 
 def make_progressbar(quiet=False, **kwds):
-    def dummy_bar(x):
-        return x
-
     if quiet:
-        return dummy_bar
+        return lambda xs: xs
     else:
         try:
             import progressbar
         except ImportError:
+            def dummy_bar(xs):
+                for x in xs:
+                    print('.', end='')
+                    yield x
+                print()
             return dummy_bar
         else:
             return progressbar.ProgressBar(**kwds)

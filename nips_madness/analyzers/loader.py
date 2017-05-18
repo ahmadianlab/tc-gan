@@ -210,8 +210,9 @@ class GANGrid(object):
             if sort_by == 'key_order':
                 sort_by = list(self.diff)
                 for data in gans:
-                    data.default_spec_keys = tuple(k for k in sort_by
-                                                   if k != 'gan_type')
+                    data.default_spec_keys = tuple(
+                        k for k in sort_by
+                        if k not in ('gan_type', 'WGAN'))
             gans.sort(key=lambda data: data.param_values(sort_by))
             self.diff = shallow_diff_dicts(data.params() for data in gans)
         self.gans = gans

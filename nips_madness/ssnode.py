@@ -34,6 +34,7 @@ DEFAULT_PARAMS = dict(
     k=0.01,
     n=2.2,
     rate_soft_bound=200, rate_hard_bound=1000,
+    tau=(0.01589, 0.002),  # Superstition: integer ratio tau_E/I is bad.
 )
 
 
@@ -151,7 +152,7 @@ def solve_dynamics(*args, **kwds):
 
 
 def fixed_point(
-        W, ext, k, n, r0, tau=[.016, .002],
+        W, ext, k, n, r0, tau=DEFAULT_PARAMS['tau'],
         # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
         max_iter=10000, atol=1e-5, dt=.0008, solver='euler',
         rate_soft_bound=DEFAULT_PARAMS['rate_soft_bound'],
@@ -289,7 +290,7 @@ def make_io_fun(k, n,
 
 
 def solve_dynamics_python(
-        W, ext, k, n, r0, tau=[.016, .002],
+        W, ext, k, n, r0, tau=DEFAULT_PARAMS['tau'],
         max_iter=100000, atol=1e-10, dt=.001,
         **kwds):
 
@@ -310,7 +311,7 @@ def solve_dynamics_python(
     return rr
 
 
-def odeint(t, W, ext, r0, k, n, tau=[.016, .002],
+def odeint(t, W, ext, r0, k, n, tau=DEFAULT_PARAMS['tau'],
            odeint_kwargs={}, **kwds):
     io_fun = make_io_fun(k=k, n=n, **kwds)
     N = W.shape[0] // 2

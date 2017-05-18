@@ -749,7 +749,7 @@ if __name__ == "__main__":
         value recorded in the MATLAB file at `datapath`. (default:
         %(default)s)''')
     parser.add_argument(
-        '--dt', default=0.0008, type=float,
+        '--dt', default=5e-4, type=float,
         help='''Time step used for SSN fixed point finder.
         (default: %(default)s)''')
     parser.add_argument(

@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, division
 
 from .. import utils
 from ..ssnode import sample_fixed_points

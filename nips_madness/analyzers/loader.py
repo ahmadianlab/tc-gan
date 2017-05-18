@@ -124,6 +124,10 @@ class GANData(object):
 
     @property
     def bandwidths(self):
+        try:
+            return np.array(self.info['run_config']['bandwidths'])
+        except (AttributeError, KeyError):
+            pass
         n = self.n_bandwidths
         if n == 8:
             return np.array([0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1])

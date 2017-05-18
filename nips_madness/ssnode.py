@@ -371,7 +371,7 @@ def find_fixed_points_serial(num, Z_W_gen, exts, **common_kwargs):
 
 
 def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
-                               resubmit_threshold=0.1,
+                               resubmit_threshold=0,
                                deterministic=True,
                                **common_kwargs):
     # Revers exts to try large bandwidth first, as it is more likely

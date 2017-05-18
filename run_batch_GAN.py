@@ -584,7 +584,7 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,r
         penalized_rate = rate_vector[:, :, :N]
     else:
         penalized_rate = rate_vector
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((penalized_rate - rate_penalty_threshold)/10).sum()**2
+    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), d_lr)#discriminator training function
@@ -668,7 +668,7 @@ def make_WGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,r
         penalized_rate = rate_vector[:, :, :N]
     else:
         penalized_rate = rate_vector
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify((penalized_rate - rate_penalty_threshold)/10).sum()**2
+    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector,red_fake_for_grad],true_loss_exp,allow_input_downcast = True)

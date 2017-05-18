@@ -385,13 +385,16 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
 
     def worker(idx, Z, W):
         solutions = []
-        for ext in exts:
-            sol = fixed_point(W, ext, **common_kwargs)
-            solutions.append(sol)
-            if not sol.success:
-                results.put((False, idx, Z, solutions))
-                return
-        results.put((True, idx, Z, solutions))
+        try:
+            for ext in exts:
+                sol = fixed_point(W, ext, **common_kwargs)
+                solutions.append(sol)
+                if not sol.success:
+                    results.put((False, idx, Z, solutions))
+                    return
+            results.put((True, idx, Z, solutions))
+        except Exception as err:
+            results.put((err, idx, Z, solutions))
 
     if no_pool:
         def submit():
@@ -415,7 +418,9 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
 
     def collect():
         success, idx, Z, solutions = results.get()
-        if success:
+        if isinstance(success, Exception):
+            raise success
+        elif success:
             solutions.reverse()
             samples.append((idx, Z, solutions))
         else:

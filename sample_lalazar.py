@@ -70,7 +70,7 @@ def sample(par,o_gen,n_gen,fname,n = 20):
 
 def sample_log(name,log,o_gen,n_gen,n = 20):
     
-    pars = [log[2 + (2**k)] for k in range(14)]
+    pars = [log[2 + k] for k in range(0,int(sys.argv[2]),int(sys.argv[3]))]
 
     for p in range(len(pars)):
         sample(pars[p],o_gen,n_gen,name + "_" + str(2**p),n)

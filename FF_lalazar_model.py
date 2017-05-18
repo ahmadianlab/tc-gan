@@ -54,7 +54,7 @@ if MODE not in ["WGAN","GAN"]:
     print("Mode not recognized")
     exit()
 
-tag = MODE + "_" + str(DATA) + "_" + str(int(RF_i*10))
+tag = MODE + "_" + str(DATA) + "_" + str(int(RF_i*10)) + "_new_"
 
 print(tag)
 
@@ -63,7 +63,7 @@ print(tag)
 #    start_params = LOG[-1]
 #else:
 
-start_params = [np.log(RF_i),np.log(.25),np.log(50),np.log(.25),.1]
+start_params = [np.log(RF_i),np.log(.25),np.log(5500),np.log(10.),np.log(10.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")

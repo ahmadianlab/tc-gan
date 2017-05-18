@@ -743,7 +743,7 @@ if __name__ == "__main__":
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')
     parser.add_argument(
-        '--N', '-N', default=0, type=int,
+        '--N', '-N', default=201, type=int,
         help='''Number of excitatory neurons in SSN. If 0, use the
         value recorded in the MATLAB file at `datapath`. (default:
         %(default)s)''')
@@ -773,7 +773,7 @@ if __name__ == "__main__":
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
-        '--n_samples', default=10, type=eval,
+        '--n_samples', default=15, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
         '--rate_cost', default='0',

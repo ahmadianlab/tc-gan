@@ -81,13 +81,14 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     # throwing away data):
     mat = scipy.io.loadmat(datapath)
     L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
-    bandwidths = mat['Modelparams'][0, 0]['bandwidths'][0] / L_mat
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
     contrast = mat['Modelparams'][0, 0]['c'][0, 0]
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
+
+    bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
 
     if N > 0:
         n_sites = N
@@ -117,6 +118,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             **dict(ssn_params, io_type=true_IO_type))
         print("DONE")
         data = np.array(data.T)      # shape: (N_data, nb)
+
+    # Check for sanity:
+    assert len(bandwidths) == data.shape[-1]
 
     #defining all the parameters that we might want to train
 
@@ -384,7 +388,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     with open(os.path.join('logfiles', 'info_{}.json'.format(tag)), 'w') as fp:
         json.dump(dict(
-            run_config=run_config,
+            run_config=dict(n_bandwidths=len(bandwidths), **run_config),
             meta_info=meta_info,
         ), fp)
 
@@ -415,16 +419,12 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             DW = Dparam.W.get_value()
             DB = Dparam.b.get_value()
         else:
-            DW = np.ones((8,1))
+            DW = np.ones((len(bandwidths), 1))
             DB = [0.]
 
-            
-        logstrG = "{},{},{},{},{},{},{},{}".format(GZmean[0],GZmean[1],GZmean[2],GZmean[3],GZmean[4],GZmean[5],GZmean[6],GZmean[7])
-        logstrD = "{},{},{},{},{},{},{},{}".format(Dmean[0],Dmean[1],Dmean[2],Dmean[3],Dmean[4],Dmean[5],Dmean[6],Dmean[7])
-        logstrW = "{},{},{},{},{},{},{},{},{}".format(DW[0,0],DW[1,0],DW[2,0],DW[3,0],DW[4,0],DW[5,0],DW[6,0],DW[7,0],DB[0])
-        
-        log(logstrG + "," + logstrD + "," + logstrW,F = "D_parameters_{}.log".format(tag),PRINT = False) 
-        
+        log(list(GZmean) + list(Dmean) + list(DW[:, 0]) + [DB[0]],
+            F="D_parameters_{}.log".format(tag), PRINT=False)
+
         if k%1 == 0:
             jj = J.get_value()
             dd = D.get_value()
@@ -713,11 +713,14 @@ if __name__ == "__main__":
 
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
+    # Changing datapath is not allowed at the moment:
+    """
     parser.add_argument(
         'datapath', nargs='?',
         default=os.path.join(os.path.dirname(__file__),
                              'training_data_TCs_Ne102.mat'),
         help='Path to MATLAB data file (default: %(default)s)')
+    """
     parser.add_argument(
         '--iterations', default=100000, type=int,
         help='Number of iterations (default: %(default)s)')
@@ -730,9 +733,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '--disc-learn-rate', default=0.001, type=float,
         help='Learning rate for discriminator (default: %(default)s)')
+    # Cannot use MATLAB data at the moment:
+    """
     parser.add_argument(
         '--use-data', default=False, action='store_true',
         help='Use data (True) or generate our own TC samples (False) (default: %(default)s)')
+    """
     parser.add_argument(
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')
@@ -796,6 +802,12 @@ if __name__ == "__main__":
     ns = parser.parse_args()
     use_pdb = ns.pdb
     del ns.pdb
+
+    # Currently works only with the following options; so let's
+    # manually fix them:
+    ns.datapath = os.path.join(os.path.dirname(__file__),
+                               'training_data_TCs_Ne102.mat')
+    ns.use_data = False
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:

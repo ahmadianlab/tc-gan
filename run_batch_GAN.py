@@ -31,7 +31,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
          rate_cost, rate_penalty_threshold, rate_penalty_no_I,
          N, IO_type, rate_hard_bound, rate_soft_bound, dt,
-         true_IO_type, truth_size, truth_seed,
+         true_IO_type, truth_size, truth_seed, n_bandwidths,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
@@ -89,7 +89,15 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
     data = mat['E_Tuning']      # shape: (N_data, nb)
 
-    bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
+    if n_bandwidths == 4:
+        bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
+    elif n_bandwidths == 5:
+        bandwidths = np.array([0.0625, 0.125, 0.25, 0.5, 0.75])
+    elif n_bandwidths == 8:
+        bandwidths = np.array([0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1])
+    else:
+        raise ValueError('Unknown number of bandwidths: {}'
+                         .format(n_bandwidths))
 
     if N > 0:
         n_sites = N
@@ -389,7 +397,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     with open(os.path.join('logfiles', 'info_{}.json'.format(tag)), 'w') as fp:
         json.dump(dict(
-            run_config=dict(n_bandwidths=len(bandwidths), **run_config),
+            run_config=dict(run_config, bandwidths=list(bandwidths)),
             meta_info=meta_info,
         ), fp)
 
@@ -773,6 +781,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
+    parser.add_argument(
+        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
+        help='Number of bandwidths (default: %(default)s)')
     parser.add_argument(
         '--n_samples', default=15, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')

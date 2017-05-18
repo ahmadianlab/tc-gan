@@ -144,7 +144,7 @@ def run_GAN():
 
     print(name)
  
-    sample_log(name,data,lambda x:np.reshape(np.transpose(output_sam(x[0],x[1],x[2],x[3],STIM),[0,2,1]),[-1,NI]),generate_samples,n = 20)
+    sample_log(name,data,lambda x:np.reshape(np.transpose(output_sam(x[0],x[1],x[2],x[3],STIM),[0,2,1]),[-1,NI]),generate_samples,n = 30)
 
 if __name__ == "__main__":
 

@@ -41,26 +41,29 @@ def read_log(F):
         
     return np.array(out)
 
-niter = 20000
+niter = 100000
 
 np.random.seed(1)
 
 MODE = sys.argv[1]
 DATA = bool(sys.argv[2])
 box_width = int(sys.argv[3])
+RF_i = float(sys.argv[4])
 
 if MODE not in ["WGAN","GAN"]:
     print("Mode not recognized")
     exit()
 
-tag = MODE + "_" + str(DATA) + "_MEAN_"
+tag = MODE + "_" + str(DATA) + "_" + str(int(RF_i*10))
+
+print(tag)
 
 #if len(sys.argv) == 5:
 #    LOG = read_log(sys.argv[4])
 #    start_params = LOG[-1]
 #else:
-#    start_params = [np.log(.25),np.log(50),np.log(.25),.1]
-    
+
+start_params = [np.log(RF_i),np.log(.25),np.log(50),np.log(.25),.1]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
@@ -168,8 +171,6 @@ def run_GAN(mode = MODE):
 
     output_sam = theano.function(GINP,FFout_sam,allow_input_downcast = True,on_unused_input = 'ignore')
 
-
-
     FFout_dat = IO_func.get_FF_output(T.exp(T_RF_low),T.exp(T_RF_del),T_THR,T.exp(T_THR_del),T.exp(T_Js),receptive_widths_true,feedforward_conn_true,feedforward_strn_true,feedforward_thrs_true,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
     
     DINP = [feedforward_conn_true,feedforward_strn_true,receptive_widths_true,feedforward_thrs_true,stimulus]
@@ -194,7 +195,7 @@ def run_GAN(mode = MODE):
 
     out = np.concatenate(out)
     np.savetxt("./FF_tuning_curve_samples/FF_ll_tuning_curves_sam.csv",out)
-    
+
     #done defining the output function
 
     NOBS = 1

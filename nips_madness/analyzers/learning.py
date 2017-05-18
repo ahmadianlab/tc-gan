@@ -88,6 +88,7 @@ def plot_learning(data):
 
 def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
                           linewidth=0.3, ylim='auto',
+                          include_true=True,
                           xlabel='Bandwidths',
                           ylabel='Average Firing Rate'):
     if ax is None:
@@ -113,6 +114,10 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     for i in range(start, stop):
         ax.plot(bandwidths, data.model_tuning[i], color=cmap(norm(i)),
                 linewidth=linewidth)
+    if include_true:
+        ax.plot(bandwidths, data.true_tuning[0],
+                linewidth=3, linestyle='--')
+
     if ylim == 'auto':
         y = data.model_tuning[start:stop]
         q3 = np.percentile(y, 75)

@@ -122,6 +122,16 @@ class GANData(object):
     def true_tuning(self):
         return self.tuning[:, self.n_bandwidths:self.n_bandwidths*2]
 
+    @property
+    def bandwidths(self):
+        n = self.n_bandwidths
+        if n == 8:
+            return np.array([0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1])
+        elif n == 4:
+            return np.array([0.0625, 0.125, 0.25, 0.75])
+        else:
+            raise ValueError("Unknown n_bandwidth: {}".format(n))
+
     def to_dataframe(self):
         import pandas
         return pandas.DataFrame(self.main, columns=self.main_names)

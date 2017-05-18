@@ -109,7 +109,7 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     cb = fig.colorbar(mappable, ax=ax)
     cb.set_label('epochs')
 
-    bandwidths = np.asarray(DEFAULT_PARAMS['bandwidths'])
+    bandwidths = data.bandwidths
     for i in range(start, stop):
         ax.plot(bandwidths, data.model_tuning[i], color=cmap(norm(i)),
                 linewidth=linewidth)

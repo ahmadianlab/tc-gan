@@ -19,10 +19,10 @@ def plot_errors(data, legend=True, ax=None):
     per_stim_error = abs(model - true) / abs(true)
     total_error = norm(model - true, axis=-1) / norm(true, axis=-1)
 
-    per_stim_lines = ax.plot(per_stim_error)
+    per_stim_lines = ax.plot(per_stim_error, alpha=0.4)
     total_error_lines = ax.plot(
         total_error,
-        path_effects=[pe.Stroke(linewidth=10, foreground='white'),
+        path_effects=[pe.Stroke(linewidth=5, foreground='white'),
                       pe.Normal()])
 
     if legend:
@@ -70,10 +70,22 @@ def plot_learning(data):
     fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))
-    df.plot('epoch', ['Gloss', 'Dloss'], ax=axes[0, 0], alpha=0.8)
+    df.plot('epoch', ['Gloss', 'Dloss'], ax=axes[0, 0], alpha=0.8, logy=True)
     df.plot('epoch', ['Daccuracy'], ax=axes[0, 1])
-    df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0])
-    df.plot('epoch', ['model_convergence'], ax=axes[1, 1])
+    df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0],
+            logy=True)
+    df.plot('epoch', ['model_convergence'], ax=axes[1, 1], logy=True)
+
+    ax_loss = axes[0, 0]
+    ax_loss.set_yscale('symlog')
+
+    ax_dacc = axes[0, 1]
+    ax_dacc.set_yscale('symlog')
+    # q1, q3 = np.percentile(df.loc[:, 'Daccuracy'], [25, 75])
+    # iqr = q3 - q1
+    # linthreshy = max((df.loc[:, 'Daccuracy'] < q3 + 1.5 * iqr).max(),
+    #                  -(df.loc[:, 'Daccuracy'] < q1 - 1.5 * iqr).min())
+    # ax_dacc.set_yscale('symlog', linthreshy=linthreshy)
 
     err1 = plot_errors(data, ax=axes[0, 2])
     err2 = plot_errors(data, ax=axes[1, 2], legend=False)
@@ -94,16 +106,13 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     if ax is None:
         _, ax = pyplot.subplots()
 
-    start = 0
     if epochs is None:
-        stop = len(data.tuning)
+        epochs = len(data.tuning)
     elif isinstance(epochs, int):
-        stop = epochs
-    else:
-        start, stop = epochs
+        epochs = range(10)
 
     cmap = matplotlib.cm.get_cmap(cmap)
-    norm = matplotlib.colors.Normalize(start, stop)
+    norm = matplotlib.colors.Normalize(min(epochs), max(epochs))
     mappable = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
     mappable.set_array([])
     fig = ax.get_figure()
@@ -111,7 +120,7 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     cb.set_label('epochs')
 
     bandwidths = data.bandwidths
-    for i in range(start, stop):
+    for i in epochs:
         ax.plot(bandwidths, data.model_tuning[i], color=cmap(norm(i)),
                 linewidth=linewidth)
     if include_true:
@@ -119,7 +128,7 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
                 linewidth=3, linestyle='--')
 
     if ylim == 'auto':
-        y = data.model_tuning[start:stop]
+        y = data.model_tuning[epochs]
         q3 = np.percentile(y, 75)
         q1 = np.percentile(y, 25)
         iqr = q3 - q1

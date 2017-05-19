@@ -42,7 +42,7 @@ def plot_errors(data, legend=True, ax=None):
     )
 
 
-def plot_gen_params(data, axes=None):
+def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
     if axes is None:
         _, axes = pyplot.subplots(ncols=3, sharex=True, figsize=(9, 3))
     for column, name in enumerate('JDS'):
@@ -59,17 +59,25 @@ def plot_gen_params(data, axes=None):
                 fake_param[:, i, j],
                 label='${}_{{{}{}}}$'.format(name, p, q),
                 color=color)
-        leg = axes[column].legend(loc='best')
-        leg.set_frame_on(True)
-        leg.get_frame().set_facecolor('white')
+        if ylim:
+            _, ymax0 = axes[column].get_ylim()
+            ymax1 = true_param.max() * 2.0
+            if ymax0 > ymax1:
+                axes[column].set_ylim(-0.05 * ymax1, ymax1)
+        if yscale:
+            axes[column].set_yscale(yscale)
+        if legend:
+            leg = axes[column].legend(loc='best')
+            leg.set_frame_on(True)
+            leg.get_frame().set_facecolor('white')
     return axes
 
 
 def plot_learning(data):
     df = data.to_dataframe()
-    fig, axes = pyplot.subplots(nrows=3, ncols=3,
+    fig, axes = pyplot.subplots(nrows=4, ncols=3,
                                 sharex=True,
-                                squeeze=False, figsize=(9, 6))
+                                squeeze=False, figsize=(9, 8))
     df.plot('epoch', ['Gloss', 'Dloss'], ax=axes[0, 0], alpha=0.8, logy=True)
     df.plot('epoch', ['Daccuracy'], ax=axes[0, 1])
     df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0],
@@ -93,6 +101,8 @@ def plot_learning(data):
     err2['ax'].set_yscale('log')
 
     plot_gen_params(data, axes=axes[2, :])
+    plot_gen_params(data, axes=axes[3, :],
+                    yscale='log', legend=False, ylim=False)
 
     fig.suptitle(data.pretty_spec())
     return fig

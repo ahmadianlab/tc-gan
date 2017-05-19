@@ -32,7 +32,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          rate_cost, rate_penalty_threshold, rate_penalty_no_I,
          N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
          true_IO_type, truth_size, truth_seed, n_bandwidths,
-         init_disturbance,
+         init_disturbance, quiet,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
@@ -373,7 +373,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     def log(a,F = "SSNGAN_log_{}.log".format(tag),PRINT = True):
         if isinstance(a, list):
             a = ','.join(map(str, a))
-        if PRINT:
+        if PRINT and not quiet:
             print(a)
         f = open("./logfiles/" + F,"a")
         f.write(str(a) + "\n")
@@ -818,6 +818,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--pdb', action='store_true',
         help='Drop into the Python debugger PDB on an exception.')
+    parser.add_argument(
+        '--quiet', action='store_true',
+        help='Do not print loss values per epoch etc.')
 
     ns = parser.parse_args()
     use_pdb = ns.pdb

@@ -30,7 +30,7 @@ import stimuli
 def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
          rate_cost, rate_penalty_threshold, rate_penalty_no_I,
-         N, IO_type, rate_hard_bound, rate_soft_bound, dt,
+         N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
          true_IO_type, truth_size, truth_seed, n_bandwidths,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
@@ -104,6 +104,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     ssn_params = dict(
         dt=dt,
+        max_iter=max_iter,
         rate_soft_bound=rate_soft_bound,
         rate_hard_bound=rate_hard_bound,
         io_type=IO_type,
@@ -759,6 +760,10 @@ if __name__ == "__main__":
     parser.add_argument(
         '--dt', default=5e-4, type=float,
         help='''Time step used for SSN fixed point finder.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--max_iter', default=100000, type=int,
+        help='''Number of time steps used for SSN fixed point finder.
         (default: %(default)s)''')
     parser.add_argument(
         '--IO_type', default="asym_tanh",

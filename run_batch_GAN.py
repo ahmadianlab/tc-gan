@@ -145,10 +145,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float64"),name = "d")
     S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L_mat).astype("float64"),name = "s")
 
-#    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
-#    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
-#    S = theano.shared(np.log(np.array([[.5,.3],[1.0,.25]])).astype("float64"),name = "s")
-
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
     Sp2 = T.exp(S2)
@@ -156,13 +152,13 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     #these are the parammeters to be fit
     dp = init_disturbance
 
-    J = theano.shared(J2.get_value() + dp*np.array([[1,1],[1,1]]),name = "j")
-    D = theano.shared(D2.get_value() + dp*np.array([[1,1],[1,1]]),name = "d")
-    S = theano.shared(S2.get_value() + dp*np.array([[1,1],[1,1]]),name = "s")
+#    J = theano.shared(J2.get_value() + dp*np.array([[1,1],[1,1]]),name = "j")
+#    D = theano.shared(D2.get_value() + dp*np.array([[1,1],[1,1]]),name = "d")
+#    S = theano.shared(S2.get_value() + dp*np.array([[1,1],[1,1]]),name = "s")
 
-#    J = theano.shared(np.log(np.array([[1.5,.25],[2.0,.2]])).astype("float64"),name = "j")
-#    D = theano.shared(np.log(np.array([[5.,2.],[18.,1.5]])).astype("float64"),name = "d")
-#    S = theano.shared(np.log(np.array([[.5,.3],[1.0,.25]])).astype("float64"),name = "s")
+    J = theano.shared(np.log(np.array([[.01,.005],[.01,.005]])).astype("float64"),name = "j")
+    D = theano.shared(np.log(np.array([[.1,.05],[.1,.05]])).astype("float64"),name = "d")
+    S = theano.shared(np.log(np.array([[.05,.01],[.1,.01]])).astype("float64"),name = "s")
 
     Jp = T.exp(J)
     Dp = T.exp(D)

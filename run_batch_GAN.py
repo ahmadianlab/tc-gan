@@ -32,6 +32,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          rate_cost, rate_penalty_threshold, rate_penalty_no_I,
          N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
          true_IO_type, truth_size, truth_seed, n_bandwidths,
+         init_disturbance,
          run_config):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
@@ -153,7 +154,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     Sp2 = T.exp(S2)
 
     #these are the parammeters to be fit
-    dp = .5
+    dp = init_disturbance
 
     J = theano.shared(J2.get_value() + dp*np.array([[1,1],[1,1]]),name = "j")
     D = theano.shared(D2.get_value() + dp*np.array([[1,1],[1,1]]),name = "d")
@@ -737,6 +738,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
+    parser.add_argument(
+        '--init-disturbance', default=0.5, type=float,
+        help='Initial disturbance to the parameter (default: %(default)s)')
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')

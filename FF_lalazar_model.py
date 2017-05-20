@@ -63,11 +63,11 @@ print(tag)
 #    start_params = LOG[-1]
 #else:
 
-start_params = [np.log(RF_i),np.log(.25),np.log(5500),np.log(10.),np.log(10.)]
+start_params = [np.log(RF_i),np.log(.25),np.log(1000),0.,np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
-curves = np.array([c/(np.mean(c) + .0001) for c in curves])
+#curves = np.array([c/(np.mean(c) + .0001) for c in curves])
 
 X_pos = read_dat("lalazar_data/XCellsFull.dat")
 Y_pos = read_dat("lalazar_data/YCellsFull.dat")
@@ -227,19 +227,17 @@ def run_GAN(mode = MODE):
     #now define the actual values and test
     train(D_train,G_train,get_DD_input,get_DG_input,generate_samples,STIM,(NSAM,NI,NOBS),mode,tag + str(box_width),DATA)
 
-def train(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,mode,tag,data):
+def train(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,mode,tag,data,NDstep = 5):
     
     if mode =="WGAN":
-        train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,data)
+        train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,data,NDstep)
     elif mode =="GAN":
         train_gan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,data)
 
-def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,use_data):
+def train_wgan(D_step,G_step,D_in,G_in,F_gen,STIM,INSHAPE,tag,use_data,NDstep = 5):
    
     print("Trainign WGAN")
  
-    NDstep = 5
-
     LOG = "./FF_logs/FF_log_"+tag+".csv"
     LOSS = "./FF_logs/FF_losslog_"+tag+".csv"
  
@@ -436,14 +434,14 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     Dgrad = T.sqrt((T.jacobian(T.reshape(D_grad_out,[-1]),D_grad_input)**2).sum(axis = [1,2,3]))
     Dgrad_penalty = ((Dgrad - 1.)**2).mean()
 
-    lam = 100.
+    lam = 1.
 
     Wdist = D_sam_out.mean() - D_dat_out.mean()
     D_loss_exp = D_sam_out.mean() - D_dat_out.mean() + lam*Dgrad_penalty#discriminator loss
     G_loss_exp = - G_sam_out.mean()#generative loss
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    lr = .001
+    lr = .01
     
     b1 = .5
     b2 = .9

@@ -33,7 +33,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
          true_IO_type, truth_size, truth_seed, n_bandwidths,
          init_disturbance, quiet,
-         run_config):
+         run_config,timetest,convtest,testDW,DRtest):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
     if WGAN:
@@ -156,9 +156,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 #    D = theano.shared(D2.get_value() + dp*np.array([[1,1],[1,1]]),name = "d")
 #    S = theano.shared(S2.get_value() + dp*np.array([[1,1],[1,1]]),name = "s")
 
-    J = theano.shared(np.log(np.array([[.01,.005],[.01,.005]])).astype("float64"),name = "j")
-    D = theano.shared(np.log(np.array([[.1,.05],[.1,.05]])).astype("float64"),name = "d")
-    S = theano.shared(np.log(np.array([[.05,.01],[.1,.01]])).astype("float64"),name = "s")
+    J = theano.shared(np.log(np.array([[.01,.01],[.02,.01]])).astype("float64"),name = "j")
+    D = theano.shared(np.log(np.array([[.2,.2],[.3,.2]])).astype("float64"),name = "d")
+    S = theano.shared(np.log(np.array([[.1,.1],[.1,.1]])).astype("float64"),name = "s")
 
     Jp = T.exp(J)
     Dp = T.exp(D)
@@ -244,7 +244,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
 
-    convtest = False
     if convtest:
         zt = np.random.rand(1,2*N,2*N)
         wt = W_test(zt)[0]
@@ -255,7 +254,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             print(np.max(r.x))
         exit()
 
-    timetest = False
     if timetest:
         times = []
         EE = 0
@@ -280,7 +278,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         exit()
 
     #run gradient descent on W (minimize W*W)
-    testDW = False
     if testDW:        
         testz = Ztest
         testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
@@ -320,7 +317,6 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
 
     #do gradient descent on R
-    DRtest = False
     if DRtest:
         print("starting DR")
     #I want to test this by adjusting the parameters to give some specified output
@@ -409,7 +405,8 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     
     for k in range(iterations):
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5)
+
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 50 if k == 0 else 5)
 
         log([k, Gloss, Dloss, D_acc(rtest, true),
              SSsolve_time,
@@ -432,28 +429,27 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         log(list(GZmean) + list(Dmean) + list(DW[:, 0]) + [DB[0]],
             F="D_parameters_{}.log".format(tag), PRINT=False)
 
-        if k%1 == 0:
-            jj = J.get_value()
-            dd = D.get_value()
-            ss = S.get_value()
-            
-            allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-
-            string = "{},{},{},{},{},{},{},{},{},{},{},{},{}".format(k,
-                                                                     allpar[0],
-                                                                     allpar[1],
-                                                                     allpar[2],
-                                                                     allpar[3],
-                                                                     allpar[4],
-                                                                     allpar[5],
-                                                                     allpar[6],
-                                                                     allpar[7],
-                                                                     allpar[8],
-                                                                     allpar[9],
-                                                                     allpar[10],
-                                                                     allpar[11])
-
-            log(string,F = "./parameters_{}.log".format(tag),PRINT = False)
+        jj = J.get_value()
+        dd = D.get_value()
+        ss = S.get_value()
+        
+        allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
+        
+        string = "{},{},{},{},{},{},{},{},{},{},{},{},{}".format(k,
+                                                                 allpar[0],
+                                                                 allpar[1],
+                                                                 allpar[2],
+                                                                 allpar[3],
+                                                                 allpar[4],
+                                                                 allpar[5],
+                                                                 allpar[6],
+                                                                 allpar[7],
+                                                                 allpar[8],
+                                                                 allpar[9],
+                                                                 allpar[10],
+                                                                 allpar[11])
+        
+        log(string,F = "./parameters_{}.log".format(tag),PRINT = False)
 
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
@@ -507,18 +503,10 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
 
-        ####
     np.random.shuffle(data)
-    
-        #the data
+
     true = data[:NZ]
-        ####
-            
-        #generated samples
-        #
-        #This chunk of code generates samples from teh fitted model adn runs the G update
-        #
-        ###################
+
     def Z_W_gen():
         while True:
             ztest = np.random.rand(1, 2*N, 2*N)
@@ -533,9 +521,6 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     Ftest = np.array(Ftest)
     Ztest = np.array(Ztest)
     rtest = np.array([[c for c in TC] for TC in Ftest])
-
-        ###################################
-        ###################################
 
     with gradient_time:
         Dloss = D_train_func(rtest,true)
@@ -602,7 +587,6 @@ def make_RGAN_functions(rate_vector,mask,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,r
     #to get the grads w.r.t. the generators parameters we need to do a jacobian 
     fake_dis_grad = T.jacobian(T.flatten(fake_loss_exp_train),rate_vector) #gradient of generator loss w.r.t rates
     fake_dis_grad = T.reshape(fake_dis_grad,[NZ,NB,2*N])
-
 
     #reshape the generator gradient to fit with Dr/Dth
     fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,NB,2*N,1,1])
@@ -821,6 +805,19 @@ if __name__ == "__main__":
     parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
+
+    parser.add_argument(
+        '--timetest',default=False, action='store_true',
+        help='perform a timing test on the SS solver')
+    parser.add_argument(
+        '--convtest',default=False, action='store_true',
+        help='perform a convergence test on the SS solver')
+    parser.add_argument(
+        '--testDW',default=False, action='store_true',
+        help='Test the W gradient')
+    parser.add_argument(
+        '--DRtest',default=False, action='store_true',
+        help='test the R gradient')
 
     ns = parser.parse_args()
     use_pdb = ns.pdb

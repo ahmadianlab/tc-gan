@@ -540,13 +540,31 @@ def sample_fixed_points(
     return find_fixed_points(NZ, Z_W_gen(), exts, **solver_kwargs)
 
 
+def sample_slice(N, sample_sites):
+    """
+    Generate a slice for sampling `sample_sites` from an array of `N` neurons.
+
+    >>> N = 201
+    >>> neurons = np.arange(N, dtype=int)
+    >>> neurons[sample_slice(N, 3)]
+    array([ 99, 100, 101])
+    >>> neurons[sample_slice(N, 4)]
+    array([ 98,  99, 100, 101])
+    >>> neurons[sample_slice(N, 5)]
+    array([ 98,  99, 100, 101, 102])
+
+    """
+    i_beg = N // 2 - sample_sites // 2
+    i_end = i_beg + sample_sites
+    return np.s_[i_beg:i_end]
+
+
 def sample_tuning_curves(sample_sites=3, **kwargs):
     _, rates, _ = sample = sample_fixed_points(**kwargs)
     rates = np.array(rates)
     N = rates.shape[-1] // 2
-    i_beg = N // 2 - sample_sites // 3
-    i_end = i_beg + sample_sites + 1
-    tunings = rates[:, :, i_beg:i_end].swapaxes(0, 1)
+    idx = sample_slice(N, sample_sites)
+    tunings = rates[:, :, idx].swapaxes(0, 1)
     tunings = tunings.reshape((tunings.shape[0], -1))
     return tunings, sample
 

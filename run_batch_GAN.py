@@ -127,12 +127,16 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             smoothness=smoothness,
             contrast=contrast,
             N=n_sites,
+            track_net_identity=track_net_identity,
             **dict(ssn_params, io_type=true_IO_type))
         print("DONE")
         data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
-    assert len(bandwidths) == data.shape[-1]
+    if track_net_identity:
+        assert len(bandwidths) * sample_sites == data.shape[-1]
+    else:
+        assert len(bandwidths) == data.shape[-1]
 
     #defining all the parameters that we might want to train
 
@@ -173,7 +177,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
     nz = theano.shared(n_samples,name = 'n_samples')
-    nb = theano.shared(data.shape[1],name = 'n_stim')
+    nb = theano.shared(len(bandwidths),name = 'n_stim')
 
     #array that computes the positions
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
@@ -401,10 +405,14 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
-    
+    if track_net_identity:
+        truth_size_per_batch = NZ
+    else:
+        truth_size_per_batch = NZ * sample_sites
+
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 50 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5)
 
         log([k, Gloss, Dloss, D_acc(rtest, true),
              SSsolve_time,
@@ -450,7 +458,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         log(string,F = "./parameters_{}.log".format(tag),PRINT = False)
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -471,18 +479,16 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             **ssn_params)
 
     for rep in range(WG_repeat):
-        ####
-        np.random.shuffle(data)
-        
         #the data
-        true = data[:NZ]
+        idx = np.random.choice(len(data), truth_size_per_batch)
+        true = data[idx]
         ####
-            
+
         #generated samples
         #
         # Update discriminator/critic given NZ true and fake samples:
 
-        eps = np.random.rand(NZ, 1)
+        eps = np.random.rand(truth_size_per_batch, 1)
 
         rtest = r_batch[NZ*rep:NZ*(rep+1)]
         with gradient_time:
@@ -496,14 +502,13 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,WG_repeat = 5):
+def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
 
-    np.random.shuffle(data)
-
-    true = data[:NZ]
+    idx = np.random.choice(len(data), truth_size_per_batch)
+    true = data[idx]
 
     def Z_W_gen():
         while True:
@@ -532,7 +537,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     if track_net_identity:
         INSHAPE = [NZ, NB * sample_sites]
     else:
-        INSHAPE = [NZ, NB]
+        INSHAPE = [NZ * sample_sites, NB]
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -618,7 +623,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     if track_net_identity:
         INSHAPE = [NZ, NB * sample_sites]
     else:
-        INSHAPE = [NZ, NB]
+        INSHAPE = [NZ * sample_sites, NB]
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 

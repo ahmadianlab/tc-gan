@@ -1,8 +1,28 @@
-from ..ssnode import sample_slice
+import numpy as np
 
 
-def subsample_neurons(rate_vector, N, NZ, NB, sample_sites,
-                      track_net_identity):
+def sample_slice(N, sample_sites):
+    """
+    Generate a slice for sampling `sample_sites` from an array of `N` neurons.
+
+    >>> N = 201
+    >>> neurons = np.arange(N, dtype=int)
+    >>> neurons[sample_slice(N, 3)]
+    array([ 99, 100, 101])
+    >>> neurons[sample_slice(N, 4)]
+    array([ 98,  99, 100, 101])
+    >>> neurons[sample_slice(N, 5)]
+    array([ 98,  99, 100, 101, 102])
+
+    """
+    i_beg = N // 2 - sample_sites // 2
+    i_end = i_beg + sample_sites
+    return np.s_[i_beg:i_end]
+
+
+def subsample_neurons(rate_vector, sample_sites,
+                      track_net_identity=False,
+                      N=None, NZ=None, NB=None):
     """
     Reduce `rate_vector` into a form that can be fed to the discriminator.
 
@@ -20,12 +40,11 @@ def subsample_neurons(rate_vector, N, NZ, NB, sample_sites,
 
     Examples
     --------
-    >>> import numpy as np
     >>> N, NZ, NB = 7, 5, 2
     >>> sample_sites = 3
     >>> rate_vector = np.tile(np.arange(2 * N), (NZ, NB, 1))
     >>> assert rate_vector.shape == (NZ, NB, 2 * N)
-    >>> red0 = subsample_neurons(rate_vector, N, NZ, NB, sample_sites, False)
+    >>> red0 = subsample_neurons(rate_vector, sample_sites, False)
     >>> assert red0.shape == (NZ * sample_sites, NB)
     >>> red0
     array([[2, 2],
@@ -43,7 +62,7 @@ def subsample_neurons(rate_vector, N, NZ, NB, sample_sites,
            [2, 2],
            [3, 3],
            [4, 4]])
-    >>> red1 = subsample_neurons(rate_vector, N, NZ, NB, sample_sites, True)
+    >>> red1 = subsample_neurons(rate_vector, sample_sites, True)
     >>> assert red1.shape == (NZ, NB * sample_sites)
     >>> red1
     array([[2, 3, 4, 2, 3, 4],
@@ -53,6 +72,16 @@ def subsample_neurons(rate_vector, N, NZ, NB, sample_sites,
            [2, 3, 4, 2, 3, 4]])
 
     """
+    if isinstance(rate_vector, np.ndarray):
+        NZ_, NB_, TN_ = rate_vector.shape
+        if NZ is None:
+            NZ = NZ_
+        if NB is None:
+            NB = NB_
+        if N is None:
+            N = TN_ // 2
+        assert (NZ_, NB_, TN_) == (NZ, NB, 2 * N)
+
     probe = sample_slice(N, sample_sites)
     subsample = rate_vector[:, :, probe]
     if track_net_identity:

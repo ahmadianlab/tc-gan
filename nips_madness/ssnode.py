@@ -362,7 +362,7 @@ def find_fixed_points(num, Z_W_gen, exts, method='parallel', **common_kwargs):
             List of solution objects for successful convergence cases.
             The order is same as `Zs` and `Rs`.
         counter : collections.Counter
-            A mapping from error code to number occurrences.
+            A mapping from error code to the number of occurrences.
         rejections : int
             Number of rejections.
         unused : int

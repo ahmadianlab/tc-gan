@@ -156,10 +156,17 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
     #these are the parammeters to be fit
     dp = init_disturbance
+    if isinstance(dp, tuple):
+        J_dis, D_dis, S_dis = dp
+    else:
+        J_dis = D_dis = S_dis = dp
+    J_dis = np.array(J_dis) * np.ones((2, 2))
+    D_dis = np.array(D_dis) * np.ones((2, 2))
+    S_dis = np.array(S_dis) * np.ones((2, 2))
 
-    J = theano.shared(J2.get_value() + dp*np.array([[1,1],[1,1]]),name = "j")
-    D = theano.shared(D2.get_value() + dp*np.array([[1,1],[1,1]]),name = "d")
-    S = theano.shared(S2.get_value() + dp*np.array([[1,1],[1,1]]),name = "s")
+    J = theano.shared(J2.get_value() + J_dis, name = "j")
+    D = theano.shared(D2.get_value() + D_dis, name = "d")
+    S = theano.shared(S2.get_value() + S_dis, name = "s")
 
 #    J = theano.shared(np.log(np.array([[.01,.01],[.02,.01]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[.2,.2],[.3,.2]])).astype("float64"),name = "d")
@@ -732,8 +739,12 @@ if __name__ == "__main__":
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
     parser.add_argument(
-        '--init-disturbance', default=0.5, type=float,
-        help='Initial disturbance to the parameter (default: %(default)s)')
+        '--init-disturbance', default=0.5, type=eval,
+        help='''Initial disturbance to the parameter.  If it is
+        evaluated to be a 3-tuple, the components are used for the
+        disturbance for J, D (delta), S (sigma), respectively.  It
+        accepts any Python expression.
+        (default: %(default)s)''')
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')

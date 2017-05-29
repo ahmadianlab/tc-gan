@@ -8,6 +8,8 @@ import sys
 import time
 import FF_functions.lalazar_func as IO_func
 
+DATA = True
+
 def read_dat(F):
     f = open(F,"r")
 
@@ -45,35 +47,14 @@ niter = 100000
 
 np.random.seed(1)
 
-MODE = sys.argv[1]
-DATA = bool(sys.argv[2])
-box_width = int(sys.argv[3])
-RF_i = float(sys.argv[4])
+tag = "pruned"
 
-if MODE not in ["WGAN","GAN"]:
-    print("Mode not recognized")
-    exit()
-
-tag = MODE + "_" + str(DATA) + "_" + str(int(RF_i*10)) + "_"
-
-print(tag)
-
-#if len(sys.argv) == 5:
-#    LOG = read_log(sys.argv[4])
-#    start_params = LOG[-1]
-#else:
-
-start_params = [np.log(RF_i),np.log(.25),np.log(1000),0.,np.log(1.),np.log(1.)]
+start_params = [np.log(2.),np.log(.25),np.log(.01),10.,np.log(10.),np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
-#curves = np.array([c/(np.mean(c) + .0001) for c in curves])
 
-X_pos = read_dat("lalazar_data/XCellsFull.dat")
-Y_pos = read_dat("lalazar_data/YCellsFull.dat")
-Z_pos = read_dat("lalazar_data/ZCellsFull.dat")
-#done importing
-
+#the initial parameters
 RF_low = theano.shared(np.float32(start_params[0]),name = "RF_s")
 RF_del = theano.shared(np.float32(start_params[1]),name = "mean_W")
 THR = theano.shared(np.float32(start_params[3]),name = "s_W")
@@ -92,11 +73,13 @@ As = theano.shared(np.float32(start_params[5]),name = "mean_b")
 # - FF connections (discreete {0,1}) - [nsam,nhid,nx*ny*nz]
 # - FF strengths (uniform [0,1]) - [nsam,nhid,nx*ny*nz]
 
-def run_GAN(mode = MODE):
+def run_GAN(mode = "WGAN"):
+
+    box_width = 100
 
     dx = 1./box_width
 
-    nsam = theano.shared(10)
+    nsam = theano.shared(20)
     nx = theano.shared(box_width)
     ny = theano.shared(box_width)
     nz = theano.shared(box_width)
@@ -111,7 +94,7 @@ def run_GAN(mode = MODE):
     YY = np.linspace(-3,3,NY).astype("float32")
     ZZ = np.linspace(-3,3,NZ).astype("float32")
       
-    pos = theano.shared(np.array([[[[x,y,z] for z in ZZ] for y in YY] for x in XX]).astype("float32"))
+    pos = np.reshape(np.array([[[[x,y,z] for z in ZZ] for y in YY] for x in XX]).astype("float32"),[-1,3])
 
     STIM = np.array([[x,y,z] for x in [-1,0,1] for y in [-1,0,1] for z in [-1,0,1]])
 
@@ -127,33 +110,28 @@ def run_GAN(mode = MODE):
 
     #generate the right shape 
     def generate_samples():
-        wid = np.random.rand(NSAM,NX,NY,NZ)
-        FF_c = np.zeros((NSAM,NHID,NX*NY*NZ)) 
+        wid = np.random.rand(NSAM,NFF)
 
-        samind = np.arange(NX*NY*NZ)
+        RF_p = np.array([pos[np.random.choice(np.arange(len(pos)),NFF)] for k in range(NSAM)])
 
-        for s in np.arange(NSAM):
-            for h in np.arange(NHID):
-                FF_c[s,h,np.random.choice(samind,NFF)] = 1
-
-        FF_s = np.random.rand(NSAM,NHID,NX*NY*NZ)
+        FF_s = np.random.rand(NSAM,NHID,NFF)
         TH_s = np.random.uniform(-1,1,[NSAM,NHID])
 
-        return FF_c,FF_s,wid,TH_s
+        return FF_s,wid,TH_s,RF_p
 
     stimulus = T.matrix("input","float32")
 
-    feedforward_conn = T.tensor3("connts","float32")
+    feedforward_pos = T.tensor3("connts","float32")
     feedforward_strn = T.tensor3("streng","float32")
     feedforward_thrs = T.matrix("streng","float32")
-    receptive_widths = T.tensor4("widths","float32")
+    receptive_widths = T.matrix("widths","float32")
 
 
     PARAM = [RF_low,RF_del,THR,THR_del,Js,As]
 
-    FFout_sam = IO_func.get_FF_output(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),T.exp(As),receptive_widths,feedforward_conn,feedforward_strn,feedforward_thrs,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
+    FFout_sam = IO_func.get_FF_output_pruned(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),T.exp(As),receptive_widths,feedforward_strn,feedforward_thrs,feedforward_pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
 
-    GINP = [feedforward_conn,feedforward_strn,receptive_widths,feedforward_thrs,stimulus]
+    GINP = [feedforward_strn,receptive_widths,feedforward_thrs,feedforward_pos,stimulus]
 
     output_sam = theano.function(GINP,FFout_sam,allow_input_downcast = True,on_unused_input = 'ignore')
 

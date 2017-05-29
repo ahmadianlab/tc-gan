@@ -27,6 +27,8 @@ def read_dat(F):
         
     return np.array(out)
 
+div = len(sys.argv[1].split("div")) > 1
+
 old = False
 
 if len(sys.argv[1].split("GAUSS")) > 1:
@@ -88,7 +90,6 @@ def sample(par,o_gen,n_gen,fname,n = 20):
     th = np.concatenate(th)
 
     np.savetxt("./FF_tuning_curve_samples/" + fname + ".csv",out)
-    np.savetxt("./FF_tuning_curve_samples/" + fname + "_threshold.csv",th)
 
 def sample_log(name,log,o_gen,n_gen,n = 20):
 
@@ -102,6 +103,7 @@ def sample_log(name,log,o_gen,n_gen,n = 20):
     
 
 def run_GAN():
+    box_width = 100
 
     dx = 1./box_width
 
@@ -120,7 +122,7 @@ def run_GAN():
     YY = np.linspace(-3,3,NY).astype("float32")
     ZZ = np.linspace(-3,3,NZ).astype("float32")
       
-    pos = theano.shared(np.array([[[[x,y,z] for z in ZZ] for y in YY] for x in XX]).astype("float32"))
+    pos = np.reshape(np.array([[[[x,y,z] for z in ZZ] for y in YY] for x in XX]).astype("float32"),[-1,3])
 
     STIM = np.array([[x,y,z] for x in [-1,0,1] for y in [-1,0,1] for z in [-1,0,1]])
 
@@ -136,41 +138,28 @@ def run_GAN():
 
     #generate the right shape 
     def generate_samples():
-        wid = np.random.rand(NSAM,NX,NY,NZ)
-        FF_c = np.zeros((NSAM,NHID,NX*NY*NZ)) 
+        wid = np.random.rand(NSAM,NFF)
 
-        samind = np.arange(NX*NY*NZ)
+        RF_p = np.array([pos[np.random.choice(np.arange(len(pos)),NFF)] for k in range(NSAM)])
 
-        for s in np.arange(NSAM):
-            for h in np.arange(NHID):
-                FF_c[s,h,np.random.choice(samind,NFF)] = 1
+        FF_s = np.random.rand(NSAM,NHID,NFF)
+        TH_s = np.random.uniform(-1,1,[NSAM,NHID])
 
-        FF_s = np.random.rand(NSAM,NHID,NX*NY*NZ)
-        if tdist == "UNIFO":
-            TH_s = np.random.uniform(-1,1,[NSAM,NHID])
-        elif tdist == "GAUSS":
-            TH_s = np.random.normal(0,1,[NSAM,NHID])
-        elif tdist == "CAUCH":
-            TH_s = np.random.standard_cauchy([NSAM,NHID])
-        elif tdist == "EXPON":
-            TH_s = np.random.exponential(1.,[NSAM,NHID])
-        elif tdist == "NEXPO":
-            TH_s = -np.random.exponential(1.,[NSAM,NHID])
-
-        return FF_c,FF_s,wid,TH_s
+        return FF_s,wid,TH_s,RF_p
 
     stimulus = T.matrix("input","float32")
 
-    feedforward_conn = T.tensor3("connts","float32")
+    feedforward_pos = T.tensor3("connts","float32")
     feedforward_strn = T.tensor3("streng","float32")
     feedforward_thrs = T.matrix("streng","float32")
-    receptive_widths = T.tensor4("widths","float32")
+    receptive_widths = T.matrix("widths","float32")
 
-    PARAM = [RF_low,RF_del,THR,THR_del,Js]
 
-    FFout_sam = IO_func.get_FF_output(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),T.exp(As),receptive_widths,feedforward_conn,feedforward_strn,feedforward_thrs,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
+    PARAM = [RF_low,RF_del,THR,THR_del,Js,As]
 
-    GINP = [feedforward_conn,feedforward_strn,receptive_widths,feedforward_thrs,stimulus]
+    FFout_sam = IO_func.get_FF_output_pruned(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),T.exp(As),receptive_widths,feedforward_strn,feedforward_thrs,feedforward_pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
+
+    GINP = [feedforward_strn,receptive_widths,feedforward_thrs,feedforward_pos,stimulus]
 
     output_sam = theano.function(GINP,FFout_sam,allow_input_downcast = True,on_unused_input = 'ignore')
    

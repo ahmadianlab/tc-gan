@@ -20,6 +20,7 @@ import numpy as np
 import scipy.optimize
 
 from .clib import libssnode, double_ptr
+from .gradient_expressions.utils import subsample_neurons
 
 
 DEFAULT_PARAMS = dict(
@@ -327,6 +328,52 @@ null_FixedPointsInfo = FixedPointsInfo(None, None, 0, 0)
 
 
 def find_fixed_points(num, Z_W_gen, exts, method='parallel', **common_kwargs):
+    """
+    Find `num` sets of fixed points using weight matrices from `Z_W_gen`.
+
+    Fixed points are calculated for each external input in `exts`.  A
+    set of fixed points is returned only if the fixed points are found
+    for all external inputs.
+
+    Parameters
+    ----------
+    num : int
+        Number of the sets of fixed points.
+    Z_W_gen : iterable
+        An iterable yielding pairs ``(Z, W)``.
+    exts : array-like of shape (NB, 2N)
+        A list of external inputs.
+    method : 'parallel' or 'serial'
+        Run the solver using multiple threads if ``'parallel'`` (default).
+
+    Other keyword arguments are passed to `fixed_point`.
+
+    Returns
+    -------
+    Zs : array of shape (num, ...)
+        "List" of Zs yielded with Ws from `Z_W_gen`.
+    Rs : array of shape (num, NB, 2N)
+        "List" of fixed points.
+    info : FixedPointsInfo
+        Supplementary information from the solver.  It has the following
+        attributes:
+
+        solutions : [FixedPointResult]
+            List of solution objects for successful convergence cases.
+            The order is same as `Zs` and `Rs`.
+        counter : collections.Counter
+            A mapping from error code to the number of occurrences.
+        rejections : int
+            Number of rejections.
+        unused : int
+            Number of unused solutions.  This value may vary for run
+            to run, due to nondeterministic behavior of multi-core
+            computation.  Since this function typically requires
+            `Z_W_gen` to generate Ws using random number generator,
+            this number has to be recorded if one needs to reproduce
+            the same computation.
+
+    """
     if method == 'parallel':
         finder = find_fixed_points_parallel
     elif method == 'serial':
@@ -540,14 +587,11 @@ def sample_fixed_points(
     return find_fixed_points(NZ, Z_W_gen(), exts, **solver_kwargs)
 
 
-def sample_tuning_curves(sample_sites=3, **kwargs):
+def sample_tuning_curves(sample_sites=3, track_net_identity=False, **kwargs):
     _, rates, _ = sample = sample_fixed_points(**kwargs)
     rates = np.array(rates)
-    N = rates.shape[-1] // 2
-    i_beg = N // 2 - sample_sites // 3
-    i_end = i_beg + sample_sites + 1
-    tunings = rates[:, :, i_beg:i_end].swapaxes(0, 1)
-    tunings = tunings.reshape((tunings.shape[0], -1))
+    tunings = subsample_neurons(rates, sample_sites,
+                                track_net_identity=track_net_identity).T
     return tunings, sample
 
 

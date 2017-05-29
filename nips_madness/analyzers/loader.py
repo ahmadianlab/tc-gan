@@ -108,6 +108,20 @@ class GANData(object):
             yield list(map(np.exp, log_JDS))
 
     @property
+    def track_net_identity(self):
+        try:
+            return self.info['run_config']['track_net_identity']
+        except (AttributeError, KeyError):
+            return False
+
+    @property
+    def sample_sites(self):
+        try:
+            return self.info['run_config']['sample_sites']
+        except (AttributeError, KeyError):
+            return 1
+
+    @property
     def n_bandwidths(self):
         try:
             return self.info['run_config']['n_bandwidths']
@@ -115,19 +129,37 @@ class GANData(object):
             return 8
 
     @property
+    def n_bandwidths_viz(self):
+        if self.track_net_identity:
+            return self.n_bandwidths * self.sample_sites
+        else:
+            return self.n_bandwidths
+
+    @property
     def model_tuning(self):
-        return self.tuning[:, :self.n_bandwidths]
+        return self.tuning[:, :self.n_bandwidths_viz]
 
     @property
     def true_tuning(self):
-        return self.tuning[:, self.n_bandwidths:self.n_bandwidths*2]
+        return self.tuning[:, self.n_bandwidths_viz:self.n_bandwidths_viz*2]
 
     @property
     def bandwidths(self):
         try:
-            return np.array(self.info['run_config']['bandwidths'])
+            bandwidths = self.info['run_config']['bandwidths']
         except (AttributeError, KeyError):
             pass
+        else:
+            bandwidths = np.array(bandwidths)
+            if self.track_net_identity:
+                # For visualization purpose, let's shift bandwidths of
+                # different sample sites:
+                return np.concatenate([
+                    bandwidths + i for i in range(self.sample_sites)
+                ])
+            return bandwidths
+
+        # Loading old logfiles:
         n = self.n_bandwidths
         if n == 8:
             return np.array([0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1])

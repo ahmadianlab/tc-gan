@@ -4,4 +4,6 @@
 *.so
 *.csv
 python
-/logfiles
+logfiles
+taka
+FF_logs

@@ -45,29 +45,16 @@ niter = 100000
 
 np.random.seed(1)
 
-MODE = sys.argv[1]
-DATA = bool(sys.argv[2])
-box_width = int(sys.argv[3])
-RF_i = float(sys.argv[4])
+box_width = int(sys.argv[1])
 
-if MODE not in ["WGAN","GAN"]:
-    print("Mode not recognized")
-    exit()
-
-tag = MODE + "_" + str(DATA) + "_" + str(int(RF_i*10)) + "_"
+tag = "wgan_FF_fit_" + str(box_width) + "_"
 
 print(tag)
 
-#if len(sys.argv) == 5:
-#    LOG = read_log(sys.argv[4])
-#    start_params = LOG[-1]
-#else:
-
-start_params = [np.log(RF_i),np.log(.25),np.log(1000),0.,np.log(1.),np.log(1.)]
+start_params = [np.log(2.),np.log(.25),np.log(1000),0.,np.log(1.),np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
-#curves = np.array([c/(np.mean(c) + .0001) for c in curves])
 
 X_pos = read_dat("lalazar_data/XCellsFull.dat")
 Y_pos = read_dat("lalazar_data/YCellsFull.dat")
@@ -81,20 +68,13 @@ THR_del = theano.shared(np.float32(start_params[4]),name = "s_W")
 Js = theano.shared(np.float32(start_params[2]),name = "mean_b")
 As = theano.shared(np.float32(start_params[5]),name = "mean_b")
 
-#parameters:
-# - RF_low
-# - delta_RF
-# - threshold
-# - weight_scale (why not?)
+PARAM = [RF_low,RF_del,THR,THR_del,Js]
 
-#random saples:
-# - RF width (uniform [0,1]) - [nsam,nx,ny,nz]
-# - FF connections (discreete {0,1}) - [nsam,nhid,nx*ny*nz]
-# - FF strengths (uniform [0,1]) - [nsam,nhid,nx*ny*nz]
+def run_GAN(mode = "WGAN"):
 
-def run_GAN(mode = MODE):
+    print("Start")
 
-    dx = 1./box_width
+    dx = 1./40
 
     nsam = theano.shared(10)
     nx = theano.shared(box_width)
@@ -148,9 +128,6 @@ def run_GAN(mode = MODE):
     feedforward_thrs = T.matrix("streng","float32")
     receptive_widths = T.tensor4("widths","float32")
 
-
-    PARAM = [RF_low,RF_del,THR,THR_del,Js,As]
-
     FFout_sam = IO_func.get_FF_output(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),T.exp(As),receptive_widths,feedforward_conn,feedforward_strn,feedforward_thrs,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
 
     GINP = [feedforward_conn,feedforward_strn,receptive_widths,feedforward_thrs,stimulus]
@@ -178,22 +155,24 @@ def run_GAN(mode = MODE):
 
     get_DG_input = theano.function(GINP,FOBS_sam,allow_input_downcast = True)
 
+    print("training funcs")
+
     #I need a function that returns training functions
     D_train, G_train, DOUT = make_train_funcs(FOBS_sam,PARAM,GINP,[128,128],(NSAM,NI,NOBS),mode)
 
     print tag
 
     #now define the actual values and test
-    train(D_train,G_train,get_DG_input,generate_samples,STIM,(NSAM,NI,NOBS),mode,tag + str(box_width),DATA)
+    train(D_train,G_train,get_DG_input,generate_samples,STIM,(NSAM,NI,NOBS),mode,tag + str(box_width))
 
-def train(D_step,G_step,G_in,F_gen,STIM,INSHAPE,mode,tag,data,NDstep = 5):
+def train(D_step,G_step,G_in,F_gen,STIM,INSHAPE,mode,tag,NDstep = 5):
     
     if mode =="WGAN":
-        train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,data,NDstep)
+        train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,NDstep)
     elif mode =="GAN":
-        train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,data)
+        train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag)
 
-def train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,use_data,NDstep = 5):
+def train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,NDstep = 5):
    
     print("Trainign WGAN")
  
@@ -272,7 +251,7 @@ def train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,use_data,NDstep = 5):
             F.close()
 
     
-def train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,use_data):
+def train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,):
 
     print("Training RGAN")
         
@@ -299,7 +278,6 @@ def train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,use_data):
     gloss = 10.
     dloss = 10.
 
-    print("DATA {}".format(use_data))
 
     for k in range(niter):
     

@@ -322,23 +322,18 @@ def make_train_funcs(generator, Gparams, Ginputs, layers, INSHAPE,mode):
 def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
-    
-    D_dat = SD.make_net(np.log(1. + D_D_input),INSHAPE,"WGAN",layers)
-    D_sam = SD.make_net(np.log(1. + D_G_input),INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
-    G_sam = SD.make_net(np.log(1. + generator),INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
-    
+
+    discriminator = SD.make_net(INSHAPE, "WGAN", layers)
+
     #get the outputs
-    D_dat_out = lasagne.layers.get_output(D_dat)
-    D_sam_out = lasagne.layers.get_output(D_sam)
-    G_sam_out = lasagne.layers.get_output(G_sam)
+    D_dat_out = lasagne.layers.get_output(discriminator, T.log(1. + D_D_input))
+    D_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + D_G_input))
+    G_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + generator))
     
     #make the loss functions
     
     D_grad_input = T.tensor3("D_sam","float32")
-
-    D_grad_net = SD.make_net(D_grad_input,INSHAPE,"WGAN",layers,params = lasagne.layers.get_all_layers(D_dat))
-
-    D_grad_out = lasagne.layers.get_output(D_grad_net)
+    D_grad_out = lasagne.layers.get_output(discriminator, D_grad_input)
 
     Dgrad = T.sqrt((T.jacobian(T.reshape(D_grad_out,[-1]),D_grad_input)**2).sum(axis = [1,2,3]))
     Dgrad_penalty = ((Dgrad - 1.)**2).mean()
@@ -355,7 +350,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     b1 = .5
     b2 = .9
 
-    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(D_dat), lr,beta1 = b1,beta2 = b2)#discriminator training function
+    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(discriminator, trainable=True), lr,beta1 = b1,beta2 = b2)#discriminator training function
     G_updates = lasagne.updates.adam(G_loss_exp, Gparams, lr,beta1 = b1,beta2 = b2)
 
     G_train_func = theano.function(Ginputs,G_loss_exp,updates = G_updates,allow_input_downcast = True,on_unused_input = 'ignore')
@@ -368,16 +363,14 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
-    
-    D_dat = SD.make_net(T.log(1. + D_D_input),INSHAPE,"CE",layers)
-    D_sam = SD.make_net(T.log(1. + D_G_input),INSHAPE,"CE",layers,params = lasagne.layers.get_all_layers(D_dat))
-    G_sam = SD.make_net(T.log(1. + generator),INSHAPE,"CE",layers,params = lasagne.layers.get_all_layers(D_dat))
-    
+
+    discriminator = SD.make_net(INSHAPE, "CE", layers)
+
     #get the outputs
-    D_dat_out = lasagne.layers.get_output(D_dat)
-    D_sam_out = lasagne.layers.get_output(D_sam)
-    G_sam_out = lasagne.layers.get_output(G_sam)
-    
+    D_dat_out = lasagne.layers.get_output(discriminator, T.log(1. + D_D_input))
+    D_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + D_G_input))
+    G_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + generator))
+
     #make the loss functions
 
     eps = .0001
@@ -392,7 +385,7 @@ def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     b1 = .5
     b2 = .9
 
-    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(D_dat), lr,beta1 = b1,beta2 = b2)#discriminator training function
+    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(discriminator, trainable=True), lr,beta1 = b1,beta2 = b2)#discriminator training function
     G_updates = lasagne.updates.adam(G_loss_exp, Gparams, lr,beta1 = b1,beta2 = b2)
 
     G_train_func = theano.function(Ginputs,G_loss_exp,updates = G_updates,allow_input_downcast = True,on_unused_input = 'ignore')

@@ -85,7 +85,11 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     mat = scipy.io.loadmat(datapath)
     L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
-    contrast = mat['Modelparams'][0, 0]['c'][0, 0]
+
+#    contrast = [mat['Modelparams'][0, 0]['c'][0, 0]]
+
+    contrast = [5,10,20]
+
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
@@ -136,7 +140,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     if track_net_identity:
         assert len(bandwidths) * sample_sites == data.shape[-1]
     else:
-        assert len(bandwidths) == data.shape[-1]
+        assert len(bandwidths)*len(contrast) == data.shape[-1]
 
     #defining all the parameters that we might want to train
 
@@ -184,7 +188,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
     nz = theano.shared(n_samples,name = 'n_samples')
-    nb = theano.shared(len(bandwidths),name = 'n_stim')
+    nb = theano.shared(len(bandwidths)*len(contrast),name = 'n_stim')
 
     #array that computes the positions
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
@@ -195,8 +199,9 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
     NB = int(nb.get_value())
     ###
 
-
     BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness, contrast)
+    
+    print(BAND_IN.shape)
 
     #theano variable for the random samples
     Z = T.tensor3("z","float32")
@@ -436,7 +441,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
             DW = Dparam.W.get_value()
             DB = Dparam.b.get_value()
         else:
-            DW = np.ones((len(bandwidths), 1))
+            DW = np.ones((len(bandwidths)*len(contrast), 1))
             DB = [0.]
 
         log(list(GZmean) + list(Dmean) + list(DW[:, 0]) + [DB[0]],
@@ -828,7 +833,7 @@ if __name__ == "__main__":
         '--rate_hard_bound', default=1000, type=float,
         help='rate_hard_bound=r1 (default: %(default)s)')
     parser.add_argument(
-        '--WGAN', default=False, action='store_true',
+        '--WGAN', default=True, action='store_true',
         help='Use WGAN (default: %(default)s)')
     parser.add_argument(
         '--WGAN_lambda', default=10.0, type=float,

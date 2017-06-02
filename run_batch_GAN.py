@@ -569,12 +569,11 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    DIS_red_r_true = SD.make_net(in_true,INSHAPE,LOSS,LAYERS)
-    DIS_red_r_fake = SD.make_net(in_fake,INSHAPE,LOSS,LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
+    discriminator = SD.make_net(INSHAPE,LOSS,LAYERS)
 
     #get the outputs
-    true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
-    fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
+    true_dis_out = lasagne.layers.get_output(discriminator, in_true)
+    fake_dis_out = lasagne.layers.get_output(discriminator, in_fake)
 
     D_acc = theano.function([rate_vector,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
 
@@ -597,7 +596,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), d_lr)#discriminator training function
+    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator), d_lr)#discriminator training function
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector],true_loss_exp,allow_input_downcast = True)
@@ -627,7 +626,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true
+    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator
 
 def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,WGAN_lambda):
 
@@ -655,12 +654,11 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    DIS_red_r_true = SD.make_net(in_true,INSHAPE,"WGAN",LAYERS)
-    DIS_red_r_fake = SD.make_net(in_fake,INSHAPE,"WGAN",LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
+    discriminator = SD.make_net(INSHAPE,"WGAN",LAYERS)
 
     #get the outputs
-    true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
-    fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
+    true_dis_out = lasagne.layers.get_output(discriminator, in_true)
+    fake_dis_out = lasagne.layers.get_output(discriminator, in_fake)
 
     D_acc = theano.function([rate_vector,red_R_true],fake_dis_out.mean() - true_dis_out.mean(),allow_input_downcast = True)
 
@@ -668,9 +666,8 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     
     red_fake_for_grad = T.matrix("reduced rates","float32")#data
     in_for_grad = T.log(1. + red_fake_for_grad)
-    
-    D_red_grad_net = SD.make_net(in_for_grad,INSHAPE,"WGAN",LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
-    for_grad_out = lasagne.layers.get_output(D_red_grad_net)
+
+    for_grad_out = lasagne.layers.get_output(discriminator, in_for_grad)
 
     lam = WGAN_lambda
 
@@ -715,7 +712,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     b2 = .9
 
     G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr,beta1 = b1,beta2 = b2)
-    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), d_lr,beta1 = b1,beta2 = b2)#discriminator training function
+    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator), d_lr,beta1 = b1,beta2 = b2)#discriminator training function
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,updates = D_updates,allow_input_downcast = True)
@@ -723,7 +720,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,DIS_red_r_true
+    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator
 
 if __name__ == "__main__":
 

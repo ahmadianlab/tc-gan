@@ -160,7 +160,7 @@ def run_GAN(mode = "WGAN"):
     #I need a function that returns training functions
     D_train, G_train, DOUT = make_train_funcs(FOBS_sam,PARAM,GINP,[128,128],(NSAM,NI,NOBS),mode)
 
-    print tag
+    print(tag)
 
     #now define the actual values and test
     train(D_train,G_train,get_DG_input,generate_samples,STIM,(NSAM,NI,NOBS),mode,tag + str(box_width))

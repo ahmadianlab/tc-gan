@@ -436,17 +436,8 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)
- 
-        Dparam = lasagne.layers.get_all_layers(DIS_red_r_true)[-1]
-        
-        if len(layers) == 0:
-            DW = Dparam.W.get_value()
-            DB = Dparam.b.get_value()
-        else:
-            DW = np.ones((len(bandwidths)*len(contrast), 1))
-            DB = [0.]
 
-        log(list(GZmean) + list(Dmean) + list(DW[:, 0]) + [DB[0]],
+        log(list(GZmean) + list(Dmean),
             F="D_parameters_{}.log".format(tag), PRINT=False)
 
         jj = J.get_value()

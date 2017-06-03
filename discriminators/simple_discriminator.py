@@ -45,7 +45,11 @@ def layer_normalized_dense_layer(incoming, num_units,
                                  nonlinearity=NL.rectify,
                                  b=lasagne.init.Constant(0.),
                                  **kwargs):
-    layer = L.DenseLayer(incoming, num_units, b=None, **kwargs)
+    layer = L.DenseLayer(incoming, num_units,
+                         W=lasagne.init.Normal(std=1),
+                         b=None,
+                         nonlinearity=NL.linear,
+                         **kwargs)
     layer = LayerNormLayer(layer)
     layer = L.ScaleLayer(layer)
     layer = L.BiasLayer(layer, b=b)

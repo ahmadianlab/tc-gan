@@ -5,6 +5,21 @@ import lasagne
 
 class LayerNormLayer(lasagne.layers.BatchNormLayer):
 
+    """
+    Implementation of Layer Normalization (Ba, Kiros & Hinton, 2016).
+
+    This layer normalizes input so that it has zero mean and unit
+    variance over neurons (as opposed to over batches as in the batch
+    normalization).  Since this layer do not have learnable
+    parameters, it must be sandwiched by `DenseLayer` and `BiasLayer`
+    etc.  See `layer_normalized_dense_layer`.
+
+    - Ba, Kiros & Hinton (2016) "Layer Normalization."
+      http://arxiv.org/abs/1607.06450
+    - https://github.com/Lasagne/Lasagne/issues/736#issuecomment-241374360
+
+    """
+
     def __init__(self, incoming, axes=-1, **kwargs):
         super(LayerNormLayer, self).__init__(incoming, axes=axes, **kwargs)
 

@@ -50,11 +50,12 @@ class LayerNormLayer(lasagne.layers.BatchNormLayer):
 
 def layer_normalized_dense_layer(incoming, num_units,
                                  nonlinearity=NL.rectify,
+                                 W=lasagne.init.Normal(std=1),
                                  b=lasagne.init.Constant(0.),
                                  **kwargs):
     assert num_units > 1
     layer = L.DenseLayer(incoming, num_units,
-                         W=lasagne.init.Normal(std=1),
+                         W=W,
                          b=None,
                          nonlinearity=NL.linear,
                          **kwargs)

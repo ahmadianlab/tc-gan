@@ -45,6 +45,7 @@ def layer_normalized_dense_layer(incoming, num_units,
                                  nonlinearity=NL.rectify,
                                  b=lasagne.init.Constant(0.),
                                  **kwargs):
+    assert num_units > 1
     layer = L.DenseLayer(incoming, num_units,
                          W=lasagne.init.Normal(std=1),
                          b=None,
@@ -70,11 +71,11 @@ def make_net(in_shape, LOSS, layers=[], normalization='none'):
         net = make_layer(net,layers[l],b=lasagne.init.Normal(.01,0))
 
     if LOSS == "LS":
-        net = make_layer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
+        net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
     elif LOSS == "CE":
-        net = make_layer(net,1,nonlinearity = NL.sigmoid,b=lasagne.init.Normal(.01,0))
+        net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid,b=lasagne.init.Normal(.01,0))
     elif LOSS == "WGAN":
-        net = make_layer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
+        net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
     else:
         raise ValueError("Invaid LOSS specified: {}".format(LOSS))
 

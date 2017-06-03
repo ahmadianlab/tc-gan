@@ -8,6 +8,16 @@ import sys
 import time
 import FF_functions.lalazar_func as IO_func
 
+
+# Use single precision (even when it is running in CPU):
+theano.config.floatX = 'float32'
+# [Note] As this script assumes float32 everywhere but Lasagne and
+# simple_discriminator do not, this setting is required to make it
+# work.  Since altering theano.config.<attribute> is not recommended
+# by the theano manual, it may be a good idea to remove the hard coded
+# assumption of the default data type.
+
+
 def read_dat(F):
     f = open(F,"r")
 

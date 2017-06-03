@@ -14,9 +14,10 @@ class LayerNormLayer(lasagne.layers.BatchNormLayer):
     parameters, it must be sandwiched by `DenseLayer` and `BiasLayer`
     etc.  See `layer_normalized_dense_layer`.
 
-    The current implementation assumes that the incoming layer is of
-    ``ndim=2`` and the first axis is the batch dimension.  In
-    particular, it does not support recurrent layer.
+    The current implementation assumes that the first (0th) axis is
+    the batch dimension and other dimensions are used to calculate the
+    mean and variance.  In particular, it does not support recurrent
+    layer.
 
     - Ba, Kiros & Hinton (2016) "Layer Normalization."
       http://arxiv.org/abs/1607.06450
@@ -24,11 +25,17 @@ class LayerNormLayer(lasagne.layers.BatchNormLayer):
 
     """
 
-    def __init__(self, incoming, axes=1, **kwargs):
+    def __init__(self, incoming, axes='auto', **kwargs):
+        if axes != 'auto':
+            kwargs['axes'] = axes
+
         super(LayerNormLayer, self).__init__(
-            incoming, axes=axes,
+            incoming,
             beta=None, gamma=None,
             **kwargs)
+
+        if axes == 'auto':
+            self.axes = tuple(range(1, len(self.input_shape)))
 
     def get_output_for(self, input,
                        batch_norm_use_averages=False,

@@ -8,8 +8,8 @@ class LayerNormLayer(lasagne.layers.BatchNormLayer):
     """
     Implementation of Layer Normalization (Ba, Kiros & Hinton, 2016).
 
-    This layer normalizes input so that it has zero mean and unit
-    variance over neurons (as opposed to over batches as in the batch
+    This normalizes input so that it has zero mean and unit variance
+    over neurons (as opposed to over batches as in the batch
     normalization).  Since this layer do not have learnable
     parameters, it must be sandwiched by `DenseLayer` and `BiasLayer`
     etc.  See `layer_normalized_dense_layer`.
@@ -17,7 +17,7 @@ class LayerNormLayer(lasagne.layers.BatchNormLayer):
     The current implementation assumes that the first (0th) axis is
     the batch dimension and other dimensions are used to calculate the
     mean and variance.  In particular, it does not support recurrent
-    layer.
+    layers.
 
     - Ba, Kiros & Hinton (2016) "Layer Normalization."
       http://arxiv.org/abs/1607.06450

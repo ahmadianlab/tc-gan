@@ -343,7 +343,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     #make the loss functions
     
     D_grad_input = T.tensor3("D_sam","float32")
-    D_grad_out = lasagne.layers.get_output(discriminator, D_grad_input)
+    D_grad_out = lasagne.layers.get_output(discriminator, T.log(1 + D_grad_input))
 
     Dgrad = T.sqrt((T.jacobian(T.reshape(D_grad_out,[-1]),D_grad_input)**2).sum(axis = [1,2,3]))
     Dgrad_penalty = ((Dgrad - 1.)**2).mean()

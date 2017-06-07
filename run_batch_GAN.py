@@ -34,6 +34,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
          N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
          true_IO_type, truth_size, truth_seed, n_bandwidths,
          sample_sites, track_net_identity, init_disturbance, quiet,
+         disc_normalization,
          run_config,timetest,convtest,testDW,DRtest):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
@@ -373,6 +374,7 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         rate_penalty_threshold=rate_penalty_threshold,
         rate_penalty_no_I=rate_penalty_no_I,
         ivec=ivec, Z=Z, J=J, D=D, S=S, N=N,
+        disc_normalization=disc_normalization,
         R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp])
 
     #Now we set up values to use in testing.
@@ -434,17 +436,8 @@ def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
 
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)
- 
-        Dparam = lasagne.layers.get_all_layers(DIS_red_r_true)[-1]
-        
-        if len(layers) == 0:
-            DW = Dparam.W.get_value()
-            DB = Dparam.b.get_value()
-        else:
-            DW = np.ones((len(bandwidths)*len(contrast), 1))
-            DB = [0.]
 
-        log(list(GZmean) + list(Dmean) + list(DW[:, 0]) + [DB[0]],
+        log(list(GZmean) + list(Dmean),
             F="D_parameters_{}.log".format(tag), PRINT=False)
 
         jj = J.get_value()
@@ -543,7 +536,7 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity):
+def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,disc_normalization):
 
     #Defines the input shape for the discriminator network
     if track_net_identity:
@@ -569,12 +562,12 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    DIS_red_r_true = SD.make_net(in_true,INSHAPE,LOSS,LAYERS)
-    DIS_red_r_fake = SD.make_net(in_fake,INSHAPE,LOSS,LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
+    discriminator = SD.make_net(INSHAPE, LOSS, LAYERS,
+                                normalization=disc_normalization)
 
     #get the outputs
-    true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
-    fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
+    true_dis_out = lasagne.layers.get_output(discriminator, in_true)
+    fake_dis_out = lasagne.layers.get_output(discriminator, in_fake)
 
     D_acc = theano.function([rate_vector,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
 
@@ -597,7 +590,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), d_lr)#discriminator training function
+    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator, trainable=True), d_lr)#discriminator training function
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector],true_loss_exp,allow_input_downcast = True)
@@ -627,9 +620,9 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true
+    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator
 
-def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,WGAN_lambda):
+def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,WGAN_lambda,disc_normalization):
 
     #Defines the input shape for the discriminator network
     if track_net_identity:
@@ -655,12 +648,12 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    DIS_red_r_true = SD.make_net(in_true,INSHAPE,"WGAN",LAYERS)
-    DIS_red_r_fake = SD.make_net(in_fake,INSHAPE,"WGAN",LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
+    discriminator = SD.make_net(INSHAPE, "WGAN", LAYERS,
+                                normalization=disc_normalization)
 
     #get the outputs
-    true_dis_out = lasagne.layers.get_output(DIS_red_r_true)
-    fake_dis_out = lasagne.layers.get_output(DIS_red_r_fake)
+    true_dis_out = lasagne.layers.get_output(discriminator, in_true)
+    fake_dis_out = lasagne.layers.get_output(discriminator, in_fake)
 
     D_acc = theano.function([rate_vector,red_R_true],fake_dis_out.mean() - true_dis_out.mean(),allow_input_downcast = True)
 
@@ -668,9 +661,8 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     
     red_fake_for_grad = T.matrix("reduced rates","float32")#data
     in_for_grad = T.log(1. + red_fake_for_grad)
-    
-    D_red_grad_net = SD.make_net(in_for_grad,INSHAPE,"WGAN",LAYERS,params = lasagne.layers.get_all_layers(DIS_red_r_true))
-    for_grad_out = lasagne.layers.get_output(D_red_grad_net)
+
+    for_grad_out = lasagne.layers.get_output(discriminator, in_for_grad)
 
     lam = WGAN_lambda
 
@@ -715,7 +707,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     b2 = .9
 
     G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr,beta1 = b1,beta2 = b2)
-    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(DIS_red_r_true), d_lr,beta1 = b1,beta2 = b2)#discriminator training function
+    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator, trainable=True), d_lr,beta1 = b1,beta2 = b2)#discriminator training function
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,updates = D_updates,allow_input_downcast = True)
@@ -723,7 +715,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,DIS_red_r_true
+    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator
 
 if __name__ == "__main__":
 
@@ -838,6 +830,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')
+    parser.add_argument(
+        '--disc-normalization', default='none', choices=('none', 'layer'),
+        help='Normalization used for discriminator.')
     parser.add_argument(
         '--pdb', action='store_true',
         help='Drop into the Python debugger PDB on an exception.')

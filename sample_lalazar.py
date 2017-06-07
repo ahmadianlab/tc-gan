@@ -60,15 +60,13 @@ THR_del = theano.shared(np.float32(np.log(5.)),name = "s_W")
 Js = theano.shared(np.float32(np.log(5000.)),name = "mean_b")
 As = theano.shared(np.float32(np.log(0)),name = "dist")
 
+params = [RF_low,RF_del,THR,THR_del,Js,As]
+
 def set_param(PP):
     print(PP)
 
-    RF_low.set_value(float(PP[0]))
-    RF_del.set_value(float(PP[1]))
-    Js.set_value(float(PP[2]))
-    THR.set_value(float(PP[3]))
-    THR_del.set_value(float(PP[4]))
-    As.set_value(float(PP[5]))
+    for p in range(len(PP)):
+        params[p].set_value(float(PP[p]))
 
 def sample(par,o_gen,n_gen,fname,n = 20):
     out = []
@@ -166,7 +164,7 @@ def run_GAN():
     feedforward_thrs = T.matrix("streng","float32")
     receptive_widths = T.tensor4("widths","float32")
 
-    PARAM = [RF_low,RF_del,THR,THR_del,Js]
+    PARAM = [RF_low,RF_del,THR,THR_del,Js,As]
 
     FFout_sam = IO_func.get_FF_output(T.exp(RF_low),T.exp(RF_del),THR,T.exp(THR_del),T.exp(Js),T.exp(As),receptive_widths,feedforward_conn,feedforward_strn,feedforward_thrs,pos,stimulus,nsam,nx,ny,nz,nhid,ni,dx)
 

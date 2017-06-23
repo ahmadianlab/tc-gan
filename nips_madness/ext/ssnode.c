@@ -1,6 +1,4 @@
 #include <math.h>
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_odeiv2.h>
 
 typedef struct {
   /* Model parameters: */
@@ -54,35 +52,6 @@ double io_atanh(double v, double r0, double r1, double v0, double k, double n) {
   }
 }
 
-#define dYdT(io_fun, tau) \
-  (- y[i] + io_fun(dot(dim, ssn->W + dim * i, y) + ssn->ext[i], \
-                   ssn->rate_soft_bound, ssn->rate_hard_bound,  \
-                   ssn->v0, ssn->k, ssn->n)) / tau
-
-int dydt_asym_tanh(double t, const double y[], double dydt[], void *params) {
-  const SSNParam *ssn = params;
-  int dim = ssn->N * 2;
-  for (int i = 0; i < ssn->N; ++i){
-    dydt[i] = dYdT(io_atanh, ssn->tau_E);
-  }
-  for (int i = ssn->N; i < dim; ++i){
-    dydt[i] = dYdT(io_atanh, ssn->tau_I);
-  }
-  return GSL_SUCCESS;
-}
-
-int dydt_asym_linear(double t, const double y[], double dydt[], void *params) {
-  const SSNParam *ssn = params;
-  int dim = ssn->N * 2;
-  for (int i = 0; i < ssn->N; ++i){
-    dydt[i] = dYdT(io_alin, ssn->tau_E);
-  }
-  for (int i = ssn->N; i < dim; ++i){
-    dydt[i] = dYdT(io_alin, ssn->tau_I);
-  }
-  return GSL_SUCCESS;
-}
-
 #define COMMON_ARG_DEF \
         /* Model parameters: */ \
         int N, double *W, double *ext, double k, double n, \
@@ -91,77 +60,6 @@ int dydt_asym_linear(double t, const double y[], double dydt[], void *params) {
         /* Solver parameters: */ \
         double dt, int max_iter, double atol, \
         double rate_soft_bound, double rate_hard_bound
-
-int solve_dynamics_gsl(
-        COMMON_ARG_DEF,
-        int (* dydt) (double t, const double y[], double dydt[], void * params)) {
-  SSNParam ssn;
-  gsl_odeiv2_system sys = {dydt, NULL, 2 * N, &ssn};
-  gsl_odeiv2_driver *driver =
-    gsl_odeiv2_driver_alloc_y_new(&sys, gsl_odeiv2_step_msadams,
-                                  dt, 1e-6, 0.0);
-  int dim = 2 * N;
-  int converged;
-  int error_code = 1;
-
-  ssn.N = N;
-  ssn.W = W;
-  ssn.ext = ext;
-  ssn.k = k;
-  ssn.n = n;
-  ssn.tau_E = tau_E;
-  ssn.tau_I = tau_I;
-  ssn.rate_soft_bound = rate_soft_bound;
-  ssn.rate_hard_bound = rate_hard_bound;
-  ssn.v0 = rate_to_volt(rate_soft_bound, k, n);
-
-  for (int i = 0; i < dim; ++i){
-    r1[i] = r0[i];
-  }
-
-  for (int step = 0; step < max_iter; ++step){
-    for (int i = 0; i < dim; ++i){
-      r0[i] = r1[i];
-    }
-
-    double t = 0;
-    int status = gsl_odeiv2_driver_apply(driver, &t, 0.1, r1);
-    if (status != GSL_SUCCESS) {
-      error_code = 1000 + status;
-      goto end;
-    }
-
-    converged = 1;
-    for (int i = 0; i < dim; ++i){
-      if (fabs(r1[i] - r0[i]) >= atol) {
-        converged = 0;
-        break;
-      }
-    }
-
-    if (converged) {
-      error_code = 0;
-      goto end;
-    }
-  }
- end:
-  gsl_odeiv2_driver_free(driver);
-  return error_code;
-}
-
-int solve_dynamics_asym_linear_gsl(COMMON_ARG_DEF) {
-  return solve_dynamics_gsl(N, W, ext, k, n, r0, r1, tau_E, tau_I,
-                            dt, max_iter, atol,
-                            rate_soft_bound, rate_hard_bound,
-                            dydt_asym_linear);
-}
-
-int solve_dynamics_asym_tanh_gsl(COMMON_ARG_DEF) {
-  return solve_dynamics_gsl(N, W, ext, k, n, r0, r1, tau_E, tau_I,
-                            dt, max_iter, atol,
-                            rate_soft_bound, rate_hard_bound,
-                            dydt_asym_tanh);
-}
 
 #define ODE_STEP(io_fun, dt_) \
   r1[i] = r0[i] + \

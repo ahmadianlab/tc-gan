@@ -154,7 +154,6 @@ def solve_dynamics(*args, **kwds):
 
 def fixed_point(
         W, ext, k, n, r0, tau=DEFAULT_PARAMS['tau'],
-        # max_iter=300, atol=1e-8, dt=.0001, solver='gsl',
         max_iter=10000, atol=1e-5, dt=.0008, solver='euler',
         rate_soft_bound=DEFAULT_PARAMS['rate_soft_bound'],
         rate_hard_bound=DEFAULT_PARAMS['rate_hard_bound'],
@@ -184,9 +183,6 @@ def fixed_point(
         The hard bound to the number of iteration of the Euler method.
     atol : float
         Absolute tolerance to the change in rate.
-        If ``solver='gsl'``, the error is measured in terms of the
-        component-wise difference between the current rate and 0.1
-        seconds past rate.
         If ``solver='euler'``, `dt` is used instead of 0.1.
     rate_soft_bound : float
         The I/O function is power-law below this point.
@@ -197,12 +193,10 @@ def fixed_point(
         `rate_soft_bound`.  If ``'asym_tanh'``, the I/O function is
         tanh after `rate_soft_bound` and the rate is bounded by
         `rate_hard_bound`.
-    solver : {'gsl', 'euler'}
+    solver : {'euler'}
         ODE solver to be used.
-        gsl uses "msadams" solver implemented in the GNU Scientific
-        Library (A variable-coefficient linear multistep Adams
-        method).
         euler is the hand-coded C implementation.
+        At this point 'euler' is the only choice.
     check : bool
         Raise `FixedPointError` if convergence failed.  Default is `False`.
 
@@ -222,7 +216,7 @@ def fixed_point(
     """
     if io_type not in ('asym_linear', 'asym_tanh', 'asym_power'):
         raise ValueError("Unknown I/O type: {}".format(io_type))
-    if solver not in ('gsl', 'euler'):
+    if solver not in ('euler'):
         raise ValueError("Unknown solver: {}".format(solver))
 
     W = np.asarray(W, dtype='double')

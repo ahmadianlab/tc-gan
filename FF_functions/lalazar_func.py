@@ -7,8 +7,10 @@ import math
 import sys 
 import time
 
+theano.config.floatX = "float32"
+
 def rectify(x):
-    return .5*(x + abs(x))
+    return np.float32(.5)*(x + abs(x))
 
 def get_FF_output(RF_l,RF_d,TH,TH_d,J,a,RF_w,FF_con,FF_str,TH_sam,x,inp,nsam,nx,ny,nz,nhid,ni,dx):
 
@@ -34,7 +36,11 @@ def get_FF_output(RF_l,RF_d,TH,TH_d,J,a,RF_w,FF_con,FF_str,TH_sam,x,inp,nsam,nx,
     
     hidden_activations = rectify((input_activations*weights).sum(axis = 3) - T.reshape((TH + (T.sgn(TH_sam)*(T.abs_(TH_sam)**a))*TH_d),[nsam,1,nhid]))#[nsam,ni,nhid]
 
-    return hidden_activations#/(T.mean(hidden_activations,axis = [1,2]) + .001)
+    mean = hidden_activations.mean(axis = 1,keepdims = True)
+    MAX = hidden_activations.max(axis = 1,keepdims = True)
+    MIN = hidden_activations.min(axis = 1,keepdims = True)
+    
+    return (hidden_activations - mean)/(MAX - MIN + .001)
 
 def get_FF_output_pruned(RF_l,RF_d,TH,TH_d,J,a,RF_w,FF_str,TH_sam,x,inp,nsam,nx,ny,nz,nhid,ni,dx):
 

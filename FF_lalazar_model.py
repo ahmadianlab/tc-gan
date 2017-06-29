@@ -1,4 +1,4 @@
-import lasagne 
+import lasagne
 import theano
 import theano.tensor as T
 import numpy as np
@@ -57,16 +57,18 @@ np.random.seed(1)
 
 box_width = int(sys.argv[1])
 
-tag = "wgan_FF_fit_" + str(box_width) + "_"
+tag = "wgan_FF_LN_fit_" + str(box_width) + "_noJ_"
 
 #tag += "slow_"
 
 print(tag)
 
-start_params = [np.log(2.),np.log(.25),np.log(1000),0.,np.log(1.),np.log(1.)]
+start_params = [np.log(.5),np.log(.5),np.log(3875),-5.,np.log(25.25),np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
+curves = np.array([[x if x > 5 else 0 for x in tc] for tc in curves])
+curves = np.array([(x - x.mean())/(x.max() - x.min() + .001) for x in curves])
 
 X_pos = read_dat("lalazar_data/XCellsFull.dat")
 Y_pos = read_dat("lalazar_data/YCellsFull.dat")
@@ -80,7 +82,7 @@ THR_del = theano.shared(np.float32(start_params[4]),name = "s_W")
 Js = theano.shared(np.float32(start_params[2]),name = "mean_b")
 As = theano.shared(np.float32(start_params[5]),name = "mean_b")
 
-PARAM = [RF_low,RF_del,THR,THR_del,Js,As]
+PARAM = [RF_low,RF_del,THR,THR_del]
 
 def run_GAN(mode = "WGAN"):
 
@@ -170,21 +172,21 @@ def run_GAN(mode = "WGAN"):
     print("training funcs")
 
     #I need a function that returns training functions
-    D_train, G_train, DOUT = make_train_funcs(FOBS_sam,PARAM,GINP,[128,128],(NSAM,NI,NOBS),mode)
+    D_train, G_train, DOUT, Dparams = make_train_funcs(FOBS_sam,PARAM,GINP,[128,128],(NSAM,NI,NOBS),mode)
 
     print(tag)
 
     #now define the actual values and test
-    train(D_train,G_train,get_DG_input,generate_samples,STIM,(NSAM,NI,NOBS),mode,tag + str(box_width))
+    train(D_train,G_train,get_DG_input,generate_samples,Dparams,STIM,(NSAM,NI,NOBS),mode,tag + str(box_width))
 
-def train(D_step,G_step,G_in,F_gen,STIM,INSHAPE,mode,tag,NDstep = 5):
+def train(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,mode,tag,NDstep = 5):
     
     if mode =="WGAN":
-        train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,NDstep)
+        train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep)
     elif mode =="GAN":
-        train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag)
+        train_gan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag)
 
-def train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,NDstep = 5):
+def train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep = 5):
    
     print("Trainign WGAN")
  
@@ -219,8 +221,10 @@ def train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,NDstep = 5):
 
 
     for k in range(niter):
+
+        np.savetxt("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
     
-        for dstep in range(100 if k == 0 else NDstep):
+        for dstep in range(1000 if k == 0 else NDstep):
             #get the samples for training
             SS = F_gen()
             DD = F_gen()
@@ -252,6 +256,7 @@ def train_wgan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,NDstep = 5):
         F = open(LOSS,"a")
         F.write("{},{}\n".format(gloss,dloss))
         F.close()
+
 
  
         if k%1==0:
@@ -314,6 +319,8 @@ def train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,):
 
 
     for k in range(niter):
+
+        np.savetxt("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
     
         SS = F_gen()
         DD = F_gen()
@@ -358,12 +365,18 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
 
-    discriminator = SD.make_net(INSHAPE, "WGAN", layers)
+    discriminator = SD.make_net(INSHAPE, "WGAN", layers,normalization = "layer")
+
+    Dparameters = discriminator
 
     #get the outputs
-    D_dat_out = lasagne.layers.get_output(discriminator, T.log(1. + D_D_input))
-    D_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + D_G_input))
-    G_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + generator))
+#    D_dat_out = lasagne.layers.get_output(discriminator, T.log(1. + D_D_input))
+#    D_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + D_G_input))
+#    G_sam_out = lasagne.layers.get_output(discriminator, T.log(1. + generator))
+
+    D_dat_out = lasagne.layers.get_output(discriminator, D_D_input)
+    D_sam_out = lasagne.layers.get_output(discriminator, D_G_input)
+    G_sam_out = lasagne.layers.get_output(discriminator, generator)
     
     #make the loss functions
     
@@ -376,16 +389,8 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     lam = 10.
 
-    DP = lasagne.layers.get_all_layers(D_sam)
-
-    l2 = .001
-
-    P_loss = [l2*(lay.W**2).sum() for lay in DP[1:]]
-
     Wdist = D_sam_out.mean() - D_dat_out.mean()
     D_loss_exp = D_sam_out.mean() - D_dat_out.mean() + lam*Dgrad_penalty#discriminator loss
-    for l in P_loss:
-        D_loss_exp += l
 
     G_loss_exp = - G_sam_out.mean()#generative loss
     
@@ -395,7 +400,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     b1 = .5
     b2 = .9
 
-    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(discriminator, trainable=True), lr,beta1 = b1,beta2 = b2)#discriminator training function
+    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(discriminator, trainable=True), 10*lr,beta1 = b1,beta2 = b2)#discriminator training function
     G_updates = lasagne.updates.adam(G_loss_exp, Gparams, lr,beta1 = b1,beta2 = b2)
 
     G_train_func = theano.function(Ginputs,G_loss_exp,updates = G_updates,allow_input_downcast = True,on_unused_input = 'ignore')
@@ -403,13 +408,15 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     Dout_func = theano.function([D_D_input,D_G_input],[D_sam_out,D_dat_out],allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return D_train_func, G_train_func,Dout_func
+    return D_train_func, G_train_func,Dout_func, Dparameters
 
 def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
 
     discriminator = SD.make_net(INSHAPE, "CE", layers)
+
+    Dparameters = discriminator
 
     #get the outputs
     D_dat_out = lasagne.layers.get_output(discriminator, T.log(1. + D_D_input))
@@ -439,7 +446,7 @@ def make_GAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     Dout_func = theano.function([D_D_input,D_G_input],[D_sam_out,D_dat_out],updates = D_updates,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return D_train_func, G_train_func, Dout_func
+    return D_train_func, G_train_func, Dout_func, Dparameters
 
 if __name__ == "__main__":
 

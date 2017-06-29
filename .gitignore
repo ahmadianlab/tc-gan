@@ -3,6 +3,7 @@
 *.mat
 *.so
 *.csv
+*.sh.*
 python
 logfiles
 taka

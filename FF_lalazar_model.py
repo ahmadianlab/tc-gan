@@ -63,7 +63,7 @@ tag = "wgan_FF_LN_fit_" + str(box_width) + "_noJ_"
 
 print(tag)
 
-start_params = [np.log(.5),np.log(.5),np.log(3875),-5.,np.log(25.25),np.log(1.)]
+start_params = [np.log(2.),np.log(.1),np.log(3875),-5.,np.log(25.25),np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")

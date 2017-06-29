@@ -222,7 +222,7 @@ def train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep = 5):
 
     for k in range(niter):
 
-        np.savetxt("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
+        np.save("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
     
         for dstep in range(1000 if k == 0 else NDstep):
             #get the samples for training
@@ -320,7 +320,7 @@ def train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,):
 
     for k in range(niter):
 
-        np.savetxt("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
+        np.save("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
     
         SS = F_gen()
         DD = F_gen()

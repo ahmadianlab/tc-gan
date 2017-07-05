@@ -16,7 +16,13 @@ theano.config.floatX = 'float32'
 # work.  Since altering theano.config.<attribute> is not recommended
 # by the theano manual, it may be a good idea to remove the hard coded
 # assumption of the default data type.
+def max_min_par(P):
+    m = 0
 
+    for p in P:
+        m = np.max([m,np.max(np.reshape(np.abs(p),[-1]))])
+
+    print m
 
 def read_dat(F):
     f = open(F,"r")
@@ -249,6 +255,8 @@ def train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep = 5):
             F.write("{},{}\n".format(gloss,dloss))
             F.close()
 
+            max_min_par(lasagne.layers.get_all_param_values(Dparams))
+
 
         SS = F_gen()
         gloss = G_step(SS[0],SS[1],SS[2],SS[3],STIM)
@@ -365,7 +373,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     D_D_input = T.tensor3("DDinput","float32")
     D_G_input = T.tensor3("DGinput","float32")    
 
-    discriminator = SD.make_net(INSHAPE, "WGAN", layers,normalization = "layer")
+    discriminator = SD.make_net(INSHAPE, "WGAN")
 
     Dparameters = discriminator
 
@@ -387,12 +395,21 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     Dgrad = T.sqrt((T.jacobian(T.reshape(D_grad_out,[-1]),D_grad_input)**2).sum(axis = [1,2,3]))
     Dgrad_penalty = ((Dgrad - 1.)**2).mean()
 
+    dpars = lasagne.layers.get_all_params(discriminator)
+
+    plam = .001
+    Ploss = (dpars[0]**2).sum()
+
+    for p in dpars[1:]:
+        Ploss += (p**2).sum()
+
     lam = 10.
 
     Wdist = D_sam_out.mean() - D_dat_out.mean()
-    D_loss_exp = D_sam_out.mean() - D_dat_out.mean() + lam*Dgrad_penalty#discriminator loss
+    D_loss_exp = D_sam_out.mean() - D_dat_out.mean() + lam*Dgrad_penalty + plam * Ploss#discriminator loss
 
     G_loss_exp = - G_sam_out.mean()#generative loss
+
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     lr = .001

@@ -5,6 +5,5 @@
 *.csv
 *.sh.*
 python
-logfiles
 taka
-FF_logs
+disc_params/

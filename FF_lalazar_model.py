@@ -63,7 +63,7 @@ np.random.seed(1)
 
 box_width = int(sys.argv[1])
 
-tag = "wgan_FF_LN_fit_" + str(box_width) + "_noJ_"
+tag = "wgan_FF_" + str(box_width) + "_"
 
 #tag += "slow_"
 
@@ -73,8 +73,8 @@ start_params = [np.log(2.),np.log(.1),np.log(3875),-5.,np.log(25.25),np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
-curves = np.array([[x if x > 5 else 0 for x in tc] for tc in curves])
-curves = np.array([(x - x.mean())/(x.max() - x.min() + .001) for x in curves])
+#curves = np.array([[x if x > 5 else 0 for x in tc] for tc in curves])
+#curves = np.array([(x - x.mean())/(x.max() - x.min() + .001) for x in curves])
 
 X_pos = read_dat("lalazar_data/XCellsFull.dat")
 Y_pos = read_dat("lalazar_data/YCellsFull.dat")
@@ -88,7 +88,7 @@ THR_del = theano.shared(np.float32(start_params[4]),name = "s_W")
 Js = theano.shared(np.float32(start_params[2]),name = "mean_b")
 As = theano.shared(np.float32(start_params[5]),name = "mean_b")
 
-PARAM = [RF_low,RF_del,THR,THR_del]
+PARAM = [RF_low,RF_del,THR,THR_del,Js]
 
 def run_GAN(mode = "WGAN"):
 
@@ -397,7 +397,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     dpars = lasagne.layers.get_all_params(discriminator)
 
-    plam = .001
+    plam = .0001
     Ploss = (dpars[0]**2).sum()
 
     for p in dpars[1:]:
@@ -417,7 +417,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
     b1 = .5
     b2 = .9
 
-    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(discriminator, trainable=True), 10*lr,beta1 = b1,beta2 = b2)#discriminator training function
+    D_updates = lasagne.updates.adam(D_loss_exp, lasagne.layers.get_all_params(discriminator, trainable=True), lr,beta1 = b1,beta2 = b2)#discriminator training function
     G_updates = lasagne.updates.adam(G_loss_exp, Gparams, lr,beta1 = b1,beta2 = b2)
 
     G_train_func = theano.function(Ginputs,G_loss_exp,updates = G_updates,allow_input_downcast = True,on_unused_input = 'ignore')

@@ -63,13 +63,13 @@ np.random.seed(1)
 
 box_width = int(sys.argv[1])
 
-tag = "wgan_FF_" + str(box_width) + "_"
+tag = "wgan_FF_" + str(box_width) + "_big_"
 
 #tag += "slow_"
 
 print(tag)
 
-start_params = [np.log(2.),np.log(.1),np.log(3875),-5.,np.log(25.25),np.log(1.)]
+start_params = [np.log(2.),np.log(.1),np.log(3875),0.,np.log(10.),np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
@@ -159,7 +159,7 @@ def run_GAN(mode = "WGAN"):
     NOBS = 1
     INSHAPE = (NSAM,NI,NOBS)
 
-    layers = [128,128]
+    layers = [256,256,256]
     
     def make_mask():
         sel = np.random.choice(np.arange(NHID),NOBS)

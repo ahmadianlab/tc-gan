@@ -63,13 +63,13 @@ np.random.seed(1)
 
 box_width = int(sys.argv[1])
 
-tag = "wgan_FF_" + str(box_width) + "_big_"
+tag = "wgan_FF_" + str(box_width) + "_"
 
 #tag += "slow_"
 
 print(tag)
 
-start_params = [np.log(2.),np.log(.1),np.log(3875),0.,np.log(10.),np.log(1.)]
+start_params = [np.log(2.),np.log(.3),np.log(1000),0.,np.log(1.),np.log(1.)]
 
 #import the data
 curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
@@ -159,7 +159,7 @@ def run_GAN(mode = "WGAN"):
     NOBS = 1
     INSHAPE = (NSAM,NI,NOBS)
 
-    layers = [256,256,256]
+    layers = [128,128]
     
     def make_mask():
         sel = np.random.choice(np.arange(NHID),NOBS)
@@ -397,7 +397,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     dpars = lasagne.layers.get_all_params(discriminator)
 
-    plam = .0001
+    plam = .00001
     Ploss = (dpars[0]**2).sum()
 
     for p in dpars[1:]:

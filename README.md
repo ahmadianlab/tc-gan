@@ -90,6 +90,29 @@ See also:
   `make configure-talapas`.
 
 
+## Using GPU in Talapas
+
+To use GPU in Talapas, one has to launch a job in partition `gpu` with
+flag `--gres=gpu:1`.  See also:
+[How-to Submit a GPU Job - Talapas Knowledge Base](https://hpcrcf.atlassian.net/wiki/spaces/TCP/pages/7289618/How-to+Submit+a+GPU+Job)
+
+### Quick check Theano installation
+
+Following instruction assumes that Preparation commands (see above)
+are already run.
+
+```console
+[you@ln1] $ cd PATH/TO/THIS/REPOSITORY
+[you@ln1] $ srun --partition gpu --gres=gpu:1 --pty bash
+[you@n098] $ module load cuda
+[you@n098] $ THEANO_FLAGS=device=cuda misc/with-env python -c 'import theano'
+Using cuDNN version 5110 on context None
+Mapped name None to device cuda: Tesla K80 (0000:04:00.0)
+```
+
+(where `ln1` is a head node and `n098` is a GPU node)
+
+
 ## Testing
 
 Just run:

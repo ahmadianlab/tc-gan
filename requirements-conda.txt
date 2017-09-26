@@ -3,4 +3,8 @@ theano
 pygpu
 cudnn==5.1
 matplotlib
+pandas
 pytest
+
+# "Optional" dependencies:
+ipython

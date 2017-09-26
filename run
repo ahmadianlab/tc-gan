@@ -1,7 +1,3 @@
 #!/bin/bash
 thisdir="$(dirname "${BASH_SOURCE[0]}")"
-
-# Execute run.py with python installed with conda:
-exec "${PWD}/env/bin/python" \
-     "$thisdir/run.py" \
-     "$@"
+exec "$thisdir/misc/with-env" "$thisdir/run.py" "$@"

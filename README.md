@@ -19,11 +19,15 @@ make env-update    # Update conda environment
 
 ## Preparation
 
-Just run:
+After `git checkout` just run the following commands:
+
 ```
+make configure-talapas    # IF in talapas
+make configure-default    # otherwise
 make
 ```
 
+These commands have to be run only once (in principle).
 This should prepare everything required for simulations, including
 installation of the relevant packages (such as Theano and Lasagne) and
 compilation of the C modules.  See below for more information.
@@ -61,7 +65,7 @@ Notes:
 
 ### Setup conda environment
 
-- Command `make env` creates conda environment and install packages
+- Command `make env` creates conda environment and installs packages
   listed in `requirements-conda.txt` and `requirements-pip.txt`.
 
 - Command `make env-update` re-installs packages listed in
@@ -70,6 +74,20 @@ Notes:
 
 - Packages listed in `requirements-conda.txt` are installed via
   `conda` command.
+
+
+### Per-machine configuration
+
+Some machine specific configuration is done via `misc/rc/rc.sh`.  This
+file is `source`ed from all entry points.
+
+See also:
+
+- `misc/with-env COMMAND [ARGUMENTS]` runs `COMMAND` in a bash process
+  configured with `misc/rc/rc.sh` and the conda environment.
+
+- `misc/rc/rc-talapas.sh` is used if the repository is configured with
+  `make configure-talapas`.
 
 
 ## Testing

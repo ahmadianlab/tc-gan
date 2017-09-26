@@ -88,7 +88,7 @@ def test_tuning_curve_asym_linear(io_type='asym_linear', method='parallel'):
     i_end = center + ofs + 1
 
     X = numpy.linspace(-0.5, 0.5, n_sites)
-    BAND_IN = stimuli.input(bandwidths, X, smoothness, contrast)
+    BAND_IN = stimuli.input(bandwidths, X, smoothness, [contrast])
 
     dummy_z = object()
     (actual_z,), (fps,), info = find_fixed_points(
@@ -159,7 +159,7 @@ def test_gradients():
     i_end = center + ofs + 1
 
     X = numpy.linspace(-0.5, 0.5, n_sites)
-    BAND_IN = stimuli.input(bandwidths, X, smoothness, contrast)
+    BAND_IN = stimuli.input(bandwidths, X, smoothness, [contrast])
 
     ZZ = np.reshape(conn_param['Zs'].transpose([2,0,3,1]),(1,2*n_sites,2*n_sites))
     print(ZZ.shape)

@@ -1,0 +1,6 @@
+python==3.6
+theano
+pygpu
+cudnn==5.1
+matplotlib
+pytest

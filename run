@@ -1,7 +1,7 @@
 #!/bin/bash
 thisdir="$(dirname "${BASH_SOURCE[0]}")"
-exec "$thisdir/run.py" "$@"
 
-# Note: Setting os.environ['LD_LIBRARY_PATH'] in Python interpreter
-# does not have the same effect.  It has to be done outside the
-# process.
+# Execute run.py with python installed with conda:
+exec "${PWD}/env/bin/python" \
+     "$thisdir/run.py" \
+     "$@"

@@ -1,8 +1,37 @@
 # SSN-GAN simulator
 
-## Compiling C code in the cluster node
 
-C code can be compiled by just running `make` at the root of this
+## Summary of entry points
+
+```sh
+make               # Prepare everything required for simulations
+make test          # Run unit tests
+make env-update    # Update conda environment
+./run <PATH.TO.PYTHON.MODULE> [-- ARGUMENTS]
+```
+
+
+## Requirements
+
+- `conda`
+- `gcc` or `icc`
+
+
+## Preparation
+
+Just run:
+```
+make
+```
+
+This should prepare everything required for simulations, including
+installation of the relevant packages (such as Theano and Lasagne) and
+compilation of the C modules.  See below for more information.
+
+
+### Compiling C code in the cluster node
+
+C code can be compiled by just running `make ext` at the root of this
 repository.  In the cluster machines, it's better to load latest
 version of the compiler.
 
@@ -28,3 +57,33 @@ Notes:
   compile the C code even if the compiled file (`libsnnode.so`) is
   newer than the C source code.  It is useful when trying different
   compiler and compiler options.
+
+
+### Setup conda environment
+
+- Command `make env` creates conda environment and install packages
+  listed in `requirements-conda.txt` and `requirements-pip.txt`.
+
+- Command `make env-update` re-installs packages listed in
+  `requirements-conda.txt` and `requirements-pip.txt`.  Run this
+  command if one of `requirements-*.txt` files is updated.
+
+- Packages listed in `requirements-conda.txt` are installed via
+  `conda` command.
+
+
+## Testing
+
+Just run:
+```
+make test
+```
+
+
+## Some useful commands
+
+Generate tuning curves:
+
+```sh
+./run nips_madness/analyzers/csv_tuning_curves.py -- logfiles/SSNGAN_XXX.log tcs --NZ=100
+```

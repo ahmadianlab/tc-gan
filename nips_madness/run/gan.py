@@ -25,7 +25,7 @@ import pdb
 import time
 import traceback
 
-import stimuli
+from .. import stimuli
 
 
 def learn(

@@ -528,7 +528,7 @@ def make_solver_params(
         k=DEFAULT_PARAMS['k'],
         n=DEFAULT_PARAMS['n'],
         ):
-    import stimuli
+    from . import stimuli
     from .tests.test_dynamics import numeric_w
 
     if isinstance(seed, int):
@@ -563,7 +563,7 @@ def sample_fixed_points(
         k=DEFAULT_PARAMS['k'],
         n=DEFAULT_PARAMS['n'],
         **solver_kwargs):
-    import stimuli
+    from . import stimuli
     from .tests.test_dynamics import numeric_w
 
     X = np.linspace(-0.5, 0.5, N)

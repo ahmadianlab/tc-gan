@@ -2,7 +2,7 @@ import timeit
 
 import numpy as np
 
-import stimuli
+from .. import stimuli
 from ..ssnode import solve_dynamics, solve_dynamics_python
 from ..tests.test_dynamics import numeric_w
 

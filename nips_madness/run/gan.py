@@ -12,12 +12,12 @@ import lasagne
 import numpy as np
 import scipy.io
 
-from nips_madness import utils
-from nips_madness.gradient_expressions.utils import subsample_neurons
+from .. import utils
+from ..gradient_expressions.utils import subsample_neurons
 import discriminators.simple_discriminator as SD
-import nips_madness.gradient_expressions.make_w_batch as make_w
-import nips_madness.gradient_expressions.SS_grad as SSgrad
-import nips_madness.ssnode as SSsolve
+from ..gradient_expressions import make_w_batch as make_w
+from ..gradient_expressions import SS_grad as SSgrad
+from .. import ssnode as SSsolve
 
 import json
 import os
@@ -25,17 +25,18 @@ import pdb
 import time
 import traceback
 
-import stimuli
+from .. import stimuli
 
 
-def main(datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-         loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
-         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
-         N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
-         true_IO_type, truth_size, truth_seed, n_bandwidths,
-         sample_sites, track_net_identity, init_disturbance, quiet,
-         disc_normalization,
-         run_config,timetest,convtest,testDW,DRtest):
+def learn(
+        datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
+        loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
+        rate_cost, rate_penalty_threshold, rate_penalty_no_I,
+        N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
+        true_IO_type, truth_size, truth_seed, n_bandwidths,
+        sample_sites, track_net_identity, init_disturbance, quiet,
+        disc_normalization,
+        run_config, timetest, convtest, testDW, DRtest):
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
 
     if WGAN:
@@ -717,8 +718,8 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator
 
-if __name__ == "__main__":
 
+def main(args=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     # Changing datapath is not allowed at the moment:
@@ -726,6 +727,8 @@ if __name__ == "__main__":
     parser.add_argument(
         'datapath', nargs='?',
         default=os.path.join(os.path.dirname(__file__),
+                             os.path.pardir,
+                             os.path.pardir,
                              'training_data_TCs_Ne102.mat'),
         help='Path to MATLAB data file (default: %(default)s)')
     """
@@ -853,13 +856,15 @@ if __name__ == "__main__":
         '--DRtest',default=False, action='store_true',
         help='test the R gradient')
 
-    ns = parser.parse_args()
+    ns = parser.parse_args(args)
     use_pdb = ns.pdb
     del ns.pdb
 
     # Currently works only with the following options; so let's
     # manually fix them:
     ns.datapath = os.path.join(os.path.dirname(__file__),
+                               os.path.pardir,
+                               os.path.pardir,
                                'training_data_TCs_Ne102.mat')
     ns.use_data = False
 
@@ -868,7 +873,7 @@ if __name__ == "__main__":
     run_config = vars(ns)
     # ...then use it as keyword arguments
     try:
-        main(run_config=run_config, **run_config)
+        learn(run_config=run_config, **run_config)
     except Exception:
         if use_pdb:
             traceback.print_exc()
@@ -876,3 +881,6 @@ if __name__ == "__main__":
             pdb.post_mortem()
         else:
             raise
+
+if __name__ == "__main__":
+    main()

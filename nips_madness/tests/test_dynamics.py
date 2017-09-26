@@ -9,7 +9,7 @@ import numpy as np
 
 from ..gradient_expressions import make_w_batch
 from ..ssnode import solve_dynamics, fixed_point, find_fixed_points
-import stimuli
+from .. import stimuli
 
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad

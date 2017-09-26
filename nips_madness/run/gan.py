@@ -12,12 +12,12 @@ import lasagne
 import numpy as np
 import scipy.io
 
-from nips_madness import utils
-from nips_madness.gradient_expressions.utils import subsample_neurons
+from .. import utils
+from ..gradient_expressions.utils import subsample_neurons
 import discriminators.simple_discriminator as SD
-import nips_madness.gradient_expressions.make_w_batch as make_w
-import nips_madness.gradient_expressions.SS_grad as SSgrad
-import nips_madness.ssnode as SSsolve
+from ..gradient_expressions import make_w_batch as make_w
+from ..gradient_expressions import SS_grad as SSgrad
+from .. import ssnode as SSsolve
 
 import json
 import os

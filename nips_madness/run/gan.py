@@ -1,6 +1,6 @@
 """
 
-Run SSN-GAN learning given a MATLAB data file.
+Run SSN-GAN learning.
 
 """
 
@@ -10,7 +10,6 @@ import theano
 import theano.tensor as T
 import lasagne
 import numpy as np
-import scipy.io
 
 from .. import utils
 from ..gradient_expressions.utils import subsample_neurons
@@ -29,15 +28,15 @@ from .. import stimuli
 
 
 def learn(
-        datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
+        iterations, seed, gen_learn_rate, disc_learn_rate,
+        loss, layers, n_samples, debug, WGAN, WGAN_lambda,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
-        N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
+        n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
         sample_sites, track_net_identity, init_disturbance, quiet,
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
-    meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
+    meta_info = utils.get_meta_info(packages=[np, theano, lasagne])
 
     if WGAN:
         def make_functions(**kwds):
@@ -49,14 +48,8 @@ def learn(
 
 
     ##Make the tag for the files
-    #tag whether or not we use data
-    if use_data:
-        tag = "data_"
-    else:
-        tag = "generated_"
-
     #tag the IO and loss
-    tag = tag + IO_type + "_" + loss
+    tag = IO_type + "_" + loss
 
     #tag the layers
     for l in layers:
@@ -78,24 +71,13 @@ def learn(
         tag = "DEBUG"
     ############################
 
-
     np.random.seed(seed)
 
-    # Load data and "experiment" parameter (note that all [0]s are to
-    # get rid of redundant dimensions of the MATLAB data and not
-    # throwing away data):
-    mat = scipy.io.loadmat(datapath)
-    L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
-    smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
-
-#    contrast = [mat['Modelparams'][0, 0]['c'][0, 0]]
-
+    L = 8
+    smoothness = 0.25 / L
     contrast = [5,10,20]
-
-    n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
-    coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
-    exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
-    data = mat['E_Tuning']      # shape: (N_data, nb)
+    coe_value = 0.01  # k
+    exp_value = 2.2   # n
 
     if n_bandwidths == 4:
         bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
@@ -106,9 +88,6 @@ def learn(
     else:
         raise ValueError('Unknown number of bandwidths: {}'
                          .format(n_bandwidths))
-
-    if N > 0:
-        n_sites = N
 
     ssn_params = dict(
         dt=dt,
@@ -121,22 +100,21 @@ def learn(
         r0=np.zeros(2 * n_sites),
     )
 
-    if not use_data:
-        if not true_IO_type:
-            true_IO_type = IO_type
-        print("Generating the truth...")
-        data, _ = SSsolve.sample_tuning_curves(
-            sample_sites=sample_sites,
-            NZ=truth_size,
-            seed=truth_seed,
-            bandwidths=bandwidths,
-            smoothness=smoothness,
-            contrast=contrast,
-            N=n_sites,
-            track_net_identity=track_net_identity,
-            **dict(ssn_params, io_type=true_IO_type))
-        print("DONE")
-        data = np.array(data.T)      # shape: (N_data, nb)
+    if not true_IO_type:
+        true_IO_type = IO_type
+    print("Generating the truth...")
+    data, _ = SSsolve.sample_tuning_curves(
+        sample_sites=sample_sites,
+        NZ=truth_size,
+        seed=truth_seed,
+        bandwidths=bandwidths,
+        smoothness=smoothness,
+        contrast=contrast,
+        N=n_sites,
+        track_net_identity=track_net_identity,
+        **dict(ssn_params, io_type=true_IO_type))
+    print("DONE")
+    data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
     if track_net_identity:
@@ -154,7 +132,7 @@ def learn(
     #these are parameters we will use to test the GAN
     J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float64"),name = "j")
     D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float64"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L_mat).astype("float64"),name = "s")
+    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L).astype("float64"),name = "s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
@@ -722,16 +700,6 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 def main(args=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    # Changing datapath is not allowed at the moment:
-    """
-    parser.add_argument(
-        'datapath', nargs='?',
-        default=os.path.join(os.path.dirname(__file__),
-                             os.path.pardir,
-                             os.path.pardir,
-                             'training_data_TCs_Ne102.mat'),
-        help='Path to MATLAB data file (default: %(default)s)')
-    """
     parser.add_argument(
         '--iterations', default=100000, type=int,
         help='Number of iterations (default: %(default)s)')
@@ -761,9 +729,8 @@ def main(args=None):
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')
     parser.add_argument(
-        '--N', '-N', default=201, type=int,
-        help='''Number of excitatory neurons in SSN. If 0, use the
-        value recorded in the MATLAB file at `datapath`. (default:
+        '--N', '-N', dest='n_sites', default=201, type=int,
+        help='''Number of excitatory neurons in SSN. (default:
         %(default)s)''')
     parser.add_argument(
         '--dt', default=5e-4, type=float,
@@ -859,14 +826,6 @@ def main(args=None):
     ns = parser.parse_args(args)
     use_pdb = ns.pdb
     del ns.pdb
-
-    # Currently works only with the following options; so let's
-    # manually fix them:
-    ns.datapath = os.path.join(os.path.dirname(__file__),
-                               os.path.pardir,
-                               os.path.pardir,
-                               'training_data_TCs_Ne102.mat')
-    ns.use_data = False
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:

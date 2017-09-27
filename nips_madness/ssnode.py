@@ -448,7 +448,6 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
 
         def submit():
             Z, W = next(Z_W_gen)
-            worker, next(indices), Z, W
             pool.apply_async(worker, (next(indices), Z, W))
             nonlocals['consumed'] += 1
 

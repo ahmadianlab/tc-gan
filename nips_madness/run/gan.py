@@ -719,12 +719,6 @@ def main(args=None):
     parser.add_argument(
         '--disc-learn-rate', default=0.001, type=float,
         help='Learning rate for discriminator (default: %(default)s)')
-    # Cannot use MATLAB data at the moment:
-    """
-    parser.add_argument(
-        '--use-data', default=False, action='store_true',
-        help='Use data (True) or generate our own TC samples (False) (default: %(default)s)')
-    """
     parser.add_argument(
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')

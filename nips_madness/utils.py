@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -70,3 +71,16 @@ class StopWatch(object):
 
     def sum(self):
         return sum(self.times)
+
+
+def cpu_count(_environ=os.environ):
+    """ Return available number of CPUs; Slurm/PBS-aware version. """
+    try:
+        return int(_environ['SLURM_CPUS_ON_NODE'])
+    except (KeyError, ValueError):
+        pass
+    try:
+        return int(_environ['PBS_NUM_PPN'])
+    except (KeyError, ValueError):
+        pass
+    return multiprocessing.cpu_count()

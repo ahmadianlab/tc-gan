@@ -33,11 +33,11 @@ def learn(
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
-        sample_sites, track_net_identity, init_disturbance, quiet,
+        sample_sites, track_offset_identity, init_disturbance, quiet,
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
 
-    print(track_net_identity)
+    print(track_offset_identity)
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
     
     if WGAN:
@@ -170,7 +170,7 @@ def learn(
                 contrast=[CON[0]],
                 offset=[CON[1]],
                 N=n_sites,
-                track_net_identity=track_net_identity,
+                track_offset_identity=track_offset_identity,
                 **dict(ssn_params, io_type=true_IO_type))
             
             data.append(DAT)
@@ -179,7 +179,7 @@ def learn(
         print(data.shape)
         
     # Check for sanity:
-    if track_net_identity:
+    if track_offset_identity:
         assert len(bandwidths) * sample_sites == data.shape[-1]
     else:
         assert len(bandwidths) == data.shape[-1]
@@ -288,7 +288,7 @@ def learn(
     
     G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
         rate_vector=rvec, NZ=NZ, NB=NB, NCOND = conditions.shape[-1], LOSS=loss, LAYERS=layers,
-        sample_sites=sample_sites, track_net_identity=track_net_identity,
+        sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
         rate_penalty_threshold=rate_penalty_threshold,
         rate_penalty_no_I=rate_penalty_no_I,
@@ -337,7 +337,7 @@ def learn(
 
     log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
-    if track_net_identity:
+    if track_offset_identity:
         truth_size_per_batch = NZ
     else:
         truth_size_per_batch = NZ * sample_sites
@@ -468,10 +468,10 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,WGAN_lambda,disc_normalization):
+def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization):
 
     #Defines the input shape for the discriminator network
-    if track_net_identity:
+    if track_offset_identity:
         INSHAPE = [NZ, (NB + NCOND) * sample_sites]
     else:
         INSHAPE = [NZ * sample_sites, NB + NCOND]
@@ -488,7 +488,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
     # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
-                                   track_net_identity=track_net_identity)
+                                   track_offset_identity=track_offset_identity)
     cond_fake = T.matrix("fake conditions","float32")
 
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
@@ -629,11 +629,12 @@ def main(args=None):
         help='''Number of neurons per SSN to be sampled (i.e., fed to
         the discriminator). (default: %(default)s)''')
     parser.add_argument(
-        '--track_net_identity', action='store_true',
+        '--track_offset_identity', action='store_true',
         help='''If False (default), squash all neurons into NZ axis;
-        i.e., forget from which network the neurons are sampled.  If
-        True, stack samples into NB axis; i.e., let discriminator know
-        that those neurons are from the same SSN.''')
+        i.e., forget from which probe offset the neurons are sampled.
+        If True, stack samples into NB axis; i.e., let discriminator
+        know that those neurons are from the different offset of the
+        same SSN.''')
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')

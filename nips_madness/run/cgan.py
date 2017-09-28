@@ -473,7 +473,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
-    cond_scale = theano.shared(np.array([[1.,50.]]).astype("float32"))
+    cond_scale = theano.shared(np.array([[1.,50.]]).astype("float32"),broadcastable = (True,False))
 
     red_R_true = T.matrix("reduced rates","float32")#data
     cond_true = T.matrix("true conditions","float32")

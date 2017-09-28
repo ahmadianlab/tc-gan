@@ -34,6 +34,7 @@ def learn(
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
         sample_sites, track_net_identity, init_disturbance, quiet,
+        contrast,
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
     meta_info = utils.get_meta_info(packages=[np, theano, lasagne])
@@ -75,7 +76,6 @@ def learn(
 
     L = 8
     smoothness = 0.25 / L
-    contrast = [5,10,20]
     coe_value = 0.01  # k
     exp_value = 2.2   # n
 
@@ -744,6 +744,11 @@ def main(args=None):
         i.e., forget from which network the neurons are sampled.  If
         True, stack samples into NB axis; i.e., let discriminator know
         that those neurons are from the same SSN.''')
+    parser.add_argument(
+        '--contrast',
+        default=[5, 10, 20],
+        type=utils.csv_line(float),
+        help='Comma separated value of floats')
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')

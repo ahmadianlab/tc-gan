@@ -73,6 +73,31 @@ class StopWatch(object):
         return sum(self.times)
 
 
+def csv_line(value_parser):
+    """
+    Return a function that parses a line of comma separated values.
+
+    Examples:
+
+    >>> csv_line(int)('1, 2, 3')
+    [1, 2, 3]
+    >>> csv_line(float)('0.5, 1.5')
+    [0.5, 1.5]
+
+    For example, it can be passed to type argument of
+    `argparse.ArgumentParser.add_argument` as follows::
+
+        parser.add_argument(
+            ...,
+            type=csv_line(float),
+            help='Comma separated value of floats')
+
+    """
+    def convert(string):
+        return list(map(value_parser, string.split(',')))
+    return convert
+
+
 def cpu_count(_environ=os.environ):
     """ Return available number of CPUs; Slurm/PBS-aware version. """
     try:

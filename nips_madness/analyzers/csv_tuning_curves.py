@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 
-from ..utils import make_progressbar
+from ..utils import make_progressbar, csv_line
 from ..ssnode import DEFAULT_PARAMS
 from .loader import load_gandata
 from .distdiff import generated_tuning_curves
@@ -58,7 +58,7 @@ def main(args=None):
     parser.add_argument(
         '--bandwidths',
         default=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
-        type=lambda x: list(map(float, x.split(','))),
+        type=csv_line(float),
         help='Comma separated value of floats')
     parser.add_argument(
         '--sample-sites',

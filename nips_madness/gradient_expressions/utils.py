@@ -21,7 +21,7 @@ def sample_slice(N, sample_sites):
 
 
 def subsample_neurons(rate_vector, sample_sites,
-                      track_net_identity=False,
+                      track_offset_identity=False,
                       N=None, NZ=None, NB=None):
     """
     Reduce `rate_vector` into a form that can be fed to the discriminator.
@@ -32,11 +32,11 @@ def subsample_neurons(rate_vector, sample_sites,
     ----------
     rate_vector : array of shape (NZ, NB, 2N)
         Output of the SSN.
-    track_net_identity : bool
+    track_offset_identity : bool
         If False, squash all neurons into NZ axis; i.e., forget from
-        which network the neurons are sampled.  If True, stack samples
+        which probe offset the neurons are sampled.  If True, stack samples
         into NB axis; i.e., let discriminator know that those neurons
-        are from the same SSN.
+        are from the different offset of the same SSN.
 
     Examples
     --------
@@ -84,7 +84,7 @@ def subsample_neurons(rate_vector, sample_sites,
 
     probe = sample_slice(N, sample_sites)
     subsample = rate_vector[:, :, probe]
-    if track_net_identity:
+    if track_offset_identity:
         return subsample.reshape((NZ, -1))
     else:
         return subsample.swapaxes(1, 2).reshape((-1, NB))

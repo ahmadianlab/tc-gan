@@ -33,7 +33,7 @@ def learn(
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
-        sample_sites, track_net_identity, init_disturbance, quiet,
+        sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
@@ -112,14 +112,14 @@ def learn(
         smoothness=smoothness,
         contrast=contrast,
         N=n_sites,
-        track_net_identity=track_net_identity,
+        track_offset_identity=track_offset_identity,
         **dict(ssn_params, io_type=true_IO_type))
     print("DONE")
     data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
     n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
-    if track_net_identity:
+    if track_offset_identity:
         assert n_stim * sample_sites == data.shape[-1]
     else:
         assert n_stim == data.shape[-1]
@@ -350,7 +350,7 @@ def learn(
     
     G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
         rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
-        sample_sites=sample_sites, track_net_identity=track_net_identity,
+        sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
         rate_penalty_threshold=rate_penalty_threshold,
         rate_penalty_no_I=rate_penalty_no_I,
@@ -400,7 +400,7 @@ def learn(
 
     log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
-    if track_net_identity:
+    if track_offset_identity:
         truth_size_per_batch = NZ
     else:
         truth_size_per_batch = NZ * sample_sites
@@ -517,10 +517,10 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,disc_normalization):
+def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization):
 
     #Defines the input shape for the discriminator network
-    if track_net_identity:
+    if track_offset_identity:
         INSHAPE = [NZ, NB * sample_sites]
     else:
         INSHAPE = [NZ * sample_sites, NB]
@@ -532,7 +532,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
-                                   track_net_identity=track_net_identity)
+                                   track_offset_identity=track_offset_identity)
 
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
 
@@ -603,10 +603,10 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator
 
-def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,WGAN_lambda,disc_normalization):
+def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization):
 
     #Defines the input shape for the discriminator network
-    if track_net_identity:
+    if track_offset_identity:
         INSHAPE = [NZ, NB * sample_sites]
     else:
         INSHAPE = [NZ * sample_sites, NB]
@@ -618,7 +618,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
-                                   track_net_identity=track_net_identity)
+                                   track_offset_identity=track_offset_identity)
 
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
 
@@ -741,11 +741,12 @@ def main(args=None):
         help='''Number of neurons per SSN to be sampled (i.e., fed to
         the discriminator). (default: %(default)s)''')
     parser.add_argument(
-        '--track_net_identity', action='store_true',
+        '--track_offset_identity', action='store_true',
         help='''If False (default), squash all neurons into NZ axis;
-        i.e., forget from which network the neurons are sampled.  If
-        True, stack samples into NB axis; i.e., let discriminator know
-        that those neurons are from the same SSN.''')
+        i.e., forget from which probe offset the neurons are sampled.
+        If True, stack samples into NB axis; i.e., let discriminator
+        know that those neurons are from the different offset of the
+        same SSN.''')
     parser.add_argument(
         '--contrast',
         default=[5, 10, 20],

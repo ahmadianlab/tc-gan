@@ -581,11 +581,12 @@ def sample_fixed_points(
     return find_fixed_points(NZ, Z_W_gen(), exts, **solver_kwargs)
 
 
-def sample_tuning_curves(sample_sites=3, track_net_identity=False, **kwargs):
+def sample_tuning_curves(sample_sites=3, track_offset_identity=False,
+                         **kwargs):
     _, rates, _ = sample = sample_fixed_points(**kwargs)
     rates = np.array(rates)
     tunings = subsample_neurons(rates, sample_sites,
-                                track_net_identity=track_net_identity).T
+                                track_offset_identity=track_offset_identity).T
     return tunings, sample
 
 

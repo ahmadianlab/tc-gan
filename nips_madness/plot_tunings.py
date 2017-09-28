@@ -8,17 +8,17 @@ from .ssnode import sample_tuning_curves, DEFAULT_PARAMS
 
 def plot_tunings(bandwidths=DEFAULT_PARAMS['bandwidths'],
                  sample_sites=3,
-                 track_net_identity=False,
+                 track_offset_identity=False,
                  linewidth=0.2, ylim=(None, None),
                  **sample_kwargs):
     tunings, sample = sample_tuning_curves(
         bandwidths=bandwidths,
         sample_sites=sample_sites,
-        track_net_identity=track_net_identity,
+        track_offset_identity=track_offset_identity,
         **sample_kwargs)
 
     xlabel = 'Bandwidths'
-    if track_net_identity:
+    if track_offset_identity:
         bandwidths = np.asarray(bandwidths)
         bandwidths = np.concatenate([
             bandwidths + i for i in range(sample_sites)

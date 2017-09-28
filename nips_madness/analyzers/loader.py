@@ -108,9 +108,9 @@ class GANData(object):
             yield list(map(np.exp, log_JDS))
 
     @property
-    def track_net_identity(self):
+    def track_offset_identity(self):
         try:
-            return self.info['run_config']['track_net_identity']
+            return self.info['run_config']['track_offset_identity']
         except (AttributeError, KeyError):
             return False
 
@@ -130,7 +130,7 @@ class GANData(object):
 
     @property
     def n_bandwidths_viz(self):
-        if self.track_net_identity:
+        if self.track_offset_identity:
             return self.n_bandwidths * self.sample_sites
         else:
             return self.n_bandwidths
@@ -151,7 +151,7 @@ class GANData(object):
             pass
         else:
             bandwidths = np.array(bandwidths)
-            if self.track_net_identity:
+            if self.track_offset_identity:
                 # For visualization purpose, let's shift bandwidths of
                 # different sample sites:
                 return np.concatenate([

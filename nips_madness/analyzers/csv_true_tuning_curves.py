@@ -5,6 +5,7 @@ import os
 import numpy as np
 
 from ..ssnode import DEFAULT_PARAMS, sample_tuning_curves
+from ..utils import csv_line
 from .loader import load_gandata
 
 
@@ -48,8 +49,10 @@ def main(args=None):
         help='Comma separated value of floats')
     parser.add_argument(
         '--sample-sites',
-        default=3,
-        help='Number of neurons per SSN to be sampled.')
+        default=[0], type=csv_line(float),
+        help='''Locations (offsets) of neurons to be sampled from SSN in the
+        "bandwidth" space [-1, 1].  0 means the center of the
+        network. (default: %(default)s)''')
     parser.add_argument(
         '--NZ', default=1000, type=int,
         help='Number of SSNs to be sampled.')

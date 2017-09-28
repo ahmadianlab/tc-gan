@@ -581,7 +581,7 @@ def sample_fixed_points(
     return find_fixed_points(NZ, Z_W_gen(), exts, **solver_kwargs)
 
 
-def sample_tuning_curves(sample_sites=3, track_offset_identity=False,
+def sample_tuning_curves(sample_sites=[0], track_offset_identity=False,
                          **kwargs):
     _, rates, _ = sample = sample_fixed_points(**kwargs)
     rates = np.array(rates)

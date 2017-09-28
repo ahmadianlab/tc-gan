@@ -750,7 +750,7 @@ def main(args=None):
         same SSN.''')
     parser.add_argument(
         '--contrast',
-        default=[5, 10, 20],
+        default=[5, 10, 30],
         type=utils.csv_line(float),
         help='Comma separated value of floats')
     parser.add_argument(

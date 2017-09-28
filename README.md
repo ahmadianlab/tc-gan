@@ -6,6 +6,7 @@
 ```sh
 make               # Prepare everything required for simulations
 make test          # Run unit tests
+make test-quick    # Run unit tests, excluding slow tests
 make env-update    # Update conda environment
 ./run <PATH.TO.PYTHON.MODULE> [-- ARGUMENTS]
 ```

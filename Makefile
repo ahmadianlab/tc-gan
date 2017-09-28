@@ -8,5 +8,8 @@ ext: misc/rc/rc.sh env
 test:
 	misc/with-env pytest
 
+test-quick:
+	misc/with-env pytest -k 'not slowtest'
+
 include misc/conda.mk
 include misc/rc/setup.mk

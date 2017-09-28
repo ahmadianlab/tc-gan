@@ -35,6 +35,7 @@ def learn(
         N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
+        contrast,
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
 
@@ -91,10 +92,6 @@ def learn(
     L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
     smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
 
-#    contrast = [mat['Modelparams'][0, 0]['c'][0, 0]]
-
-    contrast = [5,20,40]
-
     n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
     coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
     exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
@@ -126,7 +123,7 @@ def learn(
         r0=np.zeros(2 * n_sites),
     )
 
-    COS = np.array([5.,10.,20.])
+    COS = contrast
     OFS = np.array([-.5,0,.5])
 
     conditions = np.array([[c,o] for c in COS for o in OFS])
@@ -638,6 +635,11 @@ def main(args=None):
         If True, stack samples into NB axis; i.e., let discriminator
         know that those neurons are from the different offset of the
         same SSN.''')
+    parser.add_argument(
+        '--contrast',
+        default=[5, 10, 20],
+        type=utils.csv_line(float),
+        help='Comma separated value of floats')
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')

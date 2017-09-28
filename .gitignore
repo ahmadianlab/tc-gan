@@ -1,6 +1,6 @@
 *.log
 *.pyc
-*.mat
+/*.mat
 *.so
 *.csv
 *.sh.*

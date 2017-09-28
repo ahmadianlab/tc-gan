@@ -21,6 +21,7 @@ import scipy.optimize
 
 from .clib import libssnode, double_ptr
 from .gradient_expressions.utils import subsample_neurons
+from .utils import cpu_count
 
 
 DEFAULT_PARAMS = dict(
@@ -444,11 +445,10 @@ def find_fixed_points_parallel(num, Z_W_gen, exts, no_pool=False,
             worker(next(indices), Z, W)
             nonlocals['consumed'] += 1
     else:
-        pool = multiprocessing.dummy.Pool()
+        pool = multiprocessing.dummy.Pool(cpu_count())
 
         def submit():
             Z, W = next(Z_W_gen)
-            worker, next(indices), Z, W
             pool.apply_async(worker, (next(indices), Z, W))
             nonlocals['consumed'] += 1
 

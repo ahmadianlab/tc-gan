@@ -7,12 +7,17 @@ import numpy
 from matplotlib import pyplot
 import numpy as np
 
+from .. import assets
 from ..gradient_expressions import make_w_batch
 from ..ssnode import solve_dynamics, fixed_point, find_fixed_points
 from .. import stimuli
 
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
+
+
+def loadmat(path, **kwds):
+    return scipy.io.loadmat(assets.path(path), **kwds)
 
 
 J = T.matrix("j", "float32")
@@ -36,7 +41,7 @@ def numeric_w(Z, J, D, S):
 
 
 def test_weight():
-    conn_param = scipy.io.loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
+    conn_param = loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
     scale_mat = 8
     mz = conn_param['Zs']
     J = conn_param['Targetparams']['Jlow'][0, 0]
@@ -69,8 +74,8 @@ def asserting_div(num, divisor, desired_reminder):
 
 
 def test_tuning_curve_asym_linear(io_type='asym_linear', method='parallel'):
-    conn_param = scipy.io.loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
-    model_param = scipy.io.loadmat('training_data_TCs_Ne51-Zs.mat')
+    conn_param = loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
+    model_param = loadmat('training_data_TCs_Ne51-Zs.mat')
 
     W = conn_param['W'].toarray()
     L_mat = model_param['Modelparams'][0, 0]['L'][0, 0]
@@ -133,9 +138,8 @@ def test_inf():
 
 
 def test_gradients():
-    conn_param = scipy.io.loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
-    model_param = scipy.io.loadmat('training_data_TCs_Ne51-Zs.mat')
-
+    conn_param = loadmat('target_parameters_GAN-SSN_Ne51-Zs.mat')
+    model_param = loadmat('training_data_TCs_Ne51-Zs.mat')
 
     dub = conn_param['W'].toarray()
     L_mat = model_param['Modelparams'][0, 0]['L'][0, 0]

@@ -1,6 +1,6 @@
 """
 
-Run SSN-GAN learning.
+Run SSN-GAN learning given a MATLAB data file.
 
 """
 
@@ -10,10 +10,10 @@ import theano
 import theano.tensor as T
 import lasagne
 import numpy as np
+import scipy.io
 
 from .. import utils
-from ..gradient_expressions.utils import subsample_neurons, \
-    sample_sites_from_stim_space
+from ..gradient_expressions.utils import subsample_neurons
 import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
@@ -27,21 +27,19 @@ import traceback
 
 from .. import stimuli
 
-
 def learn(
-        iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, layers, n_samples, debug, WGAN_lambda,
+        datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
+        loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
-        n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
+        N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
-        sample_sites, track_offset_identity, init_disturbance, quiet,
-        contrast,
+        sample_sites, track_net_identity, init_disturbance, quiet,
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
-    meta_info = utils.get_meta_info(packages=[np, theano, lasagne])
-    sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
 
-    WGAN = loss == 'WD'
+    print(track_net_identity)
+    meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
+    
     if WGAN:
         def make_functions(**kwds):
             return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
@@ -49,22 +47,28 @@ def learn(
     else:
         make_functions = make_RGAN_functions
         train_update = RGAN_update
-
+        
     print(use_data)
-
+    
     ##Make the tag for the files
+    #tag whether or not we use data
+    if use_data:
+        tag = "data_"
+    else:
+        tag = "generated_"
+        
     #tag the IO and loss
-    tag = IO_type + "_" + loss
-
+    tag = tag + IO_type + "_" + loss
+    
     #tag the layers
     for l in layers:
         tag = tag + "_" + str(l)
-
+        
     #tag the rate cost
     if float(rate_cost) > 0:
         tag = tag + "_" + str(rate_cost)
     rate_cost = float(rate_cost)
-
+    
     if WGAN:
         tag = tag + "_WGAN"
     else:
@@ -78,10 +82,21 @@ def learn(
 
     np.random.seed(seed)
 
-    L = 8
-    smoothness = 0.25 / L
-    coe_value = 0.01  # k
-    exp_value = 2.2   # n
+    # Load data and "experiment" parameter (note that all [0]s are to
+    # get rid of redundant dimensions of the MATLAB data and not
+    # throwing away data):
+    mat = scipy.io.loadmat(datapath)
+    L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
+    smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
+
+#    contrast = [mat['Modelparams'][0, 0]['c'][0, 0]]
+
+    contrast = [5,20,40]
+
+    n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
+    coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
+    exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
+    data = mat['E_Tuning']      # shape: (N_data, nb)
 
     if n_bandwidths == 4:
         bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
@@ -92,6 +107,11 @@ def learn(
     else:
         raise ValueError('Unknown number of bandwidths: {}'
                          .format(n_bandwidths))
+
+    if N > 0:
+        n_sites = N
+
+
 
     ssn_params = dict(
         dt=dt,
@@ -104,28 +124,65 @@ def learn(
         r0=np.zeros(2 * n_sites),
     )
 
-    if not true_IO_type:
-        true_IO_type = IO_type
-    print("Generating the truth...")
-    data, _ = SSsolve.sample_tuning_curves(
-        sample_sites=sample_sites,
-        NZ=truth_size,
-        seed=truth_seed,
-        bandwidths=bandwidths,
-        smoothness=smoothness,
-        contrast=contrast,
-        N=n_sites,
-        track_offset_identity=track_offset_identity,
-        **dict(ssn_params, io_type=true_IO_type))
-    print("DONE")
-    data = np.array(data.T)      # shape: (N_data, nb)
+    COS = np.array([5.,10.,20.])
+    OFS = np.array([-.5,0,.5])
 
+    conditions = np.array([[c,o] for c in COS for o in OFS])
+
+    #specifying the shape of model/input
+    n = theano.shared(n_sites,name = "n_sites")
+    nz = theano.shared(n_samples*len(conditions),name = 'n_samples')
+    nb = theano.shared(len(bandwidths),name = 'n_stim')
+
+    ##getting regular nums##
+    N = int(n.get_value())
+    NZ = int(nz.get_value())
+    NB = int(nb.get_value())
+    ###
+
+    #array that computes the positions
+    X = theano.shared(np.linspace(-1.,1.,n.get_value()).astype("float32"),name = "positions")
+    
+    pos_num = X.get_value()
+    def input_function(cond):
+        return np.array([stimuli.input(bandwidths, pos_num, smoothness,[c[0]],[c[1]]) for c in cond])
+
+    temp_con = np.tile(np.reshape(conditions,[len(conditions),1,2]),[1,n_samples,1])
+    temp_con = np.reshape(temp_con,[-1,2])
+    
+    BAND_IN = input_function(temp_con)
+    
+    data = []
+        
+    if not use_data:
+        if not true_IO_type:
+            true_IO_type = IO_type
+        print("Generating the truth...")
+
+        for CON in conditions:
+            print(CON)
+            DAT, _ = SSsolve.sample_tuning_curves(
+                sample_sites=sample_sites,
+                NZ=truth_size,
+                seed=truth_seed,
+                bandwidths=bandwidths,
+                smoothness=smoothness,
+                contrast=[CON[0]],
+                offset=[CON[1]],
+                N=n_sites,
+                track_net_identity=track_net_identity,
+                **dict(ssn_params, io_type=true_IO_type))
+            
+            data.append(DAT)
+        print("DONE")
+        data = np.array([d.T for d in data])      # shape: (ncondition,N_data, nb)
+        print(data.shape)
+        
     # Check for sanity:
-    n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
-    if track_offset_identity:
-        assert n_stim * len(sample_sites) == data.shape[-1]
+    if track_net_identity:
+        assert len(bandwidths) * sample_sites == data.shape[-1]
     else:
-        assert n_stim == data.shape[-1]
+        assert len(bandwidths) == data.shape[-1]
 
     #defining all the parameters that we might want to train
 
@@ -135,9 +192,9 @@ def learn(
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float64"),name = "j")
-    D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float64"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L).astype("float64"),name = "s")
+    J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float32"),name = "j")
+    D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float32"),name = "d")
+    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L_mat).astype("float32"),name = "s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
@@ -149,6 +206,7 @@ def learn(
         J_dis, D_dis, S_dis = dp
     else:
         J_dis = D_dis = S_dis = dp
+        
     J_dis = np.array(J_dis) * np.ones((2, 2))
     D_dis = np.array(D_dis) * np.ones((2, 2))
     S_dis = np.array(S_dis) * np.ones((2, 2))
@@ -169,22 +227,6 @@ def learn(
     dJpJ = T.reshape(T.jacobian(T.reshape(Jp,[-1]),J),[2,2,2,2])
     dDpD = T.reshape(T.jacobian(T.reshape(Dp,[-1]),D),[2,2,2,2])
     dSpS = T.reshape(T.jacobian(T.reshape(Sp,[-1]),S),[2,2,2,2])
-
-    #specifying the shape of model/input
-    n = theano.shared(n_sites,name = "n_sites")
-    nz = theano.shared(n_samples,name = 'n_samples')
-    nb = theano.shared(n_stim, name='n_stim')
-
-    #array that computes the positions
-    X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
-
-    ##getting regular nums##
-    N = int(n.get_value())
-    NZ = int(nz.get_value())
-    NB = int(nb.get_value())
-    ###
-
-    BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness, contrast)
     
     print(BAND_IN.shape)
 
@@ -224,7 +266,7 @@ def learn(
 
     #variables for rates and inputs
     rvec = T.tensor3("rvec","float32")
-    ivec = T.matrix("ivec","float32")
+    ivec = T.tensor3("ivec","float32")
 
     #DrDth tensor expressions
     WRgrad_params = dict(
@@ -233,7 +275,9 @@ def learn(
         io_type=IO_type,
         r0=rate_soft_bound,
         r1=rate_hard_bound,
+        CGAN = True,
     )
+    
     dRdJ_exp = SSgrad.WRgrad_batch(DW=dwdj, **WRgrad_params)
     dRdD_exp = SSgrad.WRgrad_batch(DW=dwdd, **WRgrad_params)
     dRdS_exp = SSgrad.WRgrad_batch(DW=dwds, **WRgrad_params)
@@ -241,119 +285,10 @@ def learn(
     dRdJ = theano.function([rvec,ivec,Z],dRdJ_exp,allow_input_downcast = True)
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
-
-    if convtest:
-        zt = np.random.rand(1,2*N,2*N)
-        wt = W_test(zt)[0]
-
-        for c in [1.,2.,4.,8.,16.]:
-            r  = SSsolve.fixed_point(wt,c*BAND_IN[-1], *ssn_params)
-        
-            print(np.max(r.x))
-        exit()
-
-    if timetest:
-        times = []
-        EE = 0
-        for k in range(100):
-            zt = np.random.rand(1,2*N,2*N)
-            wt = W_test(zt)[0]
-
-            TT1 = time.time()
-            r  = SSsolve.fixed_point(wt,BAND_IN[-1], **ssn_params)
-
-            total = time.time() - TT1
-            print(total,r.success)
-            times.append(total)
-
-
-        print("Errors {}".format(np.sum(EE)))
-        print("MAX {}".format(np.max(times)))
-        print("MIN {}".format(np.min(times)))
-        print("MEAN {}".format(np.mean(times)))
-        print("MEDIAN {}".format(np.median(times)))
-
-        exit()
-
-    #run gradient descent on W (minimize W*W)
-    if testDW:        
-        testz = Ztest
-        testI = np.random.normal(0,10,(NB,2*N)).astype("float32")
-        
-        wtest = W(testz)
-        ssR = np.asarray([[SSsolve.solve_dynamics(wtest[z],testI[b], *ssn_params)[0].astype("float32") for b in range(len(testI))] for z in range(len(testz))])
-
-        print(ssR.mean())
-        print(wtest.mean())
-        print(DWj(testz).mean())
-                
-        print("Start DWtest")
-        for k in range(1000):
-            wtest = np.reshape(W(testz),[NZ,2*N,2*N,1,1])
-            
-            dd = DWj(testz)#[nz,2N,2N,2,2]
-            dj = 2*(wtest*dd).mean(axis = (0,1,2))
-
-            dd = DWd(testz)#[nz,2N,2N,2,2]
-            dD = 2*(wtest*dd).mean(axis = (0,1,2))
-
-            dd = DWs(testz)#[nz,2N,2N,2,2]
-            ds = 2*(wtest*dd).mean(axis = (0,1,2))
-            
-            jnew = J.get_value() - .1*dj
-            dnew = D.get_value() - .1*dD
-            snew = S.get_value() - .1*ds
-            
-            J.set_value(jnew.astype("float32"))
-            D.set_value(dnew.astype("float32"))
-            S.set_value(snew.astype("float32"))
-            
-            if k % 10 == 0:
-                print((wtest*wtest).mean())
-
-        exit()
-        #running this will verify that the W gradient is working (by adjusting parameters to minimize the mean sqaured W entry)
-
-    #do gradient descent on R
-    if DRtest:
-        print("starting DR")
-    #I want to test this by adjusting the parameters to give some specified output
-         
-        inp = BAND_IN
-        Ztest = np.random.rand(NZ,2*N,2*N)
-        
-        WW = W(Ztest)
-               
-        rr1 = np.array([[SSsolve.solve_dynamics(z,b, **ssn_params)[0] for b in inp] for z in WW])
-
-        DR =[dRdJ(rr1,inp,Ztest),dRdD(rr1,inp,Ztest),dRdS(rr1,inp,Ztest)]
-               
-        dd = 0.00001
-
-        J.set_value(J.get_value() + np.array([[dd,0],[0,0]]))
-        #D.set_value(D.get_value() + np.array([[dd,0],[0,0]]))
-        #S.set_value(S.get_value() + np.array([[dd,0.],[0.,0.]]))
-
-        WW = W(Ztest)
-
-        rr2 = np.array([[SSsolve.solve_dynamics(WW[z],inp[b], **dict(ssn_params, r0=rr1[z,b]))[0] for b in range(len(inp))] for z in range(len(WW))])
-
-        print(rr2.max())
-        print(rr2.min())
-
-        print(rr1.max())
-        print(rr1.min())
-
-        DRa = (rr2 - rr1)/dd
-        DRp = DR[0][:,:,:,0,0]
-
-        print(np.max(np.abs(DRa-DRp)))
- 
-        exit()
     
     G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
-        rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
-        sample_sites=sample_sites, track_offset_identity=track_offset_identity,
+        rate_vector=rvec, NZ=NZ, NB=NB, NCOND = conditions.shape[-1], LOSS=loss, LAYERS=layers,
+        sample_sites=sample_sites, track_net_identity=track_net_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
         rate_penalty_threshold=rate_penalty_threshold,
         rate_penalty_no_I=rate_penalty_no_I,
@@ -365,7 +300,7 @@ def learn(
 
     inp = BAND_IN
 
-    def log(a,F = "SSNGAN_log_{}.log".format(tag),PRINT = True):
+    def log(a,F = "SSNCGAN_log_{}.log".format(tag),PRINT = True):
         if isinstance(a, list):
             a = ','.join(map(str, a))
         if PRINT and not quiet:
@@ -395,23 +330,23 @@ def learn(
         ), fp)
 
     # Clear data in old log files
-    for filename in ["SSNGAN_log_{}.log",
-                     "D_parameters_{}.log",
-                     "parameters_{}.log"]:
+    for filename in ["SSNCGAN_log_{}.log",
+                     "D_parameters_CGAN_{}.log",
+                     "parameters_CGAN_{}.log"]:
         open(os.path.join("logfiles", filename.format(tag)), 'w').close()
 
     log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
-    if track_offset_identity:
+    if track_net_identity:
         truth_size_per_batch = NZ
     else:
-        truth_size_per_batch = NZ * len(sample_sites)
+        truth_size_per_batch = NZ * sample_sites
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,n_samples,WG_repeat = 50 if k == 0 else 5)
 
-        log([k, Gloss, Dloss, D_acc(rtest, true),
+        log([k, Gloss, Dloss, D_acc(rtest, temp_con, true, temp_con),
              SSsolve_time,
              gradient_time,
              model_info.rejections,
@@ -421,7 +356,7 @@ def learn(
         Dmean = true.mean(axis = 0)
 
         log(list(GZmean) + list(Dmean),
-            F="D_parameters_{}.log".format(tag), PRINT=False)
+            F="D_parameters_CGAN_{}.log".format(tag), PRINT=False)
 
         jj = J.get_value()
         dd = D.get_value()
@@ -443,11 +378,40 @@ def learn(
                                                                  allpar[10],
                                                                  allpar[11])
         
-        log(string,F = "./parameters_{}.log".format(tag),PRINT = False)
+        log(string,F = "./parameters_CGAN_{}.log".format(tag),PRINT = False)
 
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 5):
+    '''
+    Conditional WGAN update function:
+    args:
+     D_train_func - function that updates disc. parameters
+     G_train_func - function tha tupdates generator parameters
+     iterations - number of update steps to perform
+     N - number of sites in SSN network
+     NZ - number of Zs to sample per batch
+     NB - number of bandwidths
+     data - list of datasets for each condition
+     data_cond - list of conditions, indices must match the data sets in the data list
+     W - function to generate weight matrices from Z samples
+     W_test - 
+     inp_function - a function that takes conditions and generates the corresponding network inputs.
+     ssn_params - list of SSN parameter shared variable.
+     log - logfile object.
+     D_acc - function to compute discriminator accuracy
+     get_reduced - function to get reduced set of sites.
+     DIS_red_r_true - discriminator reduced rate input variable
+     tag - tag to add onto data files
+     J - J variable
+     D - D variable
+     S - sigma variable
+     truth_size_per_batch - number of true samples to take for each condition per batch
+     WG_repeat - wgan ncritic parameter
 
+    '''
+
+    print("training")
+    
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
 
@@ -461,176 +425,79 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     # generator does not change in the loop over updates of the
     # discriminator, we generate the whole samples at once.  This
     # gives us 40% speedup in asym_tanh case:
-    with SSsolve_time:
-        z_batch, r_batch, model_info = SSsolve.find_fixed_points(
-            NZ * WG_repeat, Z_W_gen(), inp,
-            **ssn_params)
 
+    conditions = np.reshape(np.tile(np.reshape(data_cond,[len(data_cond),1,-1]),[1,truth_size_per_batch,1]),[-1,2])
+    
     for rep in range(WG_repeat):
         #the data
-        idx = np.random.choice(len(data), truth_size_per_batch)
-        true = data[idx]
+        idx = [np.random.choice(len(d), truth_size_per_batch) for d in data]
+        
+        true = np.concatenate([data[d][idx[d]] for d in range(len(idx))])
+        
+        #I need to generate the inputs for these conditions
+        
         ####
 
         #generated samples
         #
         # Update discriminator/critic given NZ true and fake samples:
 
-        eps = np.random.rand(truth_size_per_batch, 1)
+        eps = np.random.rand(truth_size_per_batch*len(data), 1)
 
-        rtest = r_batch[NZ*rep:NZ*(rep+1)]
+        with SSsolve_time:
+            rtest = []
+            ztest = []
+            external = input_function(conditions)
+            for d in range(len(idx)):
+                ztemp,rtemp,model_info = SSsolve.find_fixed_points(truth_size_per_batch,Z_W_gen(),external[d],**ssn_params)
+                rtest.append(rtemp)
+                ztest.append(ztemp)
+            rtest = np.array(rtest)
+            ztest = np.array(ztest)
+        
+        rtest = np.reshape(rtest,[len(idx)*truth_size_per_batch,data.shape[2],-1])
+        ztest = np.reshape(ztest,[len(idx)*truth_size_per_batch,rtest.shape[2],rtest.shape[2]])
+        
         with gradient_time:
-            Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
+            Dloss = D_train_func(rtest,conditions,true,conditions,eps*true + (1. - eps)*get_reduced(rtest),conditions)
 
     #end D loop
 
-    Ztest = z_batch[-NZ:]
     with gradient_time:
-        Gloss = G_train_func(rtest,inp,Ztest)
+        Gloss = G_train_func(rtest,conditions,input_function(conditions),ztest)
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 5):
-
-    SSsolve_time = utils.StopWatch()
-    gradient_time = utils.StopWatch()
-
-    idx = np.random.choice(len(data), truth_size_per_batch)
-    true = data[idx]
-
-    def Z_W_gen():
-        while True:
-            ztest = np.random.rand(1, 2*N, 2*N)
-            wtest, = W(ztest)
-            yield ztest[0], wtest
-
-    with SSsolve_time:
-        Ztest, Ftest, model_info = SSsolve.find_fixed_points(
-            NZ, Z_W_gen(), inp,
-            **ssn_params)
-
-    Ftest = np.array(Ftest)
-    Ztest = np.array(Ztest)
-    rtest = np.array([[c for c in TC] for TC in Ftest])
-
-    with gradient_time:
-        Dloss = D_train_func(rtest,true)
-        Gloss = G_train_func(rtest,inp,Ztest)
-
-    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
-
-def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization):
+def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_net_identity,WGAN_lambda,disc_normalization):
 
     #Defines the input shape for the discriminator network
-    if track_offset_identity:
-        INSHAPE = [NZ, NB * len(sample_sites)]
+    if track_net_identity:
+        INSHAPE = [NZ, (NB + NCOND) * sample_sites]
     else:
-        INSHAPE = [NZ * len(sample_sites), NB]
+        INSHAPE = [NZ * sample_sites, NB + NCOND]
+
+    print(NB)
+    print(NCOND)
+    print("input shape {}".format(INSHAPE))
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
     red_R_true = T.matrix("reduced rates","float32")#data
-
+    cond_true = T.matrix("true conditions","float32")
+    
     # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
-                                   track_offset_identity=track_offset_identity)
+                                   track_net_identity=track_net_identity)
+    cond_fake = T.matrix("fake conditions","float32")
 
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
 
     ##Input Variable Definition
-
-    in_fake = T.log(1. + red_R_fake)
-    in_true = T.log(1. + red_R_true)
-
-    #I want to make a network that takes red_R and gives a scalar output
-
-    discriminator = SD.make_net(INSHAPE, LOSS, LAYERS,
-                                normalization=disc_normalization)
-
-    #get the outputs
-    true_dis_out = lasagne.layers.get_output(discriminator, in_true)
-    fake_dis_out = lasagne.layers.get_output(discriminator, in_fake)
-
-    D_acc = theano.function([rate_vector,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
-
-    #make the loss functions
-    if LOSS == "CE":
-        SM = .9
-        true_loss_exp = -SM*np.log(true_dis_out).mean() - (1. - SM)*np.log(1. - true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
-        fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
-    elif LOSS == "LS":
-        true_loss_exp = ((true_dis_out - 1.)**2).mean() + ((fake_dis_out + 1.)**2).mean()#discriminator loss
-        fake_loss_exp = ((fake_dis_out - 1.)**2).mean()#generative loss
-    else:
-        print("Invalid loss specified")
-        exit()
-
-    if rate_penalty_no_I:
-        penalized_rate = rate_vector[:, :, :N]
-    else:
-        penalized_rate = rate_vector
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
-
-    #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator, trainable=True), d_lr)#discriminator training function
-
-    #make loss functions
-    true_loss = theano.function([red_R_true,rate_vector],true_loss_exp,allow_input_downcast = True)
-    fake_loss = theano.function([rate_vector],fake_loss_exp,allow_input_downcast = True)
-
-    #to get the grads w.r.t. the generators parameters we need to do a jacobian 
-    fake_dis_grad = T.jacobian(T.flatten(fake_loss_exp_train),rate_vector) #gradient of generator loss w.r.t rates
-    fake_dis_grad = T.reshape(fake_dis_grad,[NZ,NB,2*N])
-
-    #reshape the generator gradient to fit with Dr/Dth
-    fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,NB,2*N,1,1])
-
-    #putthem together and sum of the z,b,and N axes to get a [2,2] tensor that is the gradient of the loss w.r.t. parameters
-    dLdJ_exp = (fake_dis_grad_expanded*R_grad[0]).sum(axis = (0,1,2))
-    dLdD_exp = (fake_dis_grad_expanded*R_grad[1]).sum(axis = (0,1,2))
-    dLdS_exp = (fake_dis_grad_expanded*R_grad[2]).sum(axis = (0,1,2))
-
-    dLdJ = theano.function([rate_vector,ivec,Z],dLdJ_exp,allow_input_downcast = True)
-    dLdD = theano.function([rate_vector,ivec,Z],dLdD_exp,allow_input_downcast = True)
-    dLdS = theano.function([rate_vector,ivec,Z],dLdS_exp,allow_input_downcast = True)
-
-    G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr)
-
-    G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
-    D_train_func = theano.function([rate_vector,red_R_true],true_loss_exp,updates = D_updates,allow_input_downcast = True)
-
-    G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
-    D_loss_func = theano.function([rate_vector,red_R_true],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
-
-    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator
-
-def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization):
-
-    #Defines the input shape for the discriminator network
-    if track_offset_identity:
-        INSHAPE = [NZ, NB * len(sample_sites)]
-    else:
-        INSHAPE = [NZ * len(sample_sites), NB]
-
-    ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
-
-    red_R_true = T.matrix("reduced rates","float32")#data
-
-    # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
-    red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
-                                   sample_sites=sample_sites,
-                                   track_offset_identity=track_offset_identity)
-
-    get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
-
-    ##Input Variable Definition
-
-    in_fake = T.log(1. + red_R_fake)
-    in_true = T.log(1. + red_R_true)
+    in_fake = T.concatenate([T.log(1. + red_R_fake),cond_fake],axis = 1)
+    in_true = T.concatenate([T.log(1. + red_R_true),cond_true],axis = 1)
 
     #I want to make a network that takes red_R and gives a scalar output
-
     discriminator = SD.make_net(INSHAPE, "WGAN", LAYERS,
                                 normalization=disc_normalization)
 
@@ -638,12 +505,13 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     true_dis_out = lasagne.layers.get_output(discriminator, in_true)
     fake_dis_out = lasagne.layers.get_output(discriminator, in_fake)
 
-    D_acc = theano.function([rate_vector,red_R_true],fake_dis_out.mean() - true_dis_out.mean(),allow_input_downcast = True)
+    D_acc = theano.function([rate_vector,cond_fake,red_R_true,cond_true],fake_dis_out.mean() - true_dis_out.mean(),allow_input_downcast = True)
 
     #make the loss functions
     
     red_fake_for_grad = T.matrix("reduced rates","float32")#data
-    in_for_grad = T.log(1. + red_fake_for_grad)
+    cond_fake_for_grad = T.matrix("reduced rates","float32")#data
+    in_for_grad = T.concatenate([T.log(1. + red_fake_for_grad),cond_fake_for_grad],axis = 1)
 
     for_grad_out = lasagne.layers.get_output(discriminator, in_for_grad)
 
@@ -661,8 +529,8 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
 
     #make loss functions
-    true_loss = theano.function([red_R_true,rate_vector,red_fake_for_grad],true_loss_exp,allow_input_downcast = True)
-    fake_loss = theano.function([rate_vector],fake_loss_exp,allow_input_downcast = True)
+    true_loss = theano.function([red_R_true,cond_fake,rate_vector,cond_true,red_fake_for_grad,cond_fake_for_grad],true_loss_exp,allow_input_downcast = True)
+    fake_loss = theano.function([rate_vector,cond_fake],fake_loss_exp,allow_input_downcast = True)
 
     #Computing the G gradient!
     #
@@ -680,9 +548,9 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     dLdD_exp = (fake_dis_grad_expanded*R_grad[1]).sum(axis = (0,1,2))
     dLdS_exp = (fake_dis_grad_expanded*R_grad[2]).sum(axis = (0,1,2))
 
-    dLdJ = theano.function([rate_vector,ivec,Z],dLdJ_exp,allow_input_downcast = True)
-    dLdD = theano.function([rate_vector,ivec,Z],dLdD_exp,allow_input_downcast = True)
-    dLdS = theano.function([rate_vector,ivec,Z],dLdS_exp,allow_input_downcast = True)
+    dLdJ = theano.function([rate_vector,cond_fake,ivec,Z],dLdJ_exp,allow_input_downcast = True)
+    dLdD = theano.function([rate_vector,cond_fake,ivec,Z],dLdD_exp,allow_input_downcast = True)
+    dLdS = theano.function([rate_vector,cond_fake,ivec,Z],dLdS_exp,allow_input_downcast = True)
     ####
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
@@ -692,18 +560,29 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr,beta1 = b1,beta2 = b2)
     D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator, trainable=True), d_lr,beta1 = b1,beta2 = b2)#discriminator training function
 
-    G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
-    D_train_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,updates = D_updates,allow_input_downcast = True)
+    G_train_func = theano.function([rate_vector,cond_fake,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
+    D_train_func = theano.function([rate_vector,cond_fake,red_R_true,cond_true ,red_fake_for_grad ,cond_fake_for_grad],true_loss_exp,updates = D_updates,allow_input_downcast = True)
+    
+    G_loss_func = theano.function([rate_vector,cond_fake,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
+    D_loss_func = theano.function([rate_vector,cond_fake,red_R_true,cond_true,red_fake_for_grad,cond_fake_for_grad],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
-    D_loss_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
+    print("Gtest {}".format(G_loss_func(np.random.rand(10,NB,201),np.random.rand(10,2),np.random.rand(10,NB,201),np.random.rand(10,201,201))))
 
     return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator
-
 
 def main(args=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
+    # Changing datapath is not allowed at the moment:
+    """
+    parser.add_argument(
+        'datapath', nargs='?',
+        default=os.path.join(os.path.dirname(__file__),
+                             os.path.pardir,
+                             os.path.pardir,
+                             'training_data_TCs_Ne102.mat'),
+        help='Path to MATLAB data file (default: %(default)s)')
+    """
     parser.add_argument(
         '--iterations', default=100000, type=int,
         help='Number of iterations (default: %(default)s)')
@@ -723,12 +602,19 @@ def main(args=None):
     parser.add_argument(
         '--disc-learn-rate', default=0.001, type=float,
         help='Learning rate for discriminator (default: %(default)s)')
+    # Cannot use MATLAB data at the moment:
+    """
+    parser.add_argument(
+        '--use-data', default=False, action='store_true',
+        help='Use data (True) or generate our own TC samples (False) (default: %(default)s)')
+    """
     parser.add_argument(
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')
     parser.add_argument(
-        '--N', '-N', dest='n_sites', default=201, type=int,
-        help='''Number of excitatory neurons in SSN. (default:
+        '--N', '-N', default=201, type=int,
+        help='''Number of excitatory neurons in SSN. If 0, use the
+        value recorded in the MATLAB file at `datapath`. (default:
         %(default)s)''')
     parser.add_argument(
         '--dt', default=5e-4, type=float,
@@ -739,22 +625,15 @@ def main(args=None):
         help='''Number of time steps used for SSN fixed point finder.
         (default: %(default)s)''')
     parser.add_argument(
-        '--sample-sites', default=[0], type=utils.csv_line(float),
-        help='''Locations (offsets) of neurons to be sampled from SSN in the
-        "bandwidth" space [-1, 1].  0 means the center of the
-        network. (default: %(default)s)''')
+        '--sample-sites', default=1, type=int,
+        help='''Number of neurons per SSN to be sampled (i.e., fed to
+        the discriminator). (default: %(default)s)''')
     parser.add_argument(
-        '--track_offset_identity', action='store_true',
+        '--track_net_identity', action='store_true',
         help='''If False (default), squash all neurons into NZ axis;
-        i.e., forget from which probe offset the neurons are sampled.
-        If True, stack samples into NB axis; i.e., let discriminator
-        know that those neurons are from the different offset of the
-        same SSN.''')
-    parser.add_argument(
-        '--contrast',
-        default=[5, 10, 20],
-        type=utils.csv_line(float),
-        help='Comma separated value of floats')
+        i.e., forget from which network the neurons are sampled.  If
+        True, stack samples into NB axis; i.e., let discriminator know
+        that those neurons are from the same SSN.''')
     parser.add_argument(
         '--IO_type', default="asym_tanh",
         help='Type of nonlinearity to use. Regular ("asym_power"). Linear ("asym_linear"). Tanh ("asym_tanh") (default: %(default)s)')
@@ -771,10 +650,8 @@ def main(args=None):
         '--truth_seed', default=42, type=int,
         help='Seed for generating ground truth data (default: %(default)s)')
     parser.add_argument(
-        '--loss', default="WD",
-        choices=('WD', 'CE', 'LS'),
-        help='''Type of loss to use. Wasserstein Distance (WD), Cross-Entropy
-        ("CE") or LSGAN ("LS"). (default: %(default)s)''')
+        '--loss', default="CE",
+        help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')
     parser.add_argument(
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
@@ -802,20 +679,20 @@ def main(args=None):
         '--rate_hard_bound', default=1000, type=float,
         help='rate_hard_bound=r1 (default: %(default)s)')
     parser.add_argument(
+        '--WGAN', default=True, action='store_true',
+        help='Use WGAN (default: %(default)s)')
+    parser.add_argument(
         '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
     parser.add_argument(
+        '--pdb', action='store_true',
+        help='Drop into the Python debugger PDB on an exception.')
+    parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
-    parser.add_argument(
-        '--load-config',
-        help='''Load configuration (hyper parameters) from a JSON file
-        if given.  Note that configurations are overwritten by the
-        ones in JSON file if they are given by both in command line
-        and JSON.''')
 
     parser.add_argument(
         '--timetest',default=False, action='store_true',
@@ -831,19 +708,30 @@ def main(args=None):
         help='test the R gradient')
 
     ns = parser.parse_args(args)
+    use_pdb = ns.pdb
+    del ns.pdb
+
+    # Currently works only with the following options; so let's
+    # manually fix them:
+    ns.datapath = os.path.join(os.path.dirname(__file__),
+                               os.path.pardir,
+                               os.path.pardir,
+                               'training_data_TCs_Ne102.mat')
+    ns.use_data = False
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:
     run_config = vars(ns)
-    # ...then use it as keyword arguments for `learn()`.
-
-    if ns.load_config:
-        with open(ns.load_config) as file:
-            run_config.update(json.load(file))
-    kwargs = run_config.copy()
-    del kwargs['load_config']
-
-    learn(run_config=run_config, **kwargs)
+    # ...then use it as keyword arguments
+    try:
+        learn(run_config=run_config, **run_config)
+    except Exception:
+        if use_pdb:
+            traceback.print_exc()
+            print()
+            pdb.post_mortem()
+        else:
+            raise
 
 if __name__ == "__main__":
     main()

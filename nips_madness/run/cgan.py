@@ -30,7 +30,7 @@ from .. import stimuli
 
 def learn(
         datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
+        loss, use_data, layers, n_samples, debug, WGAN_lambda,
         WGAN_n_critic0,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
@@ -40,19 +40,12 @@ def learn(
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
 
-    print(track_offset_identity)
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
     sample_sites = sample_sites_from_stim_space(sample_sites, N)
 
-    if WGAN:
-        def make_functions(**kwds):
-            return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
-        train_update = WGAN_update
-    else:
-        make_functions = make_RGAN_functions
-        train_update = RGAN_update
-        
-    print(use_data)
+    def make_functions(**kwds):
+        return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
+    train_update = WGAN_update
     
     ##Make the tag for the files
     #tag whether or not we use data
@@ -73,10 +66,7 @@ def learn(
         tag = tag + "_" + str(rate_cost)
     rate_cost = float(rate_cost)
     
-    if WGAN:
-        tag = tag + "_WGAN"
-    else:
-        tag = tag + "_RGAN"
+    tag = tag + "_WGAN"
         
     print(tag)
     #if debug mode, throw that all away
@@ -685,9 +675,6 @@ def main(args=None):
     parser.add_argument(
         '--rate_hard_bound', default=1000, type=float,
         help='rate_hard_bound=r1 (default: %(default)s)')
-    parser.add_argument(
-        '--WGAN', default=True, action='store_true',
-        help='Use WGAN (default: %(default)s)')
     parser.add_argument(
         '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')

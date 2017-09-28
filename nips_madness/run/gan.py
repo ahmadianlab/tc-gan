@@ -813,6 +813,12 @@ def main(args=None):
     parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
+    parser.add_argument(
+        '--load-config',
+        help='''Load configuration (hyper parameters) from a JSON file
+        if given.  Note that configurations are overwritten by the
+        ones in JSON file if they are given by both in command line
+        and JSON.''')
 
     parser.add_argument(
         '--timetest',default=False, action='store_true',
@@ -834,9 +840,16 @@ def main(args=None):
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:
     run_config = vars(ns)
-    # ...then use it as keyword arguments
+    # ...then use it as keyword arguments for `learn()`.
+
+    if ns.load_config:
+        with open(ns.load_config) as file:
+            run_config.update(json.load(file))
+    kwargs = run_config.copy()
+    del kwargs['load_config']
+
     try:
-        learn(run_config=run_config, **run_config)
+        learn(run_config=run_config, **kwargs)
     except Exception:
         if use_pdb:
             traceback.print_exc()

@@ -37,6 +37,7 @@ def learn(
         true_IO_type, truth_size, truth_seed, n_bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
+        offsets,
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
 
@@ -115,7 +116,7 @@ def learn(
     )
 
     COS = contrast
-    OFS = np.array([-.5,0,.5])
+    OFS = offsets
 
     conditions = np.array([[c,o] for c in COS for o in OFS])
 
@@ -629,6 +630,11 @@ def main(args=None):
     parser.add_argument(
         '--contrast',
         default=[5, 10, 20],
+        type=utils.csv_line(float),
+        help='Comma separated value of floats')
+    parser.add_argument(
+        '--offsets',
+        default=[-.5,0,.5],
         type=utils.csv_line(float),
         help='Comma separated value of floats')
     parser.add_argument(

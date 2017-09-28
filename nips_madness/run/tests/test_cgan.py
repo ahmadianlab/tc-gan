@@ -15,5 +15,6 @@ def test_smoke_slowtest(args, cleancwd):
         '--truth_size', '1',
         '--n_samples', '1',
         '--contrast', '20',
+        '--WGAN_n_critic0', '1',
     ] + args)
     assert cleancwd.join('logfiles').check()

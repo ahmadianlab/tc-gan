@@ -31,6 +31,7 @@ from .. import stimuli
 def learn(
         datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
         loss, use_data, layers, n_samples, debug, WGAN, WGAN_lambda,
+        WGAN_n_critic0,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
@@ -343,7 +344,7 @@ def learn(
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,n_samples,WG_repeat = 50 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,n_samples,WG_repeat = WGAN_n_critic0 if k == 0 else 5)
 
         log([k, Gloss, Dloss, D_acc(rtest, temp_con, true, temp_con),
              SSsolve_time,
@@ -690,6 +691,9 @@ def main(args=None):
     parser.add_argument(
         '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')
+    parser.add_argument(
+        '--WGAN_n_critic0', default=50, type=int,
+        help='First critic iterations (default: %(default)s)')
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')

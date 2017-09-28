@@ -4,6 +4,8 @@
 *.so
 *.csv
 *.sh.*
+*~
+/.cache
 python
 taka
 disc_params/

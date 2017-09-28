@@ -50,8 +50,6 @@ def learn(
         make_functions = make_RGAN_functions
         train_update = RGAN_update
 
-    print(use_data)
-
     ##Make the tag for the files
     #tag the IO and loss
     tag = IO_type + "_" + loss

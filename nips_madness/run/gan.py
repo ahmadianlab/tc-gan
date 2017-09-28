@@ -21,9 +21,7 @@ from .. import ssnode as SSsolve
 
 import json
 import os
-import pdb
 import time
-import traceback
 
 from .. import stimuli
 

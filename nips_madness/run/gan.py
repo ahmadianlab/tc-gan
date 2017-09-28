@@ -29,7 +29,7 @@ from .. import stimuli
 
 def learn(
         iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, layers, n_samples, debug, WGAN, WGAN_lambda,
+        loss, layers, n_samples, debug, WGAN_lambda,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
@@ -39,6 +39,7 @@ def learn(
         run_config, timetest, convtest, testDW, DRtest):
     meta_info = utils.get_meta_info(packages=[np, theano, lasagne])
 
+    WGAN = loss == 'WD'
     if WGAN:
         def make_functions(**kwds):
             return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
@@ -765,8 +766,10 @@ def main(args=None):
         '--truth_seed', default=42, type=int,
         help='Seed for generating ground truth data (default: %(default)s)')
     parser.add_argument(
-        '--loss', default="CE",
-        help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')
+        '--loss', default="WD",
+        choices=('WD', 'CE', 'LS'),
+        help='''Type of loss to use. Wasserstein Distance (WD), Cross-Entropy
+        ("CE") or LSGAN ("LS"). (default: %(default)s)''')
     parser.add_argument(
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
@@ -793,9 +796,6 @@ def main(args=None):
     parser.add_argument(
         '--rate_hard_bound', default=1000, type=float,
         help='rate_hard_bound=r1 (default: %(default)s)')
-    parser.add_argument(
-        '--WGAN', default=True, action='store_true',
-        help='Use WGAN (default: %(default)s)')
     parser.add_argument(
         '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')

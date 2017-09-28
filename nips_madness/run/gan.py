@@ -118,10 +118,11 @@ def learn(
     data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
+    n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
     if track_net_identity:
-        assert len(bandwidths) * sample_sites == data.shape[-1]
+        assert n_stim * sample_sites == data.shape[-1]
     else:
-        assert len(bandwidths)*len(contrast) == data.shape[-1]
+        assert n_stim == data.shape[-1]
 
     #defining all the parameters that we might want to train
 
@@ -169,7 +170,7 @@ def learn(
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
     nz = theano.shared(n_samples,name = 'n_samples')
-    nb = theano.shared(len(bandwidths)*len(contrast),name = 'n_stim')
+    nb = theano.shared(n_stim, name='n_stim')
 
     #array that computes the positions
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")

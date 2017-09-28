@@ -13,7 +13,8 @@ import numpy as np
 import scipy.io
 
 from .. import utils
-from ..gradient_expressions.utils import subsample_neurons
+from ..gradient_expressions.utils import subsample_neurons, \
+    sample_sites_from_stim_space
 import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
@@ -39,7 +40,8 @@ def learn(
 
     print(track_offset_identity)
     meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
-    
+    sample_sites = sample_sites_from_stim_space(sample_sites, N)
+
     if WGAN:
         def make_functions(**kwds):
             return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
@@ -340,7 +342,7 @@ def learn(
     if track_offset_identity:
         truth_size_per_batch = NZ
     else:
-        truth_size_per_batch = NZ * sample_sites
+        truth_size_per_batch = NZ * len(sample_sites)
 
     for k in range(iterations):
 
@@ -472,9 +474,9 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
-        INSHAPE = [NZ, (NB + NCOND) * sample_sites]
+        INSHAPE = [NZ, (NB + NCOND) * len(sample_sites)]
     else:
-        INSHAPE = [NZ * sample_sites, NB + NCOND]
+        INSHAPE = [NZ * len(sample_sites), NB + NCOND]
 
     print(NB)
     print(NCOND)
@@ -625,9 +627,10 @@ def main(args=None):
         help='''Number of time steps used for SSN fixed point finder.
         (default: %(default)s)''')
     parser.add_argument(
-        '--sample-sites', default=1, type=int,
-        help='''Number of neurons per SSN to be sampled (i.e., fed to
-        the discriminator). (default: %(default)s)''')
+        '--sample-sites', default=[0], type=utils.csv_line(float),
+        help='''Locations (offsets) of neurons to be sampled from SSN in the
+        "bandwidth" space [-1, 1].  0 means the center of the
+        network. (default: %(default)s)''')
     parser.add_argument(
         '--track_offset_identity', action='store_true',
         help='''If False (default), squash all neurons into NZ axis;

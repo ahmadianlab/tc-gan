@@ -473,6 +473,8 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
+    cond_scale = theano.shared(np.array([[1.,50.]]).astype("float32"))
+
     red_R_true = T.matrix("reduced rates","float32")#data
     cond_true = T.matrix("true conditions","float32")
     
@@ -485,8 +487,8 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
 
     ##Input Variable Definition
-    in_fake = T.concatenate([T.log(1. + red_R_fake),cond_fake],axis = 1)
-    in_true = T.concatenate([T.log(1. + red_R_true),cond_true],axis = 1)
+    in_fake = T.concatenate([T.log(1. + red_R_fake),cond_fake/cond_scale],axis = 1)
+    in_true = T.concatenate([T.log(1. + red_R_true),cond_true/cond_scale],axis = 1)
 
     #I want to make a network that takes red_R and gives a scalar output
     discriminator = SD.make_net(INSHAPE, "WGAN", LAYERS,
@@ -502,7 +504,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
     
     red_fake_for_grad = T.matrix("reduced rates","float32")#data
     cond_fake_for_grad = T.matrix("reduced rates","float32")#data
-    in_for_grad = T.concatenate([T.log(1. + red_fake_for_grad),cond_fake_for_grad],axis = 1)
+    in_for_grad = T.concatenate([T.log(1. + red_fake_for_grad),cond_fake_for_grad/cond_scale],axis = 1)
 
     for_grad_out = lasagne.layers.get_output(discriminator, in_for_grad)
 

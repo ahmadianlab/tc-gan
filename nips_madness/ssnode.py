@@ -31,6 +31,7 @@ DEFAULT_PARAMS = dict(
     bandwidths=[0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1],
     smoothness=0.25/8,
     contrast=[20],
+    offset=[0],
     io_type='asym_tanh',
     k=0.01,
     n=2.2,
@@ -559,6 +560,7 @@ def sample_fixed_points(
         bandwidths=DEFAULT_PARAMS['bandwidths'],
         smoothness=DEFAULT_PARAMS['smoothness'],
         contrast=DEFAULT_PARAMS['contrast'],
+        offset=DEFAULT_PARAMS['offset'],
         io_type=DEFAULT_PARAMS['io_type'],
         k=DEFAULT_PARAMS['k'],
         n=DEFAULT_PARAMS['n'],
@@ -567,7 +569,7 @@ def sample_fixed_points(
     from .tests.test_dynamics import numeric_w
 
     X = np.linspace(-0.5, 0.5, N)
-    exts = stimuli.input(bandwidths, X, smoothness, contrast)
+    exts = stimuli.input(bandwidths, X, smoothness, contrast, offset)
     rs = np.random.RandomState(seed)
 
     def Z_W_gen():

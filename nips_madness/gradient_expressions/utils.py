@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def sample_slice(N, sample_sites):
+def sample_slice(N, sample_sites, step_size = 1):
     """
     Generate a slice for sampling `sample_sites` from an array of `N` neurons.
 
@@ -15,12 +15,13 @@ def sample_slice(N, sample_sites):
     array([ 98,  99, 100, 101, 102])
 
     """
-    i_beg = N // 2 - sample_sites // 2
-    i_end = i_beg + sample_sites
-    return np.s_[i_beg:i_end]
+    i_beg = N // 2 - (sample_sites * step_size) // 2
+    i_end = i_beg + sample_sites * step_size
+    return np.s_[i_beg:i_end:step_size]
 
 
 def subsample_neurons(rate_vector, sample_sites,
+                      step_size = 1,
                       track_net_identity=False,
                       N=None, NZ=None, NB=None):
     """
@@ -82,7 +83,7 @@ def subsample_neurons(rate_vector, sample_sites,
             N = TN_ // 2
         assert (NZ_, NB_, TN_) == (NZ, NB, 2 * N)
 
-    probe = sample_slice(N, sample_sites)
+    probe = sample_slice(N, sample_sites,step_size)
     subsample = rate_vector[:, :, probe]
     if track_net_identity:
         return subsample.reshape((NZ, -1))

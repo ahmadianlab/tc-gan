@@ -15,6 +15,7 @@ def rectify(x):
     return .5*(x + abs(x))
 
 def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N,
+                 CGAN = False,
                  io_type=DEFAULT_PARAMS['io_type'],
                  r0=DEFAULT_PARAMS['rate_soft_bound'],
                  r1=DEFAULT_PARAMS['rate_hard_bound']):
@@ -40,7 +41,11 @@ def WRgrad_batch(R,W,DW,I,n,k,nz,nb,N,
     wt = T.reshape(W,[nz,1,2*N,2*N])
     rt = T.reshape(R,[nz,nb,1,2*N])
 
-    V = (wt*rt).sum(axis = 3) + T.reshape(I,[1,nb,2*N]) #[nz,nb,2N]
+    if CGAN:
+        V = (wt*rt).sum(axis = 3) + I #[nz,nb,2N]    
+    else:
+        V = (wt*rt).sum(axis = 3) + T.reshape(I,[1,nb,2*N]) #[nz,nb,2N]    
+                
     V_clipped = rectify(V)
 
     if io_type == "asym_power":

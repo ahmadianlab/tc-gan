@@ -808,9 +808,6 @@ def main(args=None):
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
     parser.add_argument(
-        '--pdb', action='store_true',
-        help='Drop into the Python debugger PDB on an exception.')
-    parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
     parser.add_argument(
@@ -834,8 +831,6 @@ def main(args=None):
         help='test the R gradient')
 
     ns = parser.parse_args(args)
-    use_pdb = ns.pdb
-    del ns.pdb
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:
@@ -848,15 +843,7 @@ def main(args=None):
     kwargs = run_config.copy()
     del kwargs['load_config']
 
-    try:
-        learn(run_config=run_config, **kwargs)
-    except Exception:
-        if use_pdb:
-            traceback.print_exc()
-            print()
-            pdb.post_mortem()
-        else:
-            raise
+    learn(run_config=run_config, **kwargs)
 
 if __name__ == "__main__":
     main()

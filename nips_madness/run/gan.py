@@ -771,8 +771,15 @@ def main(args=None):
     execution.add_base_learning_options(parser)
 
     ns = parser.parse_args(args)
-    run_config = vars(ns)
+    do_learning(learn, vars(ns))
 
+
+def do_learning(learn, run_config):
+    """
+    Wrap `.execution.do_learning` with some pre-processing.
+    """
+    # Set `bandwidths` outside the `learn` function, so that
+    # `bandwidths` is stored in info.json:
     n_bandwidths = run_config.pop('n_bandwidths')
     if n_bandwidths == 4:
         bandwidths = [0.0625, 0.125, 0.25, 0.75]

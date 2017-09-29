@@ -35,6 +35,7 @@ from ..gradient_expressions.utils import subsample_neurons, \
 import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
+from .. import lasagne_param_file
 from .. import ssnode as SSsolve
 
 import time
@@ -380,9 +381,9 @@ def learn(
         datastore.tables.saverow('generator.csv', allpar)
 
         if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
-            np.savez_compressed(
-                datastore.path('disc_param', str(k), '.npz'),
-                *lasagne.layers.get_all_param_values(discriminator))
+            lasagne_param_file.dump(
+                discriminator,
+                datastore.path('disc_param', str(k), '.npz'))
 
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):

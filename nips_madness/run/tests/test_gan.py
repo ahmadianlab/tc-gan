@@ -8,6 +8,7 @@ from .. import gan
     ['--loss', 'CE'],
     ['--track_offset_identity'],
     ['--sample-sites', '0, 0.5'],
+    ['--disc-param-save-interval', '1'],
 ])
 def test_smoke_slowtest(args, cleancwd):
     gan.main([

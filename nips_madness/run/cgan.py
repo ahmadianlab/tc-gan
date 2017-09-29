@@ -228,7 +228,7 @@ def learn(
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
     
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
+    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator = make_functions(
         rate_vector=rvec, NZ=NZ, NB=NB, NCOND = conditions.shape[-1], LOSS=loss, LAYERS=layers,
         sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
@@ -253,7 +253,7 @@ def learn(
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,n_samples,WG_repeat = WGAN_n_critic0 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,D_acc,get_reduced,J,D,S,n_samples,WG_repeat = WGAN_n_critic0 if k == 0 else 5)
 
         saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, temp_con, true, temp_con),
@@ -275,7 +275,7 @@ def learn(
         datastore.tables.saverow('generator.csv', allpar)
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     '''
     Conditional WGAN update function:
@@ -294,7 +294,6 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_
      ssn_params - list of SSN parameter shared variable.
      D_acc - function to compute discriminator accuracy
      get_reduced - function to get reduced set of sites.
-     DIS_red_r_true - discriminator reduced rate input variable
      J - J variable
      D - D variable
      S - sigma variable

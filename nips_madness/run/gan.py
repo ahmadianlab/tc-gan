@@ -383,7 +383,7 @@ def learn(
         if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
             lasagne_param_file.dump(
                 discriminator,
-                datastore.path('disc_param', str(k), '.npz'))
+                datastore.path('disc_param', str(k) + '.npz'))
 
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):

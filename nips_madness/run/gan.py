@@ -19,6 +19,9 @@ the datastore:
 * info.json --- It stores parameters used for each run and some
   environment information such as the Git revision of this repository.
 
+* disc_param/<k>.npz (optional) --- Parameters of discriminator after
+  `<k>`-th generator step.  See: --disc-param-save-interval
+
 """
 
 from __future__ import print_function

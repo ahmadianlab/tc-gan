@@ -50,7 +50,7 @@ def learn(
         true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
-        disc_normalization,
+        disc_normalization, disc_param_save_interval,
         datastore,
         timetest, convtest, testDW, DRtest):
 
@@ -379,6 +379,11 @@ def learn(
         
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
         datastore.tables.saverow('generator.csv', allpar)
+
+        if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
+            np.savez_compressed(
+                datastore.path('disc_param', str(k), '.npz'),
+                *lasagne.layers.get_all_param_values(discriminator))
 
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
@@ -741,6 +746,10 @@ def main(args=None):
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
+    parser.add_argument(
+        '--disc-param-save-interval', default=-1, type=int,
+        help='''Save parameters for discriminator for each given step.
+        -1 (default) means to never save.''')
 
     parser.add_argument(
         '--quiet', action='store_true',

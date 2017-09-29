@@ -333,8 +333,8 @@ def learn(
         print(np.max(np.abs(DRa-DRp)))
  
         exit()
-    
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
+
+    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator = make_functions(
         rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
         sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
@@ -359,7 +359,7 @@ def learn(
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5)
 
         saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, true),
@@ -381,7 +381,7 @@ def learn(
         datastore.tables.saverow('generator.csv', allpar)
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -425,7 +425,7 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()

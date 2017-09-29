@@ -1,6 +1,6 @@
 """
 
-Run SSN-GAN learning given a MATLAB data file.
+Run SSN-CGAN learning.
 
 """
 
@@ -10,7 +10,6 @@ import theano
 import theano.tensor as T
 import lasagne
 import numpy as np
-import scipy.io
 
 from .. import utils
 from ..gradient_expressions.utils import subsample_neurons, \
@@ -29,11 +28,11 @@ import traceback
 from .. import stimuli
 
 def learn(
-        datapath, iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, use_data, layers, n_samples, debug, WGAN_lambda,
+        iterations, seed, gen_learn_rate, disc_learn_rate,
+        loss, layers, n_samples, debug, WGAN_lambda,
         WGAN_n_critic0,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
-        N, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
+        n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, n_bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
@@ -41,22 +40,17 @@ def learn(
         disc_normalization,
         run_config, timetest, convtest, testDW, DRtest):
 
-    meta_info = utils.get_meta_info(packages=[np, scipy, theano, lasagne])
-    sample_sites = sample_sites_from_stim_space(sample_sites, N)
+    meta_info = utils.get_meta_info(packages=[np, theano, lasagne])
+    sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
 
     def make_functions(**kwds):
         return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
     train_update = WGAN_update
     
     ##Make the tag for the files
-    #tag whether or not we use data
-    if use_data:
-        tag = "data_"
-    else:
-        tag = "generated_"
         
     #tag the IO and loss
-    tag = tag + IO_type + "_" + loss
+    tag = IO_type + "_" + loss
     
     #tag the layers
     for l in layers:
@@ -67,7 +61,7 @@ def learn(
         tag = tag + "_" + str(rate_cost)
     rate_cost = float(rate_cost)
     
-    tag = tag + "_WGAN"
+    tag = tag + "_COND"
         
     print(tag)
     #if debug mode, throw that all away
@@ -77,17 +71,11 @@ def learn(
 
     np.random.seed(seed)
 
-    # Load data and "experiment" parameter (note that all [0]s are to
-    # get rid of redundant dimensions of the MATLAB data and not
-    # throwing away data):
-    mat = scipy.io.loadmat(datapath)
-    L_mat = mat['Modelparams'][0, 0]['L'][0, 0]
-    smoothness = mat['Modelparams'][0, 0]['l_margin'][0, 0] / L_mat
+    L = 8
+    smoothness = 0.25 / L
 
-    n_sites = int(mat['Modelparams'][0, 0]['Ne'][0, 0])
-    coe_value = float(mat['Modelparams'][0, 0]['k'][0, 0])
-    exp_value = float(mat['Modelparams'][0, 0]['n'][0, 0])
-    data = mat['E_Tuning']      # shape: (N_data, nb)
+    coe_value = .01 #k
+    exp_value = 2.2 #n
 
     if n_bandwidths == 4:
         bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
@@ -98,11 +86,6 @@ def learn(
     else:
         raise ValueError('Unknown number of bandwidths: {}'
                          .format(n_bandwidths))
-
-    if N > 0:
-        n_sites = N
-
-
 
     ssn_params = dict(
         dt=dt,
@@ -145,29 +128,28 @@ def learn(
     
     data = []
         
-    if not use_data:
-        if not true_IO_type:
-            true_IO_type = IO_type
-        print("Generating the truth...")
+    if not true_IO_type:
+        true_IO_type = IO_type
+    print("Generating the truth...")
 
-        for CON in conditions:
-            print(CON)
-            DAT, _ = SSsolve.sample_tuning_curves(
-                sample_sites=sample_sites,
-                NZ=truth_size,
-                seed=truth_seed,
-                bandwidths=bandwidths,
-                smoothness=smoothness,
-                contrast=[CON[0]],
-                offset=[CON[1]],
-                N=n_sites,
-                track_offset_identity=track_offset_identity,
-                **dict(ssn_params, io_type=true_IO_type))
-            
-            data.append(DAT)
-        print("DONE")
-        data = np.array([d.T for d in data])      # shape: (ncondition,N_data, nb)
-        print(data.shape)
+    for CON in conditions:
+        print(CON)
+        DAT, _ = SSsolve.sample_tuning_curves(
+            sample_sites=sample_sites,
+            NZ=truth_size,
+            seed=truth_seed,
+            bandwidths=bandwidths,
+            smoothness=smoothness,
+            contrast=[CON[0]],
+            offset=[CON[1]],
+            N=n_sites,
+            track_offset_identity=track_offset_identity,
+            **dict(ssn_params, io_type=true_IO_type))
+        
+        data.append(DAT)
+    print("DONE")
+    data = np.array([d.T for d in data])      # shape: (ncondition,N_data, nb)
+    print(data.shape)
         
     # Check for sanity:
     if track_offset_identity:
@@ -185,7 +167,7 @@ def learn(
     #these are parameters we will use to test the GAN
     J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float32"),name = "j")
     D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float32"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L_mat).astype("float32"),name = "s")
+    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L).astype("float32"),name = "s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
@@ -291,7 +273,7 @@ def learn(
 
     inp = BAND_IN
 
-    def log(a,F = "SSNCGAN_log_{}.log".format(tag),PRINT = True):
+    def log(a,F = "SSNGAN_log_{}.log".format(tag),PRINT = True):
         if isinstance(a, list):
             a = ','.join(map(str, a))
         if PRINT and not quiet:
@@ -321,9 +303,9 @@ def learn(
         ), fp)
 
     # Clear data in old log files
-    for filename in ["SSNCGAN_log_{}.log",
-                     "D_parameters_CGAN_{}.log",
-                     "parameters_CGAN_{}.log"]:
+    for filename in ["SSNGAN_log_{}.log",
+                     "D_parameters_GAN_{}.log",
+                     "parameters_GAN_{}.log"]:
         open(os.path.join("logfiles", filename.format(tag)), 'w').close()
 
     log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
@@ -347,7 +329,7 @@ def learn(
         Dmean = true.mean(axis = 0)
 
         log(list(GZmean) + list(Dmean),
-            F="D_parameters_CGAN_{}.log".format(tag), PRINT=False)
+            F="D_parameters_GAN_{}.log".format(tag), PRINT=False)
 
         jj = J.get_value()
         dd = D.get_value()
@@ -369,7 +351,7 @@ def learn(
                                                                  allpar[10],
                                                                  allpar[11])
         
-        log(string,F = "./parameters_CGAN_{}.log".format(tag),PRINT = False)
+        log(string,F = "./parameters_GAN_{}.log".format(tag),PRINT = False)
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
@@ -473,7 +455,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
-    cond_scale = theano.shared(np.array([[1.,50.]]).astype("float32"),broadcastable = (True,False))
+    cond_scale = np.array([[1.,50.]]).astype("float32")
 
     red_R_true = T.matrix("reduced rates","float32")#data
     cond_true = T.matrix("true conditions","float32")
@@ -566,16 +548,6 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,LAYERS,d_lr,g_
 def main(args=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    # Changing datapath is not allowed at the moment:
-    """
-    parser.add_argument(
-        'datapath', nargs='?',
-        default=os.path.join(os.path.dirname(__file__),
-                             os.path.pardir,
-                             os.path.pardir,
-                             'training_data_TCs_Ne102.mat'),
-        help='Path to MATLAB data file (default: %(default)s)')
-    """
     parser.add_argument(
         '--iterations', default=100000, type=int,
         help='Number of iterations (default: %(default)s)')
@@ -605,9 +577,8 @@ def main(args=None):
         '--debug', default=False, action='store_true',
         help='Run in debug mode. Save logs with DEBUG tag')
     parser.add_argument(
-        '--N', '-N', default=201, type=int,
-        help='''Number of excitatory neurons in SSN. If 0, use the
-        value recorded in the MATLAB file at `datapath`. (default:
+        '--N', '-N', dest='n_sites',default=201, type=int,
+        help='''Number of excitatory neurons in SSN. (default:
         %(default)s)''')
     parser.add_argument(
         '--dt', default=5e-4, type=float,
@@ -715,14 +686,6 @@ def main(args=None):
     ns = parser.parse_args(args)
     use_pdb = ns.pdb
     del ns.pdb
-
-    # Currently works only with the following options; so let's
-    # manually fix them:
-    ns.datapath = os.path.join(os.path.dirname(__file__),
-                               os.path.pardir,
-                               os.path.pardir,
-                               'training_data_TCs_Ne102.mat')
-    ns.use_data = False
 
     # Collect all arguments/options in a dictionary, in order to save
     # it elsewhere:

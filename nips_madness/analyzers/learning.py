@@ -165,7 +165,10 @@ def analyze_learning(logpath, show, figpath):
 def main(args=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('logpath', help='path to SSNGAN_log_*.log')
+    parser.add_argument(
+        'logpath',
+        help='''Path to GAN output directory. It can also be any file
+        in such directory; filename part is ignored.''')
     parser.add_argument('--figpath')
     parser.add_argument('--show', action='store_true')
     ns = parser.parse_args(args)

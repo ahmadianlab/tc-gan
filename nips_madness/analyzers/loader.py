@@ -52,41 +52,30 @@ def parse_tag(tag):
 class GANData(object):
 
     @classmethod
-    def load(cls, logpath):
-        basename = os.path.basename(logpath)
-        dirname = os.path.dirname(logpath)
-        suffix = basename[len('SSNGAN_log_'):]
-        assert basename.startswith('SSNGAN_log_')
-        tag = suffix[:-len('.log')]
+    def load(cls, datastore):
+        if os.path.isdir(datastore):
+            dirname = datastore
+        else:
+            dirname = os.path.dirname(datastore)
 
-        gen_logpath = os.path.join(dirname, 'parameters_' + suffix)
-        tuning_logpath = os.path.join(dirname, 'D_parameters_' + suffix)
+        logpath = os.path.join(dirname, 'learning.csv')
+        gen_logpath = os.path.join(dirname, 'generator.csv')
+        tuning_logpath = os.path.join(dirname, 'TC_mean.csv')
 
         main_names, main = load_logfile(logpath)
         gen_names, gen = load_logfile(gen_logpath)
         tuning_names, tuning = load_logfile(tuning_logpath)
 
-        try:
-            parsed_tag = parse_tag(tag)
-        except Exception as err:       # FIXME: don't catch everything!
-            parsed_tag = {'error': err}
-
-        info_path = os.path.join(dirname, 'info_' + tag + '.json')
-        if os.path.exists(info_path):
-            with open(info_path) as file:
-                info = json.load(file)
-        else:
-            info = {}
+        with open(os.path.join(dirname, 'info.json')) as file:
+            info = json.load(file)
 
         return cls(
-            tag=tag,
             main_logpath=logpath,
             gen_logpath=gen_logpath,
             tuning_logpath=tuning_logpath,
             main=main, main_names=main_names,
             gen=gen, gen_names=gen_names,
             tuning=tuning, tuning_names=tuning_names,
-            parsed_tag=parsed_tag,
             info=info)
 
     def __init__(self, **kwds):
@@ -174,35 +163,20 @@ class GANData(object):
 
     @property
     def gan_type(self):
+        loss = self.info['run_config']['loss']
         try:
-            WGAN = self.info['run_config']['WGAN']
-            loss = self.info['run_config']['loss']
-        except (AttributeError, KeyError):
-            try:
-                loss = self.parsed_tag['loss']
-            except (AttributeError, KeyError):
-                return None
-        else:
-            if WGAN:
-                return 'WGAN'
-        if loss == 'CE':
-            return 'RGAN'
-        elif loss == 'LS':
-            return 'LSGAN'
+            return {
+                'CE': 'RGAN',
+                'LS': 'LSGAN',
+                'WD': 'WGAN',
+            }[loss]
+        except KeyError:
+            pass
         return '{}-GAN'.format(loss)
 
     def params(self):
-        try:
-            params = self.info['run_config']
-        except (AttributeError, KeyError):
-            try:
-                params = self.parsed_tag
-            except AttributeError:
-                params = {}
+        params = self.info['run_config']
         params = dict(params, gan_type=self.gan_type)
-        for key in []:
-            if key in params:
-                params[key.lower()] = params[key]
         return params
 
     def param_values(self, keys, default=None):

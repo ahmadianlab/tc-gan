@@ -19,6 +19,7 @@ import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from .. import ssnode as SSsolve
+from .. import lasagne_param_file
 from .gan import do_learning
 
 import time
@@ -36,7 +37,7 @@ def learn(
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         offsets,
-        disc_normalization,
+        disc_normalization, disc_param_save_interval,
         datastore,
         timetest, convtest, testDW, DRtest):
 
@@ -273,6 +274,11 @@ def learn(
         
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
         datastore.tables.saverow('generator.csv', allpar)
+
+        if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
+            lasagne_param_file.dump(
+                discriminator,
+                datastore.path('disc_param', str(k), '.npz'))
 
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
@@ -579,6 +585,11 @@ def main(args=None):
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
+    parser.add_argument(
+        '--disc-param-save-interval', default=-1, type=int,
+        help='''Save parameters for discriminator for each given step.
+        -1 (default) means to never save.''')
+
     parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')

@@ -5,6 +5,7 @@ from .. import cgan
 
 @pytest.mark.parametrize('args', [
     [],
+    ['--disc-param-save-interval', '1'],
     # These options do not work at the moment:
     pytest.mark.xfail(['--track_offset_identity']),
     pytest.mark.xfail(['--sample-sites', '0, 0.5']),

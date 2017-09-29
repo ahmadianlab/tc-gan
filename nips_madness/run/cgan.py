@@ -11,6 +11,7 @@ import theano.tensor as T
 import lasagne
 import numpy as np
 
+from .. import execution
 from .. import utils
 from ..gradient_expressions.utils import subsample_neurons, \
     sample_sites_from_stim_space
@@ -18,57 +19,36 @@ import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from .. import ssnode as SSsolve
+from .gan import do_learning
 
-import json
-import os
-import pdb
 import time
-import traceback
 
 from .. import stimuli
 
+
 def learn(
         iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, layers, n_samples, debug, WGAN_lambda,
+        loss, layers, n_samples, WGAN_lambda,
         WGAN_n_critic0,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
-        true_IO_type, truth_size, truth_seed, n_bandwidths,
+        true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         offsets,
         disc_normalization,
-        run_config, timetest, convtest, testDW, DRtest):
+        datastore,
+        timetest, convtest, testDW, DRtest):
 
-    meta_info = utils.get_meta_info(packages=[np, theano, lasagne])
+    print(datastore)
+
     sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
 
     def make_functions(**kwds):
         return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
     train_update = WGAN_update
-    
-    ##Make the tag for the files
-        
-    #tag the IO and loss
-    tag = IO_type + "_" + loss
-    
-    #tag the layers
-    for l in layers:
-        tag = tag + "_" + str(l)
-        
-    #tag the rate cost
-    if float(rate_cost) > 0:
-        tag = tag + "_" + str(rate_cost)
-    rate_cost = float(rate_cost)
-    
-    tag = tag + "_COND"
-        
-    print(tag)
-    #if debug mode, throw that all away
-    if debug:
-        tag = "DEBUG"
-    ############################
 
+    rate_cost = float(rate_cost)
     np.random.seed(seed)
 
     L = 8
@@ -76,16 +56,6 @@ def learn(
 
     coe_value = .01 #k
     exp_value = 2.2 #n
-
-    if n_bandwidths == 4:
-        bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
-    elif n_bandwidths == 5:
-        bandwidths = np.array([0.0625, 0.125, 0.25, 0.5, 0.75])
-    elif n_bandwidths == 8:
-        bandwidths = np.array([0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1])
-    else:
-        raise ValueError('Unknown number of bandwidths: {}'
-                         .format(n_bandwidths))
 
     ssn_params = dict(
         dt=dt,
@@ -273,42 +243,9 @@ def learn(
 
     inp = BAND_IN
 
-    def log(a,F = "SSNGAN_log_{}.log".format(tag),PRINT = True):
-        if isinstance(a, list):
-            a = ','.join(map(str, a))
-        if PRINT and not quiet:
-            print(a)
-        f = open("./logfiles/" + F,"a")
-        f.write(str(a) + "\n")
-        f.close()
-
-    try:
-        os.makedirs('logfiles')
-    except OSError as err:
-        if err.errno != 17:
-            # If the error is "File exists" (errno=17) error, it means
-            # that the directory exists and it's fine to ignore the
-            # error.  It is slightly safer than checking existence of
-            # the directory since several processes may be creating it
-            # at the same time.  Maybe the error should be re-raised
-            # here but opening log file would fail anyway if there is
-            # something wrong.
-            print("!! Unexpected exception !!")
-            print(err)
-
-    with open(os.path.join('logfiles', 'info_{}.json'.format(tag)), 'w') as fp:
-        json.dump(dict(
-            run_config=dict(run_config, bandwidths=list(bandwidths)),
-            meta_info=meta_info,
-        ), fp)
-
-    # Clear data in old log files
-    for filename in ["SSNGAN_log_{}.log",
-                     "D_parameters_GAN_{}.log",
-                     "parameters_GAN_{}.log"]:
-        open(os.path.join("logfiles", filename.format(tag)), 'w').close()
-
-    log("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
+    def saverow_learning(row):
+        datastore.tables.saverow("learning.csv", row, echo=not quiet)
+    saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
     if track_offset_identity:
         truth_size_per_batch = NZ
@@ -317,9 +254,10 @@ def learn(
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,n_samples,WG_repeat = WGAN_n_critic0 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,n_samples,WG_repeat = WGAN_n_critic0 if k == 0 else 5)
 
-        log([k, Gloss, Dloss, D_acc(rtest, temp_con, true, temp_con),
+        saverow_learning(
+            [k, Gloss, Dloss, D_acc(rtest, temp_con, true, temp_con),
              SSsolve_time,
              gradient_time,
              model_info.rejections,
@@ -328,32 +266,17 @@ def learn(
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)
 
-        log(list(GZmean) + list(Dmean),
-            F="D_parameters_GAN_{}.log".format(tag), PRINT=False)
+        datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
 
         jj = J.get_value()
         dd = D.get_value()
         ss = S.get_value()
         
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-        
-        string = "{},{},{},{},{},{},{},{},{},{},{},{},{}".format(k,
-                                                                 allpar[0],
-                                                                 allpar[1],
-                                                                 allpar[2],
-                                                                 allpar[3],
-                                                                 allpar[4],
-                                                                 allpar[5],
-                                                                 allpar[6],
-                                                                 allpar[7],
-                                                                 allpar[8],
-                                                                 allpar[9],
-                                                                 allpar[10],
-                                                                 allpar[11])
-        
-        log(string,F = "./parameters_GAN_{}.log".format(tag),PRINT = False)
+        datastore.tables.saverow('generator.csv', allpar)
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,log,D_acc,get_reduced,DIS_red_r_true,tag,J,D,S,truth_size_per_batch,WG_repeat = 5):
+
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     '''
     Conditional WGAN update function:
@@ -370,11 +293,9 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_
      W_test - 
      inp_function - a function that takes conditions and generates the corresponding network inputs.
      ssn_params - list of SSN parameter shared variable.
-     log - logfile object.
      D_acc - function to compute discriminator accuracy
      get_reduced - function to get reduced set of sites.
      DIS_red_r_true - discriminator reduced rate input variable
-     tag - tag to add onto data files
      J - J variable
      D - D variable
      S - sigma variable
@@ -574,10 +495,7 @@ def main(args=None):
         help='Use data (True) or generate our own TC samples (False) (default: %(default)s)')
     """
     parser.add_argument(
-        '--debug', default=False, action='store_true',
-        help='Run in debug mode. Save logs with DEBUG tag')
-    parser.add_argument(
-        '--N', '-N', dest='n_sites',default=201, type=int,
+        '--N', '-N', dest='n_sites', default=201, type=int,
         help='''Number of excitatory neurons in SSN. (default:
         %(default)s)''')
     parser.add_argument(
@@ -664,9 +582,6 @@ def main(args=None):
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
     parser.add_argument(
-        '--pdb', action='store_true',
-        help='Drop into the Python debugger PDB on an exception.')
-    parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
 
@@ -683,23 +598,14 @@ def main(args=None):
         '--DRtest',default=False, action='store_true',
         help='test the R gradient')
 
-    ns = parser.parse_args(args)
-    use_pdb = ns.pdb
-    del ns.pdb
+    execution.add_base_learning_options(parser)
+    parser.set_defaults(
+        datastore_template='logfiles/cGAN_{IO_type}_{layers_str}_{rate_cost}',
+    )
 
-    # Collect all arguments/options in a dictionary, in order to save
-    # it elsewhere:
-    run_config = vars(ns)
-    # ...then use it as keyword arguments
-    try:
-        learn(run_config=run_config, **run_config)
-    except Exception:
-        if use_pdb:
-            traceback.print_exc()
-            print()
-            pdb.post_mortem()
-        else:
-            raise
+    ns = parser.parse_args(args)
+    do_learning(learn, vars(ns))
+
 
 if __name__ == "__main__":
     main()

@@ -47,7 +47,7 @@ def learn(
         loss, layers, n_samples, WGAN_lambda,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
-        true_IO_type, truth_size, truth_seed, n_bandwidths,
+        true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         disc_normalization,
@@ -56,6 +56,7 @@ def learn(
 
     print(datastore)
 
+    bandwidths = np.array(bandwidths)
     sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
 
     WGAN = loss == 'WD'
@@ -74,16 +75,6 @@ def learn(
     smoothness = 0.25 / L
     coe_value = 0.01  # k
     exp_value = 2.2   # n
-
-    if n_bandwidths == 4:
-        bandwidths = np.array([0.0625, 0.125, 0.25, 0.75])
-    elif n_bandwidths == 5:
-        bandwidths = np.array([0.0625, 0.125, 0.25, 0.5, 0.75])
-    elif n_bandwidths == 8:
-        bandwidths = np.array([0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1])
-    else:
-        raise ValueError('Unknown number of bandwidths: {}'
-                         .format(n_bandwidths))
 
     ssn_params = dict(
         dt=dt,
@@ -771,7 +762,22 @@ def main(args=None):
     execution.add_base_learning_options(parser)
 
     ns = parser.parse_args(args)
-    execution.do_learning(learn, vars(ns))
+    run_config = vars(ns)
+
+    n_bandwidths = run_config.pop('n_bandwidths')
+    if n_bandwidths == 4:
+        bandwidths = [0.0625, 0.125, 0.25, 0.75]
+    elif n_bandwidths == 5:
+        bandwidths = [0.0625, 0.125, 0.25, 0.5, 0.75]
+    elif n_bandwidths == 8:
+        bandwidths = [0, 0.0625, 0.125, 0.1875, 0.25, 0.5, 0.75, 1]
+    else:
+        raise ValueError('Unknown number of bandwidths: {}'
+                         .format(n_bandwidths))
+    run_config['bandwidths'] = bandwidths
+
+    execution.do_learning(learn, run_config)
+
 
 if __name__ == "__main__":
     main()

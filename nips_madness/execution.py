@@ -15,6 +15,14 @@ Packages whose versions are recorded.
 """
 
 
+def makedirs_exist_ok(name):
+    try:
+        os.makedirs(name)
+    except OSError as err:
+        if err.errno != 17:
+            raise
+
+
 class DataTables(object):
 
     def __init__(self, directory):
@@ -58,12 +66,17 @@ class DataTables(object):
 
 class DataStore(object):
 
-    def __init__(self, path):
-        self.path = path
-        self.tables = DataTables(path)
+    def __init__(self, directory):
+        self.directory = directory
+        self.tables = DataTables(directory)
+
+    def path(self, *subpaths):
+        newpath = os.path.join(self.directory, *subpaths)
+        makedirs_exist_ok(os.path.dirname(newpath))
+        return newpath
 
     def __repr__(self):
-        return '<DataStore: {}>'.format(self.path)
+        return '<DataStore: {}>'.format(self.directory)
 
 
 def format_datastore(datastore_template, run_config):
@@ -128,11 +141,7 @@ def pre_learn(
     if not datastore:
         datastore = format_datastore(datastore_template, run_config)
 
-    try:
-        os.makedirs(datastore)
-    except OSError as err:
-        if err.errno != 17:
-            raise
+    makedirs_exist_ok(datastore)
 
     meta_info = utils.get_meta_info(packages=packages)
     with open(os.path.join(datastore, 'info.json'), 'w') as fp:

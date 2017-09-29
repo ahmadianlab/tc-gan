@@ -102,7 +102,7 @@ def add_base_learning_options(parser):
         '--datastore-template',
         default='logfiles/{IO_type}_{loss}_{layers_str}_{rate_cost}',
         help='''Python string template to be used for generating
-        datastore directory.''')
+        datastore directory. (default: %(default)s)''')
     parser.add_argument(
         '--debug', dest='datastore_template',
         action='store_const', const='logfiles/debug',

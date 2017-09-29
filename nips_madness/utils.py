@@ -18,6 +18,7 @@ def get_meta_info(packages=[]):
         ),
         python=sys.executable,
         packages={p.__name__: p.__version__ for p in packages},
+        argv=sys.argv,
     )
 
 

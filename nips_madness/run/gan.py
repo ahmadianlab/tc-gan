@@ -1,6 +1,23 @@
 """
-
 Run SSN-GAN learning.
+
+It stores the learning result in the datastore directory specified by
+--datastore or --datastore-template.  Following files are generated in
+the datastore:
+
+* learning.csv --- All learning related stats such as
+  generator/discriminator losses go into this file.
+
+* TC_mean.csv --- Tuning curves averaged over instances (the "z-axis")
+  are stored in a row (for each generator step).  The first half is
+  the mean of the samples from "fake" SSN and the second half is that
+  of the "true" SSN.
+
+* generator.csv --- Generator parameters.  Concatenated and flattened.
+  Each row corresponds to each generator step.
+
+* info.json --- It stores parameters used for each run and some
+  environment information such as the Git revision of this repository.
 
 """
 
@@ -340,9 +357,9 @@ def learn(
 
     inp = BAND_IN
 
-    def saverow_SSNGAN(row):
-        datastore.tables.saverow("SSNGAN.csv", row, echo=not quiet)
-    saverow_SSNGAN("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
+    def saverow_learning(row):
+        datastore.tables.saverow("learning.csv", row, echo=not quiet)
+    saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
     if track_offset_identity:
         truth_size_per_batch = NZ
@@ -353,7 +370,7 @@ def learn(
 
         Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5)
 
-        saverow_SSNGAN(
+        saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, true),
              SSsolve_time,
              gradient_time,
@@ -630,7 +647,9 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
 def main(args=None):
     import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__)
     parser.add_argument(
         '--iterations', default=100000, type=int,
         help='Number of iterations (default: %(default)s)')

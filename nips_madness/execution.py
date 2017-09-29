@@ -21,9 +21,13 @@ class DataTables(object):
         self.directory = directory
         self._files = {}
 
+    def _open(self, name):
+        """Thin wrapper of `open`, for dependency injection in testing."""
+        return open(os.path.join(self.directory, name), 'w')
+
     def _get_file(self, name):
         if name not in self._files:
-            self._files[name] = open(name, 'w')
+            self._files[name] = self._open(name)
 
         return self._files[name]
 

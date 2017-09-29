@@ -302,8 +302,6 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_
      WG_repeat - wgan ncritic parameter
 
     '''
-
-    print("training")
     
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()

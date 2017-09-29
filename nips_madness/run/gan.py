@@ -71,8 +71,7 @@ def learn(
     rate_cost = float(rate_cost)
     np.random.seed(seed)
 
-    L = 8
-    smoothness = 0.25 / L
+    smoothness = 0.03125
     coe_value = 0.01  # k
     exp_value = 2.2   # n
 
@@ -120,7 +119,7 @@ def learn(
     #these are parameters we will use to test the GAN
     J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float64"),name = "j")
     D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float64"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.6667,.2],[1.333,.2]])/L).astype("float64"),name = "s")
+    S2 = theano.shared(np.log(np.array([[.08333375,.025],[.166625,.025]])).astype("float64"),name = "s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)

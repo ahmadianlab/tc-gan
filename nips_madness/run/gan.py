@@ -382,7 +382,9 @@ def learn(
 
     saveheader_disc_param_stats(datastore, discriminator)
     datastore.tables.saverow('disc_learning.csv', [
-        'gen_step', 'disc_step', 'Dloss', 'Daccuracy'])
+        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
+        'SSsolve_time', 'gradient_time',
+    ])
 
     if track_offset_identity:
         truth_size_per_batch = NZ
@@ -457,6 +459,7 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         saverow_disc_param_stats(datastore, discriminator, gen_step, rep)
         datastore.tables.saverow('disc_learning.csv', [
             gen_step, rep, Dloss, D_acc(rtest, true),
+            SSsolve_time.times[-1], gradient_time.times[-1],
         ])
 
     #end D loop
@@ -496,6 +499,7 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     saverow_disc_param_stats(datastore, discriminator, gen_step, 0)
     datastore.tables.saverow('disc_learning.csv', [
         gen_step, 0, Dloss, D_acc(rtest, true),
+        SSsolve_time.times[-1], gradient_time.times[-1],
     ])
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()

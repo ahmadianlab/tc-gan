@@ -11,7 +11,6 @@ import theano.tensor as T
 import lasagne
 import numpy as np
 
-from .. import execution
 from .. import utils
 from ..gradient_expressions.utils import subsample_neurons, \
     sample_sites_from_stim_space
@@ -20,7 +19,7 @@ from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from .. import ssnode as SSsolve
 from .. import lasagne_param_file
-from .gan import do_learning
+from .gan import add_learning_options, do_learning
 
 import time
 
@@ -38,7 +37,7 @@ def learn(
         contrast,
         offsets,
         disc_normalization, disc_param_save_interval,
-        datastore,
+        datastore, J0, D0, S0,
         timetest, convtest, testDW, DRtest):
 
     print(datastore)
@@ -135,9 +134,9 @@ def learn(
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float32"),name = "j")
-    D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float32"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.08333375,.025],[.166625,.025]])).astype("float32"),name = "s")
+    J2 = theano.shared(np.log(np.array(J0)).astype("float32"), name="j")
+    D2 = theano.shared(np.log(np.array(D0)).astype("float32"), name="d")
+    S2 = theano.shared(np.log(np.array(S0)).astype("float32"), name="s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
@@ -554,9 +553,6 @@ def main(args=None):
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
-        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
-        help='Number of bandwidths (default: %(default)s)')
-    parser.add_argument(
         '--n_samples', default=15, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
@@ -607,7 +603,7 @@ def main(args=None):
         '--DRtest',default=False, action='store_true',
         help='test the R gradient')
 
-    execution.add_base_learning_options(parser)
+    add_learning_options(parser)
     parser.set_defaults(
         datastore_template='logfiles/cGAN_{IO_type}_{layers_str}_{rate_cost}',
     )

@@ -78,7 +78,7 @@ def learn(
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         disc_normalization, disc_param_save_interval,
-        datastore,
+        datastore, J0, D0, S0,
         timetest, convtest, testDW, DRtest):
 
     print(datastore)
@@ -144,9 +144,9 @@ def learn(
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float64"),name = "j")
-    D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float64"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.08333375,.025],[.166625,.025]])).astype("float64"),name = "s")
+    J2 = theano.shared(np.log(np.array(J0)).astype("float64"), name="j")
+    D2 = theano.shared(np.log(np.array(D0)).astype("float64"), name="d")
+    S2 = theano.shared(np.log(np.array(S0)).astype("float64"), name="s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
@@ -758,9 +758,6 @@ def main(args=None):
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
-        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
-        help='Number of bandwidths (default: %(default)s)')
-    parser.add_argument(
         '--n_samples', default=15, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
@@ -811,10 +808,21 @@ def main(args=None):
         '--DRtest',default=False, action='store_true',
         help='test the R gradient')
 
-    execution.add_base_learning_options(parser)
-
+    add_learning_options(parser)
     ns = parser.parse_args(args)
     do_learning(learn, vars(ns))
+
+
+def add_learning_options(parser):
+    parser.add_argument(
+        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
+        help='Number of bandwidths (default: %(default)s)')
+    parser.add_argument(
+        '--load-gen-param',
+        help='''Path to generator.csv whose last row is loaded as the
+        starting point.''')
+
+    execution.add_base_learning_options(parser)
 
 
 def do_learning(learn, run_config):
@@ -834,6 +842,26 @@ def do_learning(learn, run_config):
         raise ValueError('Unknown number of bandwidths: {}'
                          .format(n_bandwidths))
     run_config['bandwidths'] = bandwidths
+
+    # Set initial parameter set J/D/S for generator.
+    load_gen_param = run_config.pop('load_gen_param')
+    if load_gen_param:
+        lastrow = np.loadtxt(load_gen_param, delimiter=',')[-1]
+        if len(lastrow) == 13:
+            lastrow = lastrow[1:]
+        elif len(lastrow) == 12:
+            pass
+        else:
+            raise ValueError('Invalid format.'
+                             ' Last row of {} contains {} columns.'
+                             ' It has to contain 13 (or 12) columns.'
+                             .format(load_gen_param, len(lastrow)))
+        J0, D0, S0 = lastrow.reshape((3, 2, 2))
+    else:
+        J0 = [[0.0957, 0.0638], [0.1197, 0.0479]]
+        D0 = [[0.7660, 0.5106], [0.9575, 0.3830]]
+        S0 = [[0.08333375, 0.025], [0.166625, 0.025]]
+    run_config.update(J0=J0, D0=D0, S0=S0)
 
     execution.do_learning(learn, run_config)
 

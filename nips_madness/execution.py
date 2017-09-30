@@ -156,7 +156,7 @@ def pre_learn(
     return run_config
 
 
-def do_learning(learn, run_config, extra_info={},
+def do_learning(learn, run_config, extra_info={}, preprocess=None,
                 packages=default_tracking_packages):
     """
     Execute `learn` with `run_config` after pre-processing.
@@ -168,6 +168,8 @@ def do_learning(learn, run_config, extra_info={},
     """
     run_config = pre_learn(packages=packages, extra_info=extra_info,
                            **run_config)
+    if preprocess:
+        preprocess(run_config)
     datastore = DataStore(run_config.pop('datastore'))
     with datastore.tables:
         return learn(datastore=datastore, **run_config)

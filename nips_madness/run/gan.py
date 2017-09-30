@@ -826,10 +826,7 @@ def add_learning_options(parser):
     execution.add_base_learning_options(parser)
 
 
-def do_learning(learn, run_config):
-    """
-    Wrap `.execution.do_learning` with some pre-processing.
-    """
+def preprocess(run_config):
     # Set `bandwidths` outside the `learn` function, so that
     # `bandwidths` is stored in info.json:
     n_bandwidths = run_config.pop('n_bandwidths')
@@ -864,11 +861,17 @@ def do_learning(learn, run_config):
         S0 = [[0.08333375, 0.025], [0.166625, 0.025]]
     run_config.update(J0=J0, D0=D0, S0=S0)
 
+
+def do_learning(learn, run_config):
+    """
+    Wrap `.execution.do_learning` with some pre-processing.
+    """
     execution.do_learning(
         learn, run_config,
+        preprocess=preprocess,
         extra_info=dict(
-            n_bandwidths=n_bandwidths,
-            load_gen_param=load_gen_param,
+            n_bandwidths=run_config['n_bandwidths'],
+            load_gen_param=run_config['load_gen_param'],
         ))
 
 

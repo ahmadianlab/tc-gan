@@ -18,8 +18,8 @@ def single_g_step(args):
     [],
     ['--disc-param-save-interval', '1'],
     # These options do not work at the moment:
-    pytest.mark.xfail(['--track_offset_identity']),
-    pytest.mark.xfail(['--sample-sites', '0, 0.5']),
+    pytest.mark.skip(['--track_offset_identity']),
+    pytest.mark.skip(['--sample-sites', '0, 0.5']),
 ])
 def test_smoke_slowtest(args, cleancwd):
     single_g_step(args)

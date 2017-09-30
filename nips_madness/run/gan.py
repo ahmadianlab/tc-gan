@@ -71,6 +71,7 @@ def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
 def learn(
         iterations, seed, gen_learn_rate, disc_learn_rate,
         loss, layers, n_samples, WGAN_lambda,
+        WGAN_n_critic0,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
@@ -388,7 +389,7 @@ def learn(
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5,gen_step=k,datastore=datastore)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat = WGAN_n_critic0 if k == 0 else 5,gen_step=k,datastore=datastore)
 
         saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, true),
@@ -782,6 +783,9 @@ def main(args=None):
     parser.add_argument(
         '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')
+    parser.add_argument(
+        '--WGAN_n_critic0', default=50, type=int,
+        help='First critic iterations (default: %(default)s)')
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')

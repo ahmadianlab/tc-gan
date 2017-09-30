@@ -16,6 +16,9 @@ the datastore:
 * generator.csv --- Generator parameters.  Concatenated and flattened.
   Each row corresponds to each generator step.
 
+* disc_param_stats.csv --- Normalized norms (2-norm divided by number
+  of elements) of parameters in each layers.
+
 * info.json --- It stores parameters used for each run and some
   environment information such as the Git revision of this repository.
 
@@ -44,6 +47,22 @@ from .. import ssnode as SSsolve
 import time
 
 from .. import stimuli
+
+
+def saveheader_disc_param_stats(datastore, discriminator):
+    header = ['gen_step', 'disc_step'] + [
+        '{}.nnorm'.format(p.name)  # Normalized NORM
+        for p in lasagne.layers.get_all_params(discriminator, trainable=True)
+    ]
+    datastore.tables.saverow('disc_param_stats.csv', header)
+
+
+def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
+    row = [gen_step, disc_step] + [
+        np.linalg.norm(arr.flatten()) / arr.size
+        for arr in lasagne.layers.get_all_param_values(discriminator)
+    ]
+    datastore.tables.saverow('disc_param_stats.csv', row)
 
 
 def learn(
@@ -355,6 +374,8 @@ def learn(
         datastore.tables.saverow("learning.csv", row, echo=not quiet)
     saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
+    saveheader_disc_param_stats(datastore, discriminator)
+
     if track_offset_identity:
         truth_size_per_batch = NZ
     else:
@@ -362,7 +383,7 @@ def learn(
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5,gen_step=k,datastore=datastore)
 
         saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, true),
@@ -389,7 +410,7 @@ def learn(
                 datastore.path('disc_param', str(k) + '.npz'))
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -424,6 +445,7 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         rtest = r_batch[NZ*rep:NZ*(rep+1)]
         with gradient_time:
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
+        saverow_disc_param_stats(datastore, discriminator, gen_step, rep)
 
     #end D loop
 
@@ -433,7 +455,7 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -459,6 +481,8 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     with gradient_time:
         Dloss = D_train_func(rtest,true)
         Gloss = G_train_func(rtest,inp,Ztest)
+
+    saverow_disc_param_stats(datastore, discriminator, gen_step, 0)
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 

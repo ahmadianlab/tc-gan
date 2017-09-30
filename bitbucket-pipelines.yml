@@ -10,7 +10,7 @@ pipelines:
           - apt-get install -y build-essential
           - make configure-bitbucket
           - make
-          - make test
+          - make test-quick
 
 definitions:
   caches:

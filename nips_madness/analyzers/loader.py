@@ -111,9 +111,9 @@ class GANData(object):
             return False
 
     @property
-    def sample_sites(self):
+    def n_sample_sites(self):
         try:
-            return self.info['run_config']['sample_sites']
+            return len(self.info['run_config']['sample_sites'])
         except (AttributeError, KeyError):
             return 1
 
@@ -131,7 +131,7 @@ class GANData(object):
     @property
     def n_bandwidths_viz(self):
         if self.track_offset_identity:
-            return self.n_bandwidths * self.sample_sites
+            return self.n_bandwidths * self.n_sample_sites
         else:
             return self.n_bandwidths
 
@@ -155,7 +155,7 @@ class GANData(object):
                 # For visualization purpose, let's shift bandwidths of
                 # different sample sites:
                 return np.concatenate([
-                    bandwidths + i for i in range(self.sample_sites)
+                    bandwidths + i for i in range(self.n_sample_sites)
                 ])
             return bandwidths
 

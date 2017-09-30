@@ -133,11 +133,14 @@ def pre_learn(
         packages,
         datastore, datastore_template,
         load_config,
-        extra_info={},
+        extra_info={}, preprocess=None,
         **run_config):
     if load_config:
         with open(load_config) as file:
             run_config.update(json.load(file))
+
+    if preprocess:
+        preprocess(run_config)
 
     if not datastore:
         datastore = format_datastore(datastore_template, run_config)
@@ -167,9 +170,8 @@ def do_learning(learn, run_config, extra_info={}, preprocess=None,
 
     """
     run_config = pre_learn(packages=packages, extra_info=extra_info,
+                           preprocess=preprocess,
                            **run_config)
-    if preprocess:
-        preprocess(run_config)
     datastore = DataStore(run_config.pop('datastore'))
     with datastore.tables:
         return learn(datastore=datastore, **run_config)

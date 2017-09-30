@@ -8,6 +8,9 @@ pipelines:
         script:
           - apt-get update --fix-missing
           - apt-get install -y build-essential
+          # Somehow, bitbucket-pipelines session has empty env/
+          # directory...  Remove it:
+          - rmdir -v env || true
           - make configure-bitbucket
           - make
           - make test-quick

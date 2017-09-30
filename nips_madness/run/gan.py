@@ -863,7 +863,12 @@ def do_learning(learn, run_config):
         S0 = [[0.08333375, 0.025], [0.166625, 0.025]]
     run_config.update(J0=J0, D0=D0, S0=S0)
 
-    execution.do_learning(learn, run_config)
+    execution.do_learning(
+        learn, run_config,
+        extra_info=dict(
+            n_bandwidths=n_bandwidths,
+            load_gen_param=load_gen_param,
+        ))
 
 
 if __name__ == "__main__":

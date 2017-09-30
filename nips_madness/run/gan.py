@@ -854,7 +854,7 @@ def preprocess(run_config):
                              ' Last row of {} contains {} columns.'
                              ' It has to contain 13 (or 12) columns.'
                              .format(load_gen_param, len(lastrow)))
-        J0, D0, S0 = lastrow.reshape((3, 2, 2))
+        J0, D0, S0 = lastrow.reshape((3, 2, 2)).tolist()
     else:
         J0 = [[0.0957, 0.0638], [0.1197, 0.0479]]
         D0 = [[0.7660, 0.5106], [0.9575, 0.3830]]

@@ -1,6 +1,7 @@
 import collections
 import json
 import os
+import warnings
 
 import numpy as np
 
@@ -65,6 +66,12 @@ class GANData(object):
         main_names, main = load_logfile(logpath)
         gen_names, gen = load_logfile(gen_logpath)
         tuning_names, tuning = load_logfile(tuning_logpath)
+
+        if gen.shape[-1] == 12:
+            warnings.warn('generator.csv only contains 12 columns; '
+                          'inserting index columns.')
+            idx = np.arange(len(gen)).reshape((-1, 1))
+            gen = np.concatenate([idx, gen], axis=1)
 
         with open(os.path.join(dirname, 'info.json')) as file:
             info = json.load(file)

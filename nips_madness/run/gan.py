@@ -32,6 +32,8 @@ the datastore:
 
 from __future__ import print_function
 
+from types import SimpleNamespace
+
 import theano
 import theano.tensor as T
 import lasagne
@@ -427,16 +429,17 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             wtest, = W(ztest)
             yield ztest[0], wtest
 
-    # Generate "fake" samples from the fitted model.  Since the
-    # generator does not change in the loop over updates of the
-    # discriminator, we generate the whole samples at once.  This
-    # gives us 40% speedup in asym_tanh case:
-    with SSsolve_time:
-        z_batch, r_batch, model_info = SSsolve.find_fixed_points(
-            NZ * WG_repeat, Z_W_gen(), inp,
-            **ssn_params)
+    model_info = SimpleNamespace(rejections=0, unused=0)
 
     for rep in range(WG_repeat):
+        with SSsolve_time:
+            Ztest, rtest, minfo = SSsolve.find_fixed_points(
+                NZ, Z_W_gen(), inp,
+                **ssn_params)
+
+        model_info.rejections += minfo.rejections
+        model_info.unused += minfo.unused
+
         #the data
         idx = np.random.choice(len(data), truth_size_per_batch)
         true = data[idx]
@@ -448,7 +451,6 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
         eps = np.random.rand(truth_size_per_batch, 1)
 
-        rtest = r_batch[NZ*rep:NZ*(rep+1)]
         with gradient_time:
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
@@ -459,7 +461,6 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     #end D loop
 
-    Ztest = z_batch[-NZ:]
     with gradient_time:
         Gloss = G_train_func(rtest,inp,Ztest)
 

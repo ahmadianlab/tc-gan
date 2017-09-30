@@ -16,8 +16,11 @@ the datastore:
   the mean of the samples from "fake" SSN and the second half is that
   of the "true" SSN.
 
-* generator.csv --- Generator parameters.  Concatenated and flattened.
-  Each row corresponds to each generator step.
+* generator.csv --- Generator parameters.  Logarithm of actual values
+  are stored.  Three 2x2 matrices J, D and S (sigma) are stored in the
+  2nd to 13th columns after they are concatenated and flattened.  The
+  first column stores the generator step.  Each row corresponds to
+  each generator step.
 
 * disc_param_stats.csv --- Normalized norms (2-norm divided by number
   of elements) of parameters in each layers.

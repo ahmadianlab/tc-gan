@@ -8,6 +8,9 @@ the datastore:
 * learning.csv --- All learning related stats such as
   generator/discriminator losses go into this file.
 
+* disc_learning.csv --- Discriminator specific learning statistics.
+  Recorded even during the inner loop for discriminator.
+
 * TC_mean.csv --- Tuning curves averaged over instances (the "z-axis")
   are stored in a row (for each generator step).  The first half is
   the mean of the samples from "fake" SSN and the second half is that
@@ -375,6 +378,8 @@ def learn(
     saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
     saveheader_disc_param_stats(datastore, discriminator)
+    datastore.tables.saverow('disc_learning.csv', [
+        'gen_step', 'disc_step', 'Dloss', 'Daccuracy'])
 
     if track_offset_identity:
         truth_size_per_batch = NZ
@@ -445,7 +450,11 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         rtest = r_batch[NZ*rep:NZ*(rep+1)]
         with gradient_time:
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
+
         saverow_disc_param_stats(datastore, discriminator, gen_step, rep)
+        datastore.tables.saverow('disc_learning.csv', [
+            gen_step, rep, Dloss, D_acc(rtest, true),
+        ])
 
     #end D loop
 
@@ -483,6 +492,9 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         Gloss = G_train_func(rtest,inp,Ztest)
 
     saverow_disc_param_stats(datastore, discriminator, gen_step, 0)
+    datastore.tables.saverow('disc_learning.csv', [
+        gen_step, 0, Dloss, D_acc(rtest, true),
+    ])
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 

@@ -19,7 +19,7 @@ import sys
 import traceback
 
 
-def run_module(module, arguments, use_pdb):
+def run_module(module, arguments, use_pdb, assert_repo_is_clean):
     if os.path.isfile(module) and module.endswith('.py'):
         here = os.path.realpath(os.path.dirname(__file__))
         relpath = os.path.relpath(os.path.realpath(module), here)
@@ -28,6 +28,11 @@ def run_module(module, arguments, use_pdb):
     if not hasattr(loaded, 'main'):
         print('Module', module, 'do not have main function.')
         return 1
+    if assert_repo_is_clean:
+        from nips_madness.utils import git_is_clean
+        if not git_is_clean():
+            print('Repository is not clean.')
+            return 3
     try:
         loaded.main(arguments)
     except Exception:
@@ -60,6 +65,9 @@ def main(args=None):
     parser.add_argument(
         '--pdb', action='store_true', dest='use_pdb',
         help='drop into pdb when there is an exception')
+    parser.add_argument(
+        '--assert-repo-is-clean', action='store_true',
+        help='abort (with code 3) if this repository is not clean')
     ns = parser.parse_args(args)
     sys.exit(run_module(**vars(ns)))
 

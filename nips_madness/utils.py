@@ -13,13 +13,17 @@ def get_meta_info(packages=[]):
     return dict(
         repository=dict(
             revision=git_output(['git', 'rev-parse', 'HEAD']).rstrip(),
-            is_clean=git_output(['git', 'status', '--short',
-                                 '--untracked-files=no']).strip() == '',
+            is_clean=git_is_clean(),
         ),
         python=sys.executable,
         packages={p.__name__: p.__version__ for p in packages},
         argv=sys.argv,
     )
+
+
+def git_is_clean():
+    return git_output(['git', 'status', '--short',
+                       '--untracked-files=no']).strip() == ''
 
 
 def git_output(args):

@@ -381,7 +381,7 @@ def learn(
         ss = S.get_value()
         
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-        datastore.tables.saverow('generator.csv', allpar)
+        datastore.tables.saverow('generator.csv', [k] + allpar)
 
         if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
             lasagne_param_file.dump(

@@ -66,11 +66,23 @@ def saveheader_disc_param_stats(datastore, discriminator):
 
 
 def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
-    row = [gen_step, disc_step] + [
+    """
+    Save normalized norms of `discriminator`.
+
+    This function also checks for finiteness of the parameter and
+    raises an error when found.  "Downloading" discriminator parameter
+    is (likely) a time-consuming operation so it makes sense to do it
+    here.
+
+    """
+    nnorms = [
         np.linalg.norm(arr.flatten()) / arr.size
         for arr in lasagne.layers.get_all_param_values(discriminator)
     ]
+    row = [gen_step, disc_step] + nnorms
     datastore.tables.saverow('disc_param_stats.csv', row)
+
+    assert np.isfinite(nnorms).all()
 
 
 def learn(

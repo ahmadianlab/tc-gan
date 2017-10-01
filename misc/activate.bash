@@ -1,7 +1,7 @@
 thisdir="$(dirname "${BASH_SOURCE[0]}")"
 source "$thisdir/rc/rc.sh"
 
-PATH="$thisdir/../env/bin:$PATH"
+PATH="$(realpath $thisdir/../env/bin):$PATH"
 # In principle, this is better done via env/bin/activate like this:
 #
 #     source "$thisdir/../env/bin/activate" "$thisdir/../env"

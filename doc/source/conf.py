@@ -52,8 +52,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'nips_madness'
-copyright = u'2017, Takafumi Arakaki'
-author = u'Takafumi Arakaki'
+author = u'Takafumi Arakaki, Gabriel Barello, Yashar Ahmadian'
+copyright = u'2017, ' + author
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -133,7 +133,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'nips_madness.tex', u'nips\\_madness Documentation',
-     u'Takafumi Arakaki', 'manual'),
+     author, 'manual'),
 ]
 
 

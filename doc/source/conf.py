@@ -58,7 +58,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'nips_madness'
+project = u'NIPS madness ↻'
 author = u'Takafumi Arakaki, Gabriel Barello, Yashar Ahmadian'
 copyright = u'2017, ' + author
 
@@ -112,6 +112,18 @@ rst_epilog = '''
 # a list of builtin themes.
 #
 html_theme = 'alabaster'
+
+# Load Alabaster's customized sidebar templates as mentioned in
+# https://alabaster.readthedocs.io/en/latest/installation.html
+html_sidebars = {
+    '**': [
+        'about.html',
+        'navigation.html',
+        'relations.html',
+        'searchbox.html',
+        'donate.html',
+    ]
+}
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

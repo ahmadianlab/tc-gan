@@ -5,30 +5,37 @@ It stores the learning result in the datastore directory specified by
 --datastore or --datastore-template.  Following files are generated in
 the datastore:
 
-* learning.csv --- All learning related stats such as
+``learning.csv``
+  All learning related stats such as
   generator/discriminator losses go into this file.
 
-* disc_learning.csv --- Discriminator specific learning statistics.
+``disc_learning.csv``
+  Discriminator specific learning statistics.
   Recorded even during the inner loop for discriminator.
 
-* TC_mean.csv --- Tuning curves averaged over instances (the "z-axis")
+``TC_mean.csv``
+  Tuning curves averaged over instances (the "z-axis")
   are stored in a row (for each generator step).  The first half is
   the mean of the samples from "fake" SSN and the second half is that
   of the "true" SSN.
 
-* generator.csv --- Generator parameters.  Logarithm of actual values
+``generator.csv``
+  Generator parameters.  Logarithm of actual values
   are stored.  Three 2x2 matrices J, D and S (sigma) are stored in the
   2nd to 13th columns after they are concatenated and flattened.  The
   first column stores the generator step.  Each row corresponds to
   each generator step.
 
-* disc_param_stats.csv --- Normalized norms (2-norm divided by number
+``disc_param_stats.csv``
+  Normalized norms (2-norm divided by number
   of elements) of parameters in each layers.
 
-* info.json --- It stores parameters used for each run and some
+``info.json``
+  It stores parameters used for each run and some
   environment information such as the Git revision of this repository.
 
-* disc_param/last.npz --- Snapshot of the discriminator parameters.
+``disc_param/last.npz``
+  Snapshot of the discriminator parameters.
   Saved for each `disc_param_save_interval` generator updates.
   See: --disc-param-save-interval, --disc-param-template
 

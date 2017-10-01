@@ -779,7 +779,8 @@ def main(args=None):
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
         '--n_samples', default=15, type=eval,
-        help='Number of samples to draw from G each step (default: %(default)s)')
+        help='''Number of samples to draw from G each step
+        (aka NZ, minibatch size). (default: %(default)s)''')
     parser.add_argument(
         '--rate_cost', default='0',
         help='The cost of having the rate be large (default: %(default)s)')

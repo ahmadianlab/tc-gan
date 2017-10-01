@@ -35,9 +35,14 @@ from nips_madness.utils import git_revision
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.inheritance_diagram',
+    'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
-    'sphinx.ext.mathjax',
+    # 'matplotlib.sphinxext.plot_directive',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -82,6 +87,10 @@ language = 'en'
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
 exclude_patterns = []
+
+# The reST default role (used for this markup: `text`) to use for all
+# documents.
+default_role = 'py:obj'
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'

@@ -1,4 +1,4 @@
-.PHONY: ext test* prepare
+.PHONY: doc ext test* prepare
 
 prepare: env ext
 
@@ -13,6 +13,9 @@ test-quick:
 
 test-flakes:
 	misc/with-env pytest -m flakes
+
+doc:
+	misc/with-env $(MAKE) --directory=doc html
 
 include misc/conda.mk
 include misc/rc/setup.mk

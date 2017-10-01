@@ -16,9 +16,10 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.pardir,
+                                                os.path.pardir)))
 
 
 # -- General configuration ------------------------------------------------
@@ -30,9 +31,12 @@
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.autodoc',
+extensions = [
+    'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.todo']
+    'sphinx.ext.todo',
+    'sphinx.ext.mathjax',
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -155,7 +159,46 @@ texinfo_documents = [
 ]
 
 
+# -- Inter-Sphinx ----------------------------------------------------------
+
+intersphinx_mapping = {
+    'python': ('http://docs.python.org/', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
+    'matplotlib': ('http://matplotlib.org/', None),
+    'pandas': ('http://pandas.pydata.org/pandas-docs/stable/', None),
+}
 
 
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+# -- Options autodoc ----------------------------------------------------------
+
+# http://sphinx.pocoo.org/ext/autodoc.html#confval-autodoc_member_order
+
+autodoc_member_order = 'bysource'
+
+autodoc_default_flags = ['members', 'special-members']
+
+
+# -- Run custom pre-build commands -------------------------------------------
+
+def run_apidoc(_):
+    """
+    Run sphinx-apidoc
+
+    See:
+    http://www.sphinx-doc.org/en/stable/extdev/appapi.html
+    https://github.com/rtfd/readthedocs.org/issues/1139
+    """
+    from sphinx.apidoc import main
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(os.path.dirname(here))
+    main(['--force', '--separate', '--private',
+          '--output-dir', os.path.join(here, 'api'),
+          # Module path:
+          os.path.join(root, 'nips_madness'),
+          # Exclude:
+          os.path.join(root, 'nips_madness', '__main__.py')])
+
+
+def setup(app):
+    app.connect('builder-inited', run_apidoc)

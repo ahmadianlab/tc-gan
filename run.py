@@ -15,13 +15,25 @@ from __future__ import print_function
 import importlib
 import os
 import pdb
+import subprocess
 import sys
 import traceback
 
+record_env_script_template = '''
+module list &> module-list.txt || rm module-list.txt
+set -ex
+which python
+which pip
+which conda
+pip freeze > pip-freeze.txt
+conda list --prefix "{project_root}/env" --export > conda-list.txt
+'''
 
-def run_module(module, arguments, use_pdb, assert_repo_is_clean):
+
+def run_module(module, arguments, use_pdb, assert_repo_is_clean,
+               record_env):
+    here = os.path.realpath(os.path.dirname(__file__))
     if os.path.isfile(module) and module.endswith('.py'):
-        here = os.path.realpath(os.path.dirname(__file__))
         relpath = os.path.relpath(os.path.realpath(module), here)
         module = relpath[:-len('.py')].replace(os.path.sep, '.')
     loaded = importlib.import_module(module)
@@ -33,6 +45,12 @@ def run_module(module, arguments, use_pdb, assert_repo_is_clean):
         if not git_is_clean():
             print('Repository is not clean.')
             return 3
+    if record_env:
+        subprocess.check_call(
+            record_env_script_template.format(project_root=here),
+            shell=True,
+            executable='/bin/bash',
+            cwd=record_env)
     try:
         loaded.main(arguments)
     except Exception:
@@ -68,6 +86,10 @@ def main(args=None):
     parser.add_argument(
         '--assert-repo-is-clean', action='store_true',
         help='abort (with code 3) if this repository is not clean')
+    parser.add_argument(
+        '--record-env',
+        help='''Directory in which environment information is saved.
+        Do nothing if not given.''')
     ns = parser.parse_args(args)
     sys.exit(run_module(**vars(ns)))
 

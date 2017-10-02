@@ -54,7 +54,8 @@ class DiscriminatorLog(object):
             return json.load(file)
 
     def pretty_title(self, title_params):
-        run_config = self.get_info()['run_config']
+        info = self.get_info()
+        run_config = dict(info['extra_info'], **info['run_config'])
         return ' '.join('{}={}'.format(k, run_config[k]) for k in title_params)
 
 

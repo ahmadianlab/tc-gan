@@ -68,6 +68,7 @@ def analyze_disc_learning(logpath, figpath=None, show=False, **kwds):
     """
     disc = load_disc_log(logpath)
     fig = disc.plot_all(**kwds)
+    fig.tight_layout()
     if show:
         pyplot.show()
     if figpath:

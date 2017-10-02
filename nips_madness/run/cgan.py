@@ -36,7 +36,7 @@ def learn(
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         offsets,
-        disc_normalization, disc_param_save_interval,
+        disc_normalization, disc_param_save_interval, disc_param_template,
         datastore, J0, D0, S0,
         timetest, convtest, testDW, DRtest):
 
@@ -277,7 +277,7 @@ def learn(
         if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
             lasagne_param_file.dump(
                 discriminator,
-                datastore.path('disc_param', str(k) + '.npz'))
+                datastore.path('disc_param', disc_param_template.format(k)))
 
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
@@ -582,9 +582,19 @@ def main(args=None):
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
     parser.add_argument(
-        '--disc-param-save-interval', default=-1, type=int,
-        help='''Save parameters for discriminator for each given step.
-        -1 (default) means to never save.''')
+        '--disc-param-save-interval', default=5, type=int,
+        help='''Save parameters for discriminator for each given
+        generator step. -1 means to never save.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-template', default='last.npz',
+        help='''Python string format for the name of the file to save
+        discriminator parameters.  First argument "{}" to the format
+        is the number of generator updates.  Not using "{}" means to
+        overwrite to existing file (default) which is handy if you are
+        only interested in the latest parameter.  Use "{}.npz" for
+        recording the history of evolution of the discriminator.
+        (default: %(default)s)''')
 
     parser.add_argument(
         '--quiet', action='store_true',

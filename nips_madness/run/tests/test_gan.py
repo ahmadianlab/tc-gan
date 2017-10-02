@@ -29,4 +29,4 @@ def test_disc_param_save_slowtest(cleancwd, single_g_step=single_g_step):
         '--disc-param-save-interval', '1',
         '--datastore', '.',
     ])
-    assert cleancwd.join('disc_param', '0.npz').check()
+    assert cleancwd.join('disc_param', 'last.npz').check()

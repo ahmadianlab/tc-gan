@@ -18,6 +18,7 @@ def single_g_step(args):
     ['--loss', 'CE'],
     ['--track_offset_identity'],
     ['--sample-sites', '0, 0.5'],
+    ['--disc-param-save-on-error'],
 ])
 def test_smoke_slowtest(args, cleancwd):
     single_g_step(args)

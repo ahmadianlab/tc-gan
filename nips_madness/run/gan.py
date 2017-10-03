@@ -96,6 +96,7 @@ def learn(
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         disc_normalization, disc_param_save_interval, disc_param_template,
+        disc_param_save_on_error,
         datastore, J0, D0, S0,
         timetest, convtest, testDW, DRtest):
 
@@ -406,6 +407,11 @@ def learn(
         truth_size_per_batch = NZ
     else:
         truth_size_per_batch = NZ * len(sample_sites)
+
+    if disc_param_save_on_error:
+        train_update = lasagne_param_file.wrap_with_save_on_error(
+            discriminator, datastore.path('disc_param', 'pre_error.npz'),
+        )(train_update)
 
     for k in range(iterations):
 
@@ -821,6 +827,11 @@ def main(args=None):
         overwrite to existing file (default) which is handy if you are
         only interested in the latest parameter.  Use "{}.npz" for
         recording the history of evolution of the discriminator.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-save-on-error', action='store_true',
+        help='''Save discriminator parameter just before something
+        when wrong (e.g., having NaN).
         (default: %(default)s)''')
 
     parser.add_argument(

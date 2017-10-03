@@ -20,11 +20,10 @@ the datastore:
   of the "true" SSN.
 
 ``generator.csv``
-  Generator parameters.  Logarithm of actual values
-  are stored.  Three 2x2 matrices J, D and S (sigma) are stored in the
-  2nd to 13th columns after they are concatenated and flattened.  The
-  first column stores the generator step.  Each row corresponds to
-  each generator step.
+  Generator parameters.  Three 2x2 matrices J, D and S (sigma) are
+  stored in the 2nd to 13th columns after they are concatenated and
+  flattened.  The first column stores the generator step.  Each row
+  corresponds to each generator step.
 
 ``disc_param_stats.csv``
   Normalized norms (2-norm divided by number
@@ -44,6 +43,8 @@ the datastore:
 from __future__ import print_function
 
 from types import SimpleNamespace
+import json
+import os
 
 import theano
 import theano.tensor as T
@@ -199,6 +200,8 @@ def learn(
     Jp = T.exp(J)
     Dp = T.exp(D)
     Sp = T.exp(S)
+
+    get_gen_param = theano.function([], [Jp, Dp, Sp])
 
     #compute jacobian of the primed variables w.r.t. J,D,S.
     dJpJ = T.reshape(T.jacobian(T.reshape(Jp,[-1]),J),[2,2,2,2])
@@ -436,11 +439,7 @@ def learn(
 
         datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
 
-        jj = J.get_value()
-        dd = D.get_value()
-        ss = S.get_value()
-        
-        allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
+        allpar = np.reshape(np.concatenate(get_gen_param()), [-1]).tolist()
         datastore.tables.saverow('generator.csv', [k] + allpar)
 
         if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
@@ -906,7 +905,13 @@ def preprocess(run_config):
                              ' Last row of {} contains {} columns.'
                              ' It has to contain 13 (or 12) columns.'
                              .format(load_gen_param, len(lastrow)))
-        J0, D0, S0 = np.exp(lastrow).reshape((3, 2, 2)).tolist()
+        with open(os.path.join(os.path.dirname(load_gen_param), 'info.json')) \
+                as file:
+            info = json.load(file)
+        data_version = info.get('extra_info', {}).get('data_version', 0)
+        if data_version < 1:
+            lastrow = np.exp(lastrow)
+        J0, D0, S0 = lastrow.reshape((3, 2, 2)).tolist()
     else:
         J0 = [[0.0957, 0.0638], [0.1197, 0.0479]]
         D0 = [[0.7660, 0.5106], [0.9575, 0.3830]]
@@ -924,6 +929,7 @@ def do_learning(learn, run_config):
         extra_info=dict(
             n_bandwidths=run_config['n_bandwidths'],
             load_gen_param=run_config['load_gen_param'],
+            data_version=1,
         ))
 
 

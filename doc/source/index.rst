@@ -6,6 +6,21 @@
 Welcome to NIPS madness!
 ========================
 
+Quick links:
+
+`.run.gan`
+  Entry point for running (non-conditional) GAN.
+
+`.run.cgan`
+  Entry point for running cGAN.
+
+`.ssnode`
+  Fixed-point solver for SSN.
+
+`.gradient_expressions`
+  Implementation of generator gradient.
+
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

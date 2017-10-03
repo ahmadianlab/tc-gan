@@ -103,6 +103,7 @@ def learn(
         true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
+        gen_param_type,
         disc_normalization, disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         datastore, J0, D0, S0,
@@ -171,13 +172,18 @@ def learn(
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array(J0)).astype("float64"), name="j")
-    D2 = theano.shared(np.log(np.array(D0)).astype("float64"), name="d")
-    S2 = theano.shared(np.log(np.array(S0)).astype("float64"), name="s")
+    if gen_param_type == 'log':
+        J2 = theano.shared(np.log(np.array(J0)).astype("float64"), name="j")
+        D2 = theano.shared(np.log(np.array(D0)).astype("float64"), name="d")
+        S2 = theano.shared(np.log(np.array(S0)).astype("float64"), name="s")
 
-    Jp2 = T.exp(J2)
-    Dp2 = T.exp(D2)
-    Sp2 = T.exp(S2)
+        Jp2 = T.exp(J2)
+        Dp2 = T.exp(D2)
+        Sp2 = T.exp(S2)
+    else:
+        J2 = Jp2 = theano.shared(np.array(J0, dtype="float64"), name="j")
+        D2 = Dp2 = theano.shared(np.array(D0, dtype="float64"), name="d")
+        S2 = Sp2 = theano.shared(np.array(S0, dtype="float64"), name="s")
 
     #these are the parammeters to be fit
     dp = init_disturbance
@@ -189,17 +195,18 @@ def learn(
     D_dis = np.array(D_dis) * np.ones((2, 2))
     S_dis = np.array(S_dis) * np.ones((2, 2))
 
-    J = theano.shared(J2.get_value() + J_dis, name = "j")
-    D = theano.shared(D2.get_value() + D_dis, name = "d")
-    S = theano.shared(S2.get_value() + S_dis, name = "s")
+    if gen_param_type == 'log':
+        J = theano.shared(J2.get_value() + J_dis, name="j")
+        D = theano.shared(D2.get_value() + D_dis, name="d")
+        S = theano.shared(S2.get_value() + S_dis, name="s")
 
-#    J = theano.shared(np.log(np.array([[.01,.01],[.02,.01]])).astype("float64"),name = "j")
-#    D = theano.shared(np.log(np.array([[.2,.2],[.3,.2]])).astype("float64"),name = "d")
-#    S = theano.shared(np.log(np.array([[.1,.1],[.1,.1]])).astype("float64"),name = "s")
-
-    Jp = T.exp(J)
-    Dp = T.exp(D)
-    Sp = T.exp(S)
+        Jp = T.exp(J)
+        Dp = T.exp(D)
+        Sp = T.exp(S)
+    else:
+        J = Jp = theano.shared(J2.get_value() * np.exp(J_dis), name="j")
+        D = Dp = theano.shared(D2.get_value() * np.exp(D_dis), name="d")
+        S = Sp = theano.shared(S2.get_value() * np.exp(S_dis), name="s")
 
     get_gen_param = theano.function([], [Jp, Dp, Sp])
 
@@ -426,6 +433,11 @@ def learn(
     for k in range(iterations):
 
         Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat = WGAN_n_critic0 if k == 0 else WGAN_n_critic,gen_step=k,datastore=datastore)
+
+        if gen_param_type == 'clip':
+            for gen_param in [J, D, S]:
+                gen_param.set_value(np.clip(gen_param.get_value(),
+                                            1e-3, 10))
 
         saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, true),
@@ -820,6 +832,9 @@ def main(args=None):
     parser.add_argument(
         '--WGAN_n_critic', default=5, type=int,
         help='Critic iterations (default: %(default)s)')
+    parser.add_argument(
+        '--gen-param-type', default='log', choices=('log', 'clip'),
+        help='Parametrization of generator (default: %(default)s)')
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')

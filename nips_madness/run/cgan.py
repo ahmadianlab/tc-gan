@@ -145,7 +145,7 @@ def learn(
 
     #these are the parammeters to be fit
     dp = init_disturbance
-    if isinstance(dp, tuple):
+    if isinstance(dp, (tuple, list)):
         J_dis, D_dis, S_dis = dp
     else:
         J_dis = D_dis = S_dis = dp
@@ -487,9 +487,9 @@ def main(args=None):
     parser.add_argument(
         '--init-disturbance', default=0.5, type=eval,
         help='''Initial disturbance to the parameter.  If it is
-        evaluated to be a 3-tuple, the components are used for the
-        disturbance for J, D (delta), S (sigma), respectively.  It
-        accepts any Python expression.
+        evaluated to be a tuple or list with three elements, these
+        elements are used for the disturbance for J, D (delta),
+        S (sigma), respectively.  It accepts any Python expression.
         (default: %(default)s)''')
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,

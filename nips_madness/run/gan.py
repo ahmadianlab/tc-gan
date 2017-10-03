@@ -896,6 +896,7 @@ def preprocess(run_config):
     # Set initial parameter set J/D/S for generator.
     load_gen_param = run_config.pop('load_gen_param')
     if load_gen_param:
+        assert not {'J0', 'D0', 'S0'} & set(run_config)
         lastrow = np.loadtxt(load_gen_param, delimiter=',')[-1]
         if len(lastrow) == 13:
             lastrow = lastrow[1:]
@@ -906,12 +907,14 @@ def preprocess(run_config):
                              ' Last row of {} contains {} columns.'
                              ' It has to contain 13 (or 12) columns.'
                              .format(load_gen_param, len(lastrow)))
-        J0, D0, S0 = np.exp(lastrow).reshape((3, 2, 2)).tolist()
+        J0, D0, S0 = np.exp(lastrow).reshape((3, 2, 2))
+        run_config.update(J0=J0, D0=D0, S0=S0)
     else:
-        J0 = [[0.0957, 0.0638], [0.1197, 0.0479]]
-        D0 = [[0.7660, 0.5106], [0.9575, 0.3830]]
-        S0 = [[0.08333375, 0.025], [0.166625, 0.025]]
-    run_config.update(J0=J0, D0=D0, S0=S0)
+        run_config.setdefault('J0', [[0.0957, 0.0638], [0.1197, 0.0479]])
+        run_config.setdefault('D0', [[0.7660, 0.5106], [0.9575, 0.3830]])
+        run_config.setdefault('S0', [[0.08333375, 0.025], [0.166625, 0.025]])
+    for key in ('J0', 'D0', 'S0'):
+        run_config[key] = utils.tolist_if_not(run_config[key])
 
 
 def do_learning(learn, run_config):

@@ -17,6 +17,7 @@ def single_g_step(args):
 @pytest.mark.parametrize('args', [
     [],
     ['--disc-param-save-interval', '1'],
+    ['--disc-param-save-on-error'],
     # These options do not work at the moment:
     pytest.mark.skip(['--track_offset_identity']),
     pytest.mark.skip(['--sample-sites', '0, 0.5']),

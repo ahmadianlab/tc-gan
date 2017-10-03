@@ -5,6 +5,8 @@ cudnn==5.1
 matplotlib
 pandas
 pytest
+pyflakes
+sphinx
 
 # "Optional" dependencies:
 ipython

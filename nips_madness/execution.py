@@ -133,10 +133,14 @@ def pre_learn(
         packages,
         datastore, datastore_template,
         load_config,
+        extra_info={}, preprocess=None,
         **run_config):
     if load_config:
         with open(load_config) as file:
             run_config.update(json.load(file))
+
+    if preprocess:
+        preprocess(run_config)
 
     if not datastore:
         datastore = format_datastore(datastore_template, run_config)
@@ -147,6 +151,7 @@ def pre_learn(
     with open(os.path.join(datastore, 'info.json'), 'w') as fp:
         json.dump(dict(
             run_config=run_config,
+            extra_info=extra_info,
             meta_info=meta_info,
         ), fp)
 
@@ -154,7 +159,8 @@ def pre_learn(
     return run_config
 
 
-def do_learning(learn, run_config, packages=default_tracking_packages):
+def do_learning(learn, run_config, extra_info={}, preprocess=None,
+                packages=default_tracking_packages):
     """
     Execute `learn` with `run_config` after pre-processing.
 
@@ -163,7 +169,9 @@ def do_learning(learn, run_config, packages=default_tracking_packages):
     `datastore` is an instance of `DataStore` object.
 
     """
-    run_config = pre_learn(packages=packages, **run_config)
+    run_config = pre_learn(packages=packages, extra_info=extra_info,
+                           preprocess=preprocess,
+                           **run_config)
     datastore = DataStore(run_config.pop('datastore'))
     with datastore.tables:
         return learn(datastore=datastore, **run_config)

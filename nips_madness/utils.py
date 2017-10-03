@@ -12,14 +12,22 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 def get_meta_info(packages=[]):
     return dict(
         repository=dict(
-            revision=git_output(['git', 'rev-parse', 'HEAD']).rstrip(),
-            is_clean=git_output(['git', 'status', '--short',
-                                 '--untracked-files=no']).strip() == '',
+            revision=git_revision(),
+            is_clean=git_is_clean(),
         ),
         python=sys.executable,
         packages={p.__name__: p.__version__ for p in packages},
         argv=sys.argv,
     )
+
+
+def git_revision():
+    return git_output(['git', 'rev-parse', 'HEAD']).rstrip()
+
+
+def git_is_clean():
+    return git_output(['git', 'status', '--short',
+                       '--untracked-files=no']).strip() == ''
 
 
 def git_output(args):

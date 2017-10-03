@@ -11,7 +11,6 @@ import theano.tensor as T
 import lasagne
 import numpy as np
 
-from .. import execution
 from .. import utils
 from ..gradient_expressions.utils import subsample_neurons, \
     sample_sites_from_stim_space
@@ -19,7 +18,8 @@ import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from .. import ssnode as SSsolve
-from .gan import do_learning
+from .. import lasagne_param_file
+from .gan import add_learning_options, do_learning
 
 import time
 
@@ -36,8 +36,9 @@ def learn(
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
         offsets,
-        disc_normalization,
-        datastore,
+        disc_normalization, disc_param_save_interval, disc_param_template,
+        disc_param_save_on_error,
+        datastore, J0, D0, S0,
         timetest, convtest, testDW, DRtest):
 
     print(datastore)
@@ -134,9 +135,9 @@ def learn(
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float32"),name = "j")
-    D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float32"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.08333375,.025],[.166625,.025]])).astype("float32"),name = "s")
+    J2 = theano.shared(np.log(np.array(J0)).astype("float32"), name="j")
+    D2 = theano.shared(np.log(np.array(D0)).astype("float32"), name="d")
+    S2 = theano.shared(np.log(np.array(S0)).astype("float32"), name="s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
@@ -228,7 +229,7 @@ def learn(
     dRdD = theano.function([rvec,ivec,Z],dRdD_exp,allow_input_downcast = True)
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
     
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,DIS_red_r_true = make_functions(
+    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator = make_functions(
         rate_vector=rvec, NZ=NZ, NB=NB, NCOND = conditions.shape[-1], LOSS=loss, LAYERS=layers,
         sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
@@ -251,9 +252,14 @@ def learn(
     else:
         truth_size_per_batch = NZ * len(sample_sites)
 
+    if disc_param_save_on_error:
+        train_update = lasagne_param_file.wrap_with_save_on_error(
+            discriminator, datastore.path('disc_param', 'pre_error.npz'),
+        )(train_update)
+
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,n_samples,WG_repeat = WGAN_n_critic0 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test,input_function,ssn_params,D_acc,get_reduced,J,D,S,n_samples,WG_repeat = WGAN_n_critic0 if k == 0 else 5)
 
         saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, temp_con, true, temp_con),
@@ -272,10 +278,15 @@ def learn(
         ss = S.get_value()
         
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-        datastore.tables.saverow('generator.csv', allpar)
+        datastore.tables.saverow('generator.csv', [k] + allpar)
+
+        if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
+            lasagne_param_file.dump(
+                discriminator,
+                datastore.path('disc_param', disc_param_template.format(k)))
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,D_acc,get_reduced,DIS_red_r_true,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     '''
     Conditional WGAN update function:
@@ -294,7 +305,6 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_
      ssn_params - list of SSN parameter shared variable.
      D_acc - function to compute discriminator accuracy
      get_reduced - function to get reduced set of sites.
-     DIS_red_r_true - discriminator reduced rate input variable
      J - J variable
      D - D variable
      S - sigma variable
@@ -547,9 +557,6 @@ def main(args=None):
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
-        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
-        help='Number of bandwidths (default: %(default)s)')
-    parser.add_argument(
         '--n_samples', default=15, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
@@ -579,6 +586,26 @@ def main(args=None):
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
     parser.add_argument(
+        '--disc-param-save-interval', default=5, type=int,
+        help='''Save parameters for discriminator for each given
+        generator step. -1 means to never save.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-template', default='last.npz',
+        help='''Python string format for the name of the file to save
+        discriminator parameters.  First argument "{}" to the format
+        is the number of generator updates.  Not using "{}" means to
+        overwrite to existing file (default) which is handy if you are
+        only interested in the latest parameter.  Use "{}.npz" for
+        recording the history of evolution of the discriminator.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-save-on-error', action='store_true',
+        help='''Save discriminator parameter just before something
+        when wrong (e.g., having NaN).
+        (default: %(default)s)''')
+
+    parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
 
@@ -595,7 +622,7 @@ def main(args=None):
         '--DRtest',default=False, action='store_true',
         help='test the R gradient')
 
-    execution.add_base_learning_options(parser)
+    add_learning_options(parser)
     parser.set_defaults(
         datastore_template='logfiles/cGAN_{IO_type}_{layers_str}_{rate_cost}',
     )

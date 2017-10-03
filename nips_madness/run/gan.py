@@ -5,23 +5,45 @@ It stores the learning result in the datastore directory specified by
 --datastore or --datastore-template.  Following files are generated in
 the datastore:
 
-* learning.csv --- All learning related stats such as
+``learning.csv``
+  All learning related stats such as
   generator/discriminator losses go into this file.
 
-* TC_mean.csv --- Tuning curves averaged over instances (the "z-axis")
+``disc_learning.csv``
+  Discriminator specific learning statistics.
+  Recorded even during the inner loop for discriminator.
+
+``TC_mean.csv``
+  Tuning curves averaged over instances (the "z-axis")
   are stored in a row (for each generator step).  The first half is
   the mean of the samples from "fake" SSN and the second half is that
   of the "true" SSN.
 
-* generator.csv --- Generator parameters.  Concatenated and flattened.
-  Each row corresponds to each generator step.
+``generator.csv``
+  Generator parameters.  Logarithm of actual values
+  are stored.  Three 2x2 matrices J, D and S (sigma) are stored in the
+  2nd to 13th columns after they are concatenated and flattened.  The
+  first column stores the generator step.  Each row corresponds to
+  each generator step.
 
-* info.json --- It stores parameters used for each run and some
+``disc_param_stats.csv``
+  Normalized norms (2-norm divided by number
+  of elements) of parameters in each layers.
+
+``info.json``
+  It stores parameters used for each run and some
   environment information such as the Git revision of this repository.
+
+``disc_param/last.npz``
+  Snapshot of the discriminator parameters.
+  Saved for each `disc_param_save_interval` generator updates.
+  See: --disc-param-save-interval, --disc-param-template
 
 """
 
 from __future__ import print_function
+
+from types import SimpleNamespace
 
 import theano
 import theano.tensor as T
@@ -35,6 +57,7 @@ from ..gradient_expressions.utils import subsample_neurons, \
 import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
+from .. import lasagne_param_file
 from .. import ssnode as SSsolve
 
 import time
@@ -42,16 +65,46 @@ import time
 from .. import stimuli
 
 
+def saveheader_disc_param_stats(datastore, discriminator):
+    header = ['gen_step', 'disc_step'] + [
+        '{}.nnorm'.format(p.name)  # Normalized NORM
+        for p in lasagne.layers.get_all_params(discriminator, trainable=True)
+    ]
+    datastore.tables.saverow('disc_param_stats.csv', header)
+
+
+def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
+    """
+    Save normalized norms of `discriminator`.
+
+    This function also checks for finiteness of the parameter and
+    raises an error when found.  "Downloading" discriminator parameter
+    is (likely) a time-consuming operation so it makes sense to do it
+    here.
+
+    """
+    nnorms = [
+        np.linalg.norm(arr.flatten()) / arr.size
+        for arr in lasagne.layers.get_all_param_values(discriminator)
+    ]
+    row = [gen_step, disc_step] + nnorms
+    datastore.tables.saverow('disc_param_stats.csv', row)
+
+    assert np.isfinite(nnorms).all()
+
+
 def learn(
         iterations, seed, gen_learn_rate, disc_learn_rate,
         loss, layers, n_samples, WGAN_lambda,
+        WGAN_n_critic0, WGAN_n_critic,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
-        disc_normalization, disc_param_save_interval,
-        datastore,
+        disc_normalization, disc_param_save_interval, disc_param_template,
+        disc_param_save_on_error,
+        datastore, J0, D0, S0,
         timetest, convtest, testDW, DRtest):
 
     print(datastore)
@@ -117,9 +170,9 @@ def learn(
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array([[.0957,.0638],[.1197,.0479]])).astype("float64"),name = "j")
-    D2 = theano.shared(np.log(np.array([[.7660,.5106],[.9575,.3830]])).astype("float64"),name = "d")
-    S2 = theano.shared(np.log(np.array([[.08333375,.025],[.166625,.025]])).astype("float64"),name = "s")
+    J2 = theano.shared(np.log(np.array(J0)).astype("float64"), name="j")
+    D2 = theano.shared(np.log(np.array(D0)).astype("float64"), name="d")
+    S2 = theano.shared(np.log(np.array(S0)).astype("float64"), name="s")
 
     Jp2 = T.exp(J2)
     Dp2 = T.exp(D2)
@@ -351,14 +404,25 @@ def learn(
         datastore.tables.saverow("learning.csv", row, echo=not quiet)
     saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
+    saveheader_disc_param_stats(datastore, discriminator)
+    datastore.tables.saverow('disc_learning.csv', [
+        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
+        'SSsolve_time', 'gradient_time',
+    ])
+
     if track_offset_identity:
         truth_size_per_batch = NZ
     else:
         truth_size_per_batch = NZ * len(sample_sites)
 
+    if disc_param_save_on_error:
+        train_update = lasagne_param_file.wrap_with_save_on_error(
+            discriminator, datastore.path('disc_param', 'pre_error.npz'),
+        )(train_update)
+
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 50 if k == 0 else 5)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat = WGAN_n_critic0 if k == 0 else WGAN_n_critic,gen_step=k,datastore=datastore)
 
         saverow_learning(
             [k, Gloss, Dloss, D_acc(rtest, true),
@@ -377,15 +441,15 @@ def learn(
         ss = S.get_value()
         
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-        datastore.tables.saverow('generator.csv', allpar)
+        datastore.tables.saverow('generator.csv', [k] + allpar)
 
         if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
-            np.savez_compressed(
-                datastore.path('disc_param', str(k), '.npz'),
-                *lasagne.layers.get_all_param_values(discriminator))
+            lasagne_param_file.dump(
+                discriminator,
+                datastore.path('disc_param', disc_param_template.format(k)))
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -396,16 +460,17 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
             wtest, = W(ztest)
             yield ztest[0], wtest
 
-    # Generate "fake" samples from the fitted model.  Since the
-    # generator does not change in the loop over updates of the
-    # discriminator, we generate the whole samples at once.  This
-    # gives us 40% speedup in asym_tanh case:
-    with SSsolve_time:
-        z_batch, r_batch, model_info = SSsolve.find_fixed_points(
-            NZ * WG_repeat, Z_W_gen(), inp,
-            **ssn_params)
+    model_info = SimpleNamespace(rejections=0, unused=0)
 
     for rep in range(WG_repeat):
+        with SSsolve_time:
+            Ztest, rtest, minfo = SSsolve.find_fixed_points(
+                NZ, Z_W_gen(), inp,
+                **ssn_params)
+
+        model_info.rejections += minfo.rejections
+        model_info.unused += minfo.unused
+
         #the data
         idx = np.random.choice(len(data), truth_size_per_batch)
         true = data[idx]
@@ -417,19 +482,23 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
         eps = np.random.rand(truth_size_per_batch, 1)
 
-        rtest = r_batch[NZ*rep:NZ*(rep+1)]
         with gradient_time:
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
+        saverow_disc_param_stats(datastore, discriminator, gen_step, rep)
+        datastore.tables.saverow('disc_learning.csv', [
+            gen_step, rep, Dloss, D_acc(rtest, true),
+            SSsolve_time.times[-1], gradient_time.times[-1],
+        ])
+
     #end D loop
 
-    Ztest = z_batch[-NZ:]
     with gradient_time:
         Gloss = G_train_func(rtest,inp,Ztest)
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -455,6 +524,12 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
     with gradient_time:
         Dloss = D_train_func(rtest,true)
         Gloss = G_train_func(rtest,inp,Ztest)
+
+    saverow_disc_param_stats(datastore, discriminator, gen_step, 0)
+    datastore.tables.saverow('disc_learning.csv', [
+        gen_step, 0, Dloss, D_acc(rtest, true),
+        SSsolve_time.times[-1], gradient_time.times[-1],
+    ])
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
@@ -717,11 +792,9 @@ def main(args=None):
         '--layers', default=[], type=eval,
         help='List of nnumbers of units in hidden layers (default: %(default)s)')
     parser.add_argument(
-        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
-        help='Number of bandwidths (default: %(default)s)')
-    parser.add_argument(
         '--n_samples', default=15, type=eval,
-        help='Number of samples to draw from G each step (default: %(default)s)')
+        help='''Number of samples to draw from G each step
+        (aka NZ, minibatch size). (default: %(default)s)''')
     parser.add_argument(
         '--rate_cost', default='0',
         help='The cost of having the rate be large (default: %(default)s)')
@@ -743,12 +816,33 @@ def main(args=None):
         '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')
     parser.add_argument(
+        '--WGAN_n_critic0', default=50, type=int,
+        help='First critic iterations (default: %(default)s)')
+    parser.add_argument(
+        '--WGAN_n_critic', default=5, type=int,
+        help='Critic iterations (default: %(default)s)')
+    parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
     parser.add_argument(
-        '--disc-param-save-interval', default=-1, type=int,
-        help='''Save parameters for discriminator for each given step.
-        -1 (default) means to never save.''')
+        '--disc-param-save-interval', default=5, type=int,
+        help='''Save parameters for discriminator for each given
+        generator step. -1 means to never save.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-template', default='last.npz',
+        help='''Python string format for the name of the file to save
+        discriminator parameters.  First argument "{}" to the format
+        is the number of generator updates.  Not using "{}" means to
+        overwrite to existing file (default) which is handy if you are
+        only interested in the latest parameter.  Use "{}.npz" for
+        recording the history of evolution of the discriminator.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-save-on-error', action='store_true',
+        help='''Save discriminator parameter just before something
+        when wrong (e.g., having NaN).
+        (default: %(default)s)''')
 
     parser.add_argument(
         '--quiet', action='store_true',
@@ -767,16 +861,24 @@ def main(args=None):
         '--DRtest',default=False, action='store_true',
         help='test the R gradient')
 
-    execution.add_base_learning_options(parser)
-
+    add_learning_options(parser)
     ns = parser.parse_args(args)
     do_learning(learn, vars(ns))
 
 
-def do_learning(learn, run_config):
-    """
-    Wrap `.execution.do_learning` with some pre-processing.
-    """
+def add_learning_options(parser):
+    parser.add_argument(
+        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
+        help='Number of bandwidths (default: %(default)s)')
+    parser.add_argument(
+        '--load-gen-param',
+        help='''Path to generator.csv whose last row is loaded as the
+        starting point.''')
+
+    execution.add_base_learning_options(parser)
+
+
+def preprocess(run_config):
     # Set `bandwidths` outside the `learn` function, so that
     # `bandwidths` is stored in info.json:
     n_bandwidths = run_config.pop('n_bandwidths')
@@ -791,7 +893,38 @@ def do_learning(learn, run_config):
                          .format(n_bandwidths))
     run_config['bandwidths'] = bandwidths
 
-    execution.do_learning(learn, run_config)
+    # Set initial parameter set J/D/S for generator.
+    load_gen_param = run_config.pop('load_gen_param')
+    if load_gen_param:
+        lastrow = np.loadtxt(load_gen_param, delimiter=',')[-1]
+        if len(lastrow) == 13:
+            lastrow = lastrow[1:]
+        elif len(lastrow) == 12:
+            pass
+        else:
+            raise ValueError('Invalid format.'
+                             ' Last row of {} contains {} columns.'
+                             ' It has to contain 13 (or 12) columns.'
+                             .format(load_gen_param, len(lastrow)))
+        J0, D0, S0 = np.exp(lastrow).reshape((3, 2, 2)).tolist()
+    else:
+        J0 = [[0.0957, 0.0638], [0.1197, 0.0479]]
+        D0 = [[0.7660, 0.5106], [0.9575, 0.3830]]
+        S0 = [[0.08333375, 0.025], [0.166625, 0.025]]
+    run_config.update(J0=J0, D0=D0, S0=S0)
+
+
+def do_learning(learn, run_config):
+    """
+    Wrap `.execution.do_learning` with some pre-processing.
+    """
+    execution.do_learning(
+        learn, run_config,
+        preprocess=preprocess,
+        extra_info=dict(
+            n_bandwidths=run_config['n_bandwidths'],
+            load_gen_param=run_config['load_gen_param'],
+        ))
 
 
 if __name__ == "__main__":

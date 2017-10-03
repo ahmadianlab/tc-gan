@@ -5,6 +5,7 @@ import matplotlib
 import numpy as np
 
 from ..ssnode import DEFAULT_PARAMS
+from ..utils import csv_line
 from .loader import load_gandata
 
 
@@ -73,7 +74,7 @@ def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
     return axes
 
 
-def plot_learning(data):
+def plot_learning(data, title_params=None):
     df = data.to_dataframe()
     fig, axes = pyplot.subplots(nrows=4, ncols=3,
                                 sharex=True,
@@ -104,7 +105,7 @@ def plot_learning(data):
     plot_gen_params(data, axes=axes[3, :],
                     yscale='log', legend=False, ylim=False)
 
-    fig.suptitle(data.pretty_spec())
+    fig.suptitle(data.pretty_spec(title_params))
     return fig
 
 
@@ -154,8 +155,8 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     return ax
 
 
-def analyze_learning(logpath, show, figpath):
-    fig = plot_learning(load_gandata(logpath))
+def analyze_learning(logpath, show, figpath, title_params):
+    fig = plot_learning(load_gandata(logpath), title_params)
     if show:
         pyplot.show()
     if figpath:
@@ -165,9 +166,15 @@ def analyze_learning(logpath, show, figpath):
 def main(args=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('logpath', help='path to SSNGAN_log_*.log')
+    parser.add_argument(
+        'logpath',
+        help='''Path to GAN output directory. It can also be any file
+        in such directory; filename part is ignored.''')
     parser.add_argument('--figpath')
     parser.add_argument('--show', action='store_true')
+    parser.add_argument(
+        '--title-params', type=csv_line(str),
+        help='Comma separated name of parameters to be used in figure title.')
     ns = parser.parse_args(args)
     analyze_learning(**vars(ns))
 

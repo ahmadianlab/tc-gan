@@ -25,6 +25,7 @@ Quick links:
    :maxdepth: 2
    :caption: Contents:
 
+   ssn.rst
    api/modules.rst
 
 

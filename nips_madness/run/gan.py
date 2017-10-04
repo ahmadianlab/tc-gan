@@ -93,6 +93,13 @@ def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
     assert np.isfinite(nnorms).all()
 
 
+def get_updater(update_name, *args, **kwds):
+    if update_name == 'adam-wgan':
+        return lasagne.updates.adam(*args,
+                                    **dict(beta1=0.5, beta2=0.9, **kwds))
+    return getattr(lasagne.updates, update_name)(*args, **kwds)
+
+
 def learn(
         iterations, seed, gen_learn_rate, disc_learn_rate,
         loss, layers, n_samples, WGAN_lambda,
@@ -105,7 +112,8 @@ def learn(
         disc_normalization, disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         datastore, J0, D0, S0,
-        timetest, convtest, testDW, DRtest):
+        timetest, convtest, testDW, DRtest,
+        **make_func_kwargs):
 
     print(datastore)
 
@@ -394,7 +402,8 @@ def learn(
         rate_penalty_no_I=rate_penalty_no_I,
         ivec=ivec, Z=Z, J=J, D=D, S=S, N=N,
         disc_normalization=disc_normalization,
-        R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp])
+        R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp],
+        **make_func_kwargs)
 
     #Now we set up values to use in testing.
 
@@ -534,7 +543,7 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization):
+def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update):
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -591,7 +600,10 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
                                         allow_input_downcast=True)
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator, trainable=True), d_lr)#discriminator training function
+    D_updates = get_updater(
+        disc_update, true_loss_exp,
+        lasagne.layers.get_all_params(discriminator, trainable=True),
+        d_lr)
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector],true_loss_exp,allow_input_downcast = True)
@@ -613,7 +625,8 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     dLdD = theano.function([rate_vector,ivec,Z],dLdD_exp,allow_input_downcast = True)
     dLdS = theano.function([rate_vector,ivec,Z],dLdS_exp,allow_input_downcast = True)
 
-    G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr)
+    G_updates = get_updater(gen_update, [dLdJ_exp, dLdD_exp, dLdS_exp],
+                            [J, D, S], g_lr)
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true],true_loss_exp,updates = D_updates,allow_input_downcast = True)
@@ -623,7 +636,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func
 
-def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization):
+def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update):
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -707,11 +720,12 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     ####
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    b1 = .5
-    b2 = .9
-
-    G_updates = lasagne.updates.adam([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr,beta1 = b1,beta2 = b2)
-    D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator, trainable=True), d_lr,beta1 = b1,beta2 = b2)#discriminator training function
+    G_updates = get_updater(gen_update, [dLdJ_exp, dLdD_exp, dLdS_exp],
+                            [J, D, S], g_lr)
+    D_updates = get_updater(
+        disc_update, true_loss_exp,
+        lasagne.layers.get_all_params(discriminator, trainable=True),
+        d_lr)
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,updates = D_updates,allow_input_downcast = True)
@@ -746,6 +760,19 @@ def main(args=None):
     parser.add_argument(
         '--disc-learn-rate', default=0.001, type=float,
         help='Learning rate for discriminator (default: %(default)s)')
+    parser.add_argument(
+        '--gen-update', default='adam-wgan',
+        help='''Update function for generator.  Any function under
+        `lasagne.updates` can be specified.  Special value "adam-wgan"
+        means Adam with the betas mentioned in "Improved WGAN" paper.
+        Note that this is also the case even when --loss is not WD
+        (WGAN).  To use default Adam for this case (old behavior), use
+        --gen-update=adam and --disc-update=adam.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-update', default='adam-wgan',
+        help='''Update function for generator.
+        See --gen-update. (default: %(default)s)''')
     parser.add_argument(
         '--N', '-N', dest='n_sites', default=201, type=int,
         help='''Number of excitatory neurons in SSN. (default:

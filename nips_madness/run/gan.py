@@ -386,7 +386,7 @@ def learn(
  
         exit()
 
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator = make_functions(
+    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func = make_functions(
         rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
         sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
@@ -402,7 +402,7 @@ def learn(
 
     def saverow_learning(row):
         datastore.tables.saverow("learning.csv", row, echo=not quiet)
-    saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
+    saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused,rate_penalty")
 
     saveheader_disc_param_stats(datastore, discriminator)
     datastore.tables.saverow('disc_learning.csv', [
@@ -429,7 +429,8 @@ def learn(
              SSsolve_time,
              gradient_time,
              model_info.rejections,
-             model_info.unused])
+             model_info.unused,
+             rate_penalty_func(rtest)])
 
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)
@@ -584,7 +585,10 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
         penalized_rate = rate_vector[:, :, :N]
     else:
         penalized_rate = rate_vector
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
+    rate_penalty = SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
+    fake_loss_exp_train = fake_loss_exp + rate_cost * rate_penalty
+    rate_penalty_func = theano.function([rate_vector], rate_penalty,
+                                        allow_input_downcast=True)
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     D_updates = lasagne.updates.adam(true_loss_exp,lasagne.layers.get_all_params(discriminator, trainable=True), d_lr)#discriminator training function
@@ -617,7 +621,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator
+    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func
 
 def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization):
 
@@ -672,7 +676,10 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
         penalized_rate = rate_vector[:, :, :N]
     else:
         penalized_rate = rate_vector
-    fake_loss_exp_train = fake_loss_exp + rate_cost * SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
+    rate_penalty = SSgrad.rectify(penalized_rate - rate_penalty_threshold).mean()
+    fake_loss_exp_train = fake_loss_exp + rate_cost * rate_penalty
+    rate_penalty_func = theano.function([rate_vector], rate_penalty,
+                                        allow_input_downcast=True)
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector,red_fake_for_grad],true_loss_exp,allow_input_downcast = True)
@@ -712,7 +719,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator
+    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func
 
 
 def main(args=None):

@@ -1,3 +1,7 @@
+"""
+Benchmark to find a good `resubmit_threshold` for `.find_fixed_points`.
+"""
+
 import itertools
 import timeit
 

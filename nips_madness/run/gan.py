@@ -100,6 +100,23 @@ def get_updater(update_name, *args, **kwds):
     return getattr(lasagne.updates, update_name)(*args, **kwds)
 
 
+def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
+    JDS_fake = np.concatenate(JDS_fake).flatten()
+    JDS_true = np.concatenate(JDS_true).flatten()
+    JDS_distance = np.linalg.norm(JDS_fake - JDS_true)
+
+    if quit_JDS_threshold > 0 and JDS_distance >= quit_JDS_threshold:
+        datastore.dump_json(dict(
+            reason='JDS_distance',
+            JDS_distance=JDS_distance,
+            good=False,
+        ), 'exit.json')
+        raise execution.SuccessExit(
+            'Exit simulation since (J, D, S)-distance (= {})'
+            ' to the true parameter exceed threshold (= {}).'
+            .format(JDS_distance, quit_JDS_threshold))
+
+
 def learn(
         iterations, seed, gen_learn_rate, disc_learn_rate,
         loss, layers, n_samples, WGAN_lambda,
@@ -111,7 +128,7 @@ def learn(
         contrast,
         disc_normalization, disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
-        datastore, J0, D0, S0,
+        datastore, J0, D0, S0, quit_JDS_threshold,
         timetest, convtest, testDW, DRtest,
         **make_func_kwargs):
 
@@ -458,6 +475,13 @@ def learn(
                 discriminator,
                 datastore.path('disc_param', disc_param_template.format(k)))
 
+        maybe_quit(
+            datastore,
+            JDS_fake=list(map(np.exp, [jj, dd, ss])),
+            JDS_true=[J0, D0, S0],
+            quit_JDS_threshold=quit_JDS_threshold,
+        )
+
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
 
@@ -754,6 +778,12 @@ def main(args=None):
         elements are used for the disturbance for J, D (delta),
         S (sigma), respectively.  It accepts any Python expression.
         (default: %(default)s)''')
+    parser.add_argument(
+        '--quit-JDS-threshold', default=-1, type=float,
+        help='''Threshold in l2 norm distance in (J, D, S)-space form
+        the true parameter.  If the distance exceeds this threshold,
+        the simulation is terminated.  -1 (default) means never
+        terminate.''')
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')

@@ -7,6 +7,11 @@ import theano
 
 from . import utils
 
+
+class SuccessExit(Exception):
+    """Exception for successful exit (code=0)."""
+
+
 default_tracking_packages = [
     theano, lasagne, numpy,
 ]
@@ -74,6 +79,10 @@ class DataStore(object):
         newpath = os.path.join(self.directory, *subpaths)
         makedirs_exist_ok(os.path.dirname(newpath))
         return newpath
+
+    def dump_json(self, obj, filename):
+        with open(self.path(filename), 'w') as fp:
+            json.dump(obj, fp)
 
     def __repr__(self):
         return '<DataStore: {}>'.format(self.directory)

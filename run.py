@@ -36,7 +36,7 @@ def run_module(module, arguments, use_pdb, assert_repo_is_clean,
     if os.path.isfile(module) and module.endswith('.py'):
         relpath = os.path.relpath(os.path.realpath(module), here)
         module = relpath[:-len('.py')].replace(os.path.sep, '.')
-    from nips_madness.execution import SuccessExit
+    from nips_madness.execution import KnownError
     loaded = importlib.import_module(module)
     if not hasattr(loaded, 'main'):
         print('Module', module, 'do not have main function.')
@@ -59,8 +59,9 @@ def run_module(module, arguments, use_pdb, assert_repo_is_clean,
             traceback.print_exc()
             print()
             pdb.post_mortem()
-        elif isinstance(err, SuccessExit):
-            pass
+        elif isinstance(err, KnownError):
+            print(err)
+            return err.exit_code
         else:
             raise
 

@@ -90,7 +90,16 @@ def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
     row = [gen_step, disc_step] + nnorms
     datastore.tables.saverow('disc_param_stats.csv', row)
 
-    assert np.isfinite(nnorms).all()
+    isfinite_nnorms = np.isfinite(nnorms)
+    if not isfinite_nnorms.all():
+        datastore.dump_json(dict(
+            reason='disc_param_has_nan',
+            isfinite_nnorms=isfinite_nnorms.tolist(),
+            good=False,
+        ), 'exit.json')
+        raise execution.KnownError(
+            "Discriminator parameter is not finite.",
+            exit_code=3)
 
 
 def get_updater(update_name, *args, **kwds):

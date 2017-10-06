@@ -8,8 +8,19 @@ import theano
 from . import utils
 
 
-class SuccessExit(Exception):
+class KnownError(Exception):
+    """Exception with exit code."""
+
+    def __init__(self, message, exit_code=1):
+        self.exit_code = exit_code
+        super(KnownError, self).__init__(message)
+
+
+class SuccessExit(KnownError):
     """Exception for successful exit (code=0)."""
+
+    def __init__(self, message):
+        super(SuccessExit, self).__init__(message, exit_code=0)
 
 
 default_tracking_packages = [

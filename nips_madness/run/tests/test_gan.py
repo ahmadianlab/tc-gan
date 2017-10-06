@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+import lasagne
 import numpy as np
 import pytest
 
@@ -37,6 +38,17 @@ def test_disc_param_save_slowtest(cleancwd, single_g_step=single_g_step):
         '--datastore', '.',
     ])
     assert cleancwd.join('disc_param', 'last.npz').check()
+
+
+def test_disc_param_isfinite():
+    datastore = Mock()
+    l0 = lasagne.layers.InputLayer((2, 3))
+    l1 = lasagne.layers.DenseLayer(l0, 5)
+    W = l1.W.get_value()
+    W[0, 0] = np.nan
+    l1.W.set_value(W)
+    with pytest.raises(execution.KnownError):
+        gan.saverow_disc_param_stats(datastore, l1, 0, 0)
 
 
 def test_quit_JDS_threshold_quit():

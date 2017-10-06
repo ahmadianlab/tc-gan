@@ -92,14 +92,16 @@ def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
 
     isfinite_nnorms = np.isfinite(nnorms)
     if not isfinite_nnorms.all():
-        datastore.dump_json(dict(
-            reason='disc_param_has_nan',
-            isfinite_nnorms=isfinite_nnorms.tolist(),
-            good=False,
-        ), 'exit.json')
-        raise execution.KnownError(
-            "Discriminator parameter is not finite.",
-            exit_code=3)
+        if not all(np.isfinite(arr).all() for arr in
+                   lasagne.layers.get_all_param_values(discriminator)):
+            datastore.dump_json(dict(
+                reason='disc_param_has_nan',
+                isfinite_nnorms=isfinite_nnorms.tolist(),
+                good=False,
+            ), 'exit.json')
+            raise execution.KnownError(
+                "Discriminator parameter is not finite.",
+                exit_code=3)
 
 
 def get_updater(update_name, *args, **kwds):

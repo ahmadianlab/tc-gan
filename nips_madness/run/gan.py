@@ -151,15 +151,15 @@ def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
 
 
 def learn(
-        iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, layers, n_samples,
+        iterations, seed,
+        loss, n_samples,
         WGAN_n_critic0, WGAN_n_critic,
-        rate_cost, rate_penalty_threshold, rate_penalty_no_I,
+        rate_cost,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity, init_disturbance, quiet,
         contrast,
-        disc_normalization, disc_param_save_interval, disc_param_template,
+        disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         datastore, J0, D0, S0, quit_JDS_threshold,
         timetest, convtest, testDW, DRtest,
@@ -167,12 +167,16 @@ def learn(
 
     gan = GenerativeAdversarialNetwork(
         datastore=datastore,
+        track_offset_identity=track_offset_identity,
+        rate_cost=float(rate_cost),
+        loss_type=loss,
     )
 
     print(datastore)
 
     bandwidths = np.array(bandwidths)
-    sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
+    gan.sample_sites = \
+        sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
 
     WGAN = loss == 'WD'
     if WGAN:
@@ -182,7 +186,6 @@ def learn(
         make_functions = make_RGAN_functions
         train_update = RGAN_update
 
-    rate_cost = float(rate_cost)
     np.random.seed(seed)
 
     smoothness = 0.03125
@@ -285,7 +288,7 @@ def learn(
     print(BAND_IN.shape)
 
     #theano variable for the random samples
-    Z = T.tensor3("z","float32")
+    gan.Z = Z = T.tensor3("z", "float32")
 
     #symbolic W
     ww = make_w.make_W_with_x(Z,Jp,Dp,Sp,n,X)
@@ -320,8 +323,8 @@ def learn(
     #now we need to get a function to generate dr/dth from dw/dth
 
     #variables for rates and inputs
-    rvec = T.tensor3("rvec","float32")
-    ivec = T.matrix("ivec","float32")
+    gan.rate_vector = rvec = T.tensor3("rvec", "float32")
+    gan.ivec = ivec = T.matrix("ivec", "float32")
 
     #DrDth tensor expressions
     WRgrad_params = dict(
@@ -448,17 +451,11 @@ def learn(
  
         exit()
 
+    assert not set(vars(gan)) & set(make_func_kwargs)  # no common keys
     make_functions(
         gan,
-        rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
-        sample_sites=sample_sites, track_offset_identity=track_offset_identity,
-        d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
-        rate_penalty_threshold=rate_penalty_threshold,
-        rate_penalty_no_I=rate_penalty_no_I,
-        ivec=ivec, Z=Z, J=J, D=D, S=S, N=N,
-        disc_normalization=disc_normalization,
         R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp],
-        **make_func_kwargs)
+        **dict(make_func_kwargs, **vars(gan)))
 
     #Now we set up values to use in testing.
 
@@ -618,7 +615,9 @@ def RGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,g
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
 
-def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update, **_):
+def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update, **_):
+    d_lr = disc_learn_rate
+    g_lr = gen_learn_rate
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -644,7 +643,7 @@ def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    discriminator = SD.make_net(INSHAPE, LOSS, LAYERS,
+    discriminator = SD.make_net(INSHAPE, loss_type, layers,
                                 normalization=disc_normalization)
 
     #get the outputs
@@ -654,11 +653,11 @@ def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr
     D_acc = theano.function([rate_vector,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
 
     #make the loss functions
-    if LOSS == "CE":
+    if loss_type == "CE":
         SM = .9
         true_loss_exp = -SM*np.log(true_dis_out).mean() - (1. - SM)*np.log(1. - true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
         fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
-    elif LOSS == "LS":
+    elif loss_type == "LS":
         true_loss_exp = ((true_dis_out - 1.)**2).mean() + ((fake_dis_out + 1.)**2).mean()#discriminator loss
         fake_loss_exp = ((fake_dis_out - 1.)**2).mean()#generative loss
     else:
@@ -722,7 +721,9 @@ def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr
     gan.rate_penalty_func = rate_penalty_func
 
 
-def make_WGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,**_):
+def make_WGAN_functions(gan,rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,**_):
+    d_lr = disc_learn_rate
+    g_lr = gen_learn_rate
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -748,7 +749,7 @@ def make_WGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    discriminator = SD.make_net(INSHAPE, "WGAN", LAYERS,
+    discriminator = SD.make_net(INSHAPE, "WGAN", layers,
                                 normalization=disc_normalization)
 
     #get the outputs

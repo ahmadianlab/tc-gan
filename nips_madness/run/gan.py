@@ -97,6 +97,48 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
     """
 
 
+class UpdateResult(SimpleNamespace):
+    """
+    Result of a generator update.
+
+    Attributes
+    ----------
+    Dloss : float
+        Value of the discriminator loss.  If there are multiple
+        discriminator updates per generator update (in WGAN), this is
+        the value from the last iteration.
+    Gloss : float
+        Value of the generator loss.
+    rtest : array of shape (NZ, len(inp), 2N)
+        Fixed-points of the fake SSN.  This is the second element
+        (`Rs`) returned by `.find_fixed_points`.
+    true : array
+        True tuning curves.  This is the fixed-point "reduced" by
+        `.subsample_neurons`.  The shape of this array is
+        ``(NZ, NB * len(sample_sites))`` if `track_offset_identity` is
+        set to true or otherwise ``(NZ * len(sample_sites), NB)``.
+        See `make_WGAN_functions` and  `make_RGAN_functions`.
+    model_info : `.FixedPointsInfo` or `.SimpleNamespace`
+        An object with attribute `rejections` and `unused` which are
+        the sum of the value in the same field of all
+        `.FixedPointsInfo` objects returned by `.find_fixed_points`
+        calls in `.WGAN_update`.  In case of `.RGAN_update`, it simply
+        is `.FixedPointsInfo` since there is only one generator
+        update.
+    SSsolve_time : float
+        Total wall time spent for solving fixed points in update
+        function.
+    gradient_time : float
+        Total wall time spent for calculating gradient and updating
+        parameters.
+
+    Todo
+    ----
+    Rename parameters like `.rtest`, `.true` to more descriptive ones.
+
+    """
+
+
 def saveheader_disc_param_stats(datastore, discriminator):
     header = ['gen_step', 'disc_step'] + [
         '{}.nnorm'.format(p.name)  # Normalized NORM
@@ -134,6 +176,103 @@ def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
             raise execution.KnownError(
                 "Discriminator parameter is not finite.",
                 exit_code=3)
+
+
+class LearningRecorder(object):
+
+    filename = "learning.csv"
+    column_names = (
+        "epoch", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
+        "gradient_time", "model_convergence", "model_unused",
+        "rate_penalty")
+
+    def __init__(self, datastore, quiet):
+        self.datastore = datastore
+        self.quiet = quiet
+
+    def _saverow(self, row):
+        assert len(row) == len(self.column_names)
+        self.datastore.tables.saverow(self.filename, row, echo=not self.quiet)
+
+    def write_header(self):
+        self._saverow(self.column_names)
+
+    def record(self, gan, gen_step, update_result):
+        self._saverow([
+            gen_step,
+            update_result.Gloss,
+            update_result.Dloss,
+            update_result.Daccuracy,
+            update_result.SSsolve_time,
+            update_result.gradient_time,
+            update_result.model_info.rejections,
+            update_result.model_info.unused,
+            gan.rate_penalty_func(update_result.rtest)])
+
+
+class GANDriver(object):
+
+    def __init__(self, gan, **kwargs):
+        self.gan = gan
+        self.datastore = gan.datastore
+        self.__dict__.update(kwargs)
+
+    def pre_loop(self):
+        self.learning_recorder = LearningRecorder(self.datastore, self.quiet)
+        saveheader_disc_param_stats(self.datastore, self.gan.discriminator)
+        self.datastore.tables.saverow('disc_learning.csv', [
+            'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
+            'SSsolve_time', 'gradient_time',
+        ])
+
+    def post_update(self, gen_step, update_result):
+        self.learning_recorder.record(self.gan, gen_step, update_result)
+
+        GZmean = self.gan.get_reduced(update_result.rtest).mean(axis=0)
+        Dmean = update_result.true.mean(axis=0)
+
+        self.datastore.tables.saverow('TC_mean.csv',
+                                      list(GZmean) + list(Dmean))
+
+        jj = self.gan.J.get_value()
+        dd = self.gan.D.get_value()
+        ss = self.gan.S.get_value()
+
+        allpar = np.reshape(np.concatenate([jj, dd, ss]), [-1]).tolist()
+        self.datastore.tables.saverow('generator.csv', [gen_step] + allpar)
+
+        if self.disc_param_save_interval > 0 \
+                and gen_step % self.disc_param_save_interval == 0:
+            lasagne_param_file.dump(
+                self.gan.discriminator,
+                self.datastore.path('disc_param',
+                                    self.disc_param_template.format(gen_step)))
+
+        maybe_quit(
+            self.datastore,
+            JDS_fake=list(map(np.exp, [jj, dd, ss])),
+            JDS_true=[self.gan.J0, self.gan.D0, self.gan.S0],
+            quit_JDS_threshold=self.quit_JDS_threshold,
+        )
+
+    def post_loop(self):
+        self.datastore.dump_json(dict(
+            reason='end_of_iteration',
+            good=True,
+        ), 'exit.json')
+
+    def iterate(self, update_func):
+        if self.disc_param_save_on_error:
+            update_func = lasagne_param_file.wrap_with_save_on_error(
+                self.gan.discriminator,
+                self.datastore.path('disc_param', 'pre_error.npz'),
+                self.datastore.path('disc_param', 'post_error.npz'),
+            )(update_func)
+
+        self.pre_loop()
+        for gen_step in range(self.iterations):
+            self.post_update(gen_step, update_func(gen_step))
+        self.post_loop()
 
 
 def get_updater(update_name, *args, **kwds):
@@ -181,6 +320,14 @@ def learn(
         track_offset_identity=track_offset_identity,
         rate_cost=float(rate_cost),
         loss_type=loss,
+        J0=J0, D0=D0, S0=S0,
+    )
+    driver = GANDriver(
+        gan, iterations=iterations, quiet=quiet,
+        disc_param_save_interval=disc_param_save_interval,
+        disc_param_template=disc_param_template,
+        disc_param_save_on_error=disc_param_save_on_error,
+        quit_JDS_threshold=quit_JDS_threshold,
     )
 
     print(datastore)
@@ -472,72 +619,22 @@ def learn(
 
     gan.inp = inp = BAND_IN
 
-    def saverow_learning(row):
-        datastore.tables.saverow("learning.csv", row, echo=not quiet)
-    saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused,rate_penalty")
-
-    saveheader_disc_param_stats(datastore, gan.discriminator)
-    datastore.tables.saverow('disc_learning.csv', [
-        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
-        'SSsolve_time', 'gradient_time',
-    ])
-
     if track_offset_identity:
         gan.truth_size_per_batch = NZ
     else:
         gan.truth_size_per_batch = NZ * len(sample_sites)
 
-    if disc_param_save_on_error:
-        train_update = lasagne_param_file.wrap_with_save_on_error(
-            gan.discriminator,
-            datastore.path('disc_param', 'pre_error.npz'),
-            datastore.path('disc_param', 'post_error.npz'),
-        )(train_update)
-
-    for k in range(iterations):
-
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(
+    def update_func(k):
+        update_result = train_update(
             gan,
             WG_repeat=WGAN_n_critic0 if k == 0 else WGAN_n_critic,
             gen_step=k,
             **vars(gan))
+        update_result.Daccuracy = gan.D_acc(update_result.rtest,
+                                            update_result.true)
+        return update_result
 
-        saverow_learning(
-            [k, Gloss, Dloss, gan.D_acc(rtest, true),
-             SSsolve_time,
-             gradient_time,
-             model_info.rejections,
-             model_info.unused,
-             gan.rate_penalty_func(rtest)])
-
-        GZmean = gan.get_reduced(rtest).mean(axis=0)
-        Dmean = true.mean(axis = 0)
-
-        datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
-
-        jj = J.get_value()
-        dd = D.get_value()
-        ss = S.get_value()
-        
-        allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-        datastore.tables.saverow('generator.csv', [k] + allpar)
-
-        if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
-            lasagne_param_file.dump(
-                gan.discriminator,
-                datastore.path('disc_param', disc_param_template.format(k)))
-
-        maybe_quit(
-            datastore,
-            JDS_fake=list(map(np.exp, [jj, dd, ss])),
-            JDS_true=[J0, D0, S0],
-            quit_JDS_threshold=quit_JDS_threshold,
-        )
-
-    datastore.dump_json(dict(
-        reason='end_of_iteration',
-        good=True,
-    ), 'exit.json')
+    driver.iterate(update_func)
 
 
 def WGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
@@ -587,7 +684,15 @@ def WGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,g
     with gradient_time:
         Gloss = G_train_func(rtest,inp,Ztest)
 
-    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
+    return UpdateResult(
+        Dloss=Dloss,
+        Gloss=Gloss,
+        rtest=rtest,
+        true=true,
+        model_info=model_info,
+        SSsolve_time=SSsolve_time.sum(),
+        gradient_time=gradient_time.sum(),
+    )
 
 
 def RGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
@@ -623,7 +728,15 @@ def RGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,g
         SSsolve_time.times[-1], gradient_time.times[-1],
     ])
 
-    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
+    return UpdateResult(
+        Dloss=Dloss,
+        Gloss=Gloss,
+        rtest=rtest,
+        true=true,
+        model_info=model_info,
+        SSsolve_time=SSsolve_time.sum(),
+        gradient_time=gradient_time.sum(),
+    )
 
 
 def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update, **_):

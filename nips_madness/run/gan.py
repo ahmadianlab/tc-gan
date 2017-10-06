@@ -456,6 +456,7 @@ def learn(
     if disc_param_save_on_error:
         train_update = lasagne_param_file.wrap_with_save_on_error(
             discriminator, datastore.path('disc_param', 'pre_error.npz'),
+            datastore.path('disc_param', 'post_error.npz'),
         )(train_update)
 
     for k in range(iterations):

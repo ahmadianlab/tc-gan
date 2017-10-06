@@ -491,6 +491,11 @@ def learn(
             quit_JDS_threshold=quit_JDS_threshold,
         )
 
+    datastore.dump_json(dict(
+        reason='end_of_iteration',
+        good=True,
+    ), 'exit.json')
+
 
 def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
 

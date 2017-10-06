@@ -120,10 +120,11 @@ def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
             JDS_distance=JDS_distance,
             good=False,
         ), 'exit.json')
-        raise execution.SuccessExit(
+        raise execution.KnownError(
             'Exit simulation since (J, D, S)-distance (= {})'
             ' to the true parameter exceed threshold (= {}).'
-            .format(JDS_distance, quit_JDS_threshold))
+            .format(JDS_distance, quit_JDS_threshold),
+            exit_code=4)
 
 
 def learn(

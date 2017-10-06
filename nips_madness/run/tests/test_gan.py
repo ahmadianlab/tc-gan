@@ -50,7 +50,7 @@ def test_quit_JDS_threshold_quit():
         [[-2.7327504049935936, -4.210179719643937],
          [-1.9547447679855652, -3.5791486928972325]],
     ]
-    with pytest.raises(execution.SuccessExit):
+    with pytest.raises(execution.KnownError):
         gan.maybe_quit(
             datastore,
             JDS_fake=list(map(np.exp, log_JDS)),

@@ -65,6 +65,27 @@ import time
 from .. import stimuli
 
 
+class GenerativeAdversarialNetwork(SimpleNamespace):
+    """
+    Namespace to put GAN-related objects to be used in various places.
+
+    This is a "poor man's object-oriented'ish programming."  We do
+    this for staying compatible with old function-based code-base (so
+    that git log is still readable, etc.).
+
+    This is done by slightly modifying the functions to accept this
+    namespace (an instance of this class) as the first positional
+    argument (``gan``; like ``self`` in instance methods) and to
+    ignore any unused keyword arguments (so add ``**_`` in the
+    function signature).  Then, those functions are called with the
+    attributes of this namespace as keyword arguments, i.e., like
+    this: ``f(gan, **vars(gan))``.
+
+    .. todo:: Move to class-based approach (eventually).
+
+    """
+
+
 def saveheader_disc_param_stats(datastore, discriminator):
     header = ['gen_step', 'disc_step'] + [
         '{}.nnorm'.format(p.name)  # Normalized NORM
@@ -131,7 +152,7 @@ def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
 
 def learn(
         iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, layers, n_samples, WGAN_lambda,
+        loss, layers, n_samples,
         WGAN_n_critic0, WGAN_n_critic,
         rate_cost, rate_penalty_threshold, rate_penalty_no_I,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
@@ -144,6 +165,10 @@ def learn(
         timetest, convtest, testDW, DRtest,
         **make_func_kwargs):
 
+    gan = GenerativeAdversarialNetwork(
+        datastore=datastore,
+    )
+
     print(datastore)
 
     bandwidths = np.array(bandwidths)
@@ -151,8 +176,7 @@ def learn(
 
     WGAN = loss == 'WD'
     if WGAN:
-        def make_functions(**kwds):
-            return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
+        make_functions = make_WGAN_functions
         train_update = WGAN_update
     else:
         make_functions = make_RGAN_functions
@@ -165,7 +189,7 @@ def learn(
     coe_value = 0.01  # k
     exp_value = 2.2   # n
 
-    ssn_params = dict(
+    gan.ssn_params = ssn_params = dict(
         dt=dt,
         max_iter=max_iter,
         rate_soft_bound=rate_soft_bound,
@@ -190,7 +214,7 @@ def learn(
         track_offset_identity=track_offset_identity,
         **dict(ssn_params, io_type=true_IO_type))
     print("DONE")
-    data = np.array(data.T)      # shape: (N_data, nb)
+    gan.data = data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
     n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
@@ -225,9 +249,9 @@ def learn(
     D_dis = np.array(D_dis) * np.ones((2, 2))
     S_dis = np.array(S_dis) * np.ones((2, 2))
 
-    J = theano.shared(J2.get_value() + J_dis, name = "j")
-    D = theano.shared(D2.get_value() + D_dis, name = "d")
-    S = theano.shared(S2.get_value() + S_dis, name = "s")
+    gan.J = J = theano.shared(J2.get_value() + J_dis, name="j")
+    gan.D = D = theano.shared(D2.get_value() + D_dis, name="d")
+    gan.S = S = theano.shared(S2.get_value() + S_dis, name="s")
 
 #    J = theano.shared(np.log(np.array([[.01,.01],[.02,.01]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[.2,.2],[.3,.2]])).astype("float64"),name = "d")
@@ -251,9 +275,9 @@ def learn(
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
 
     ##getting regular nums##
-    N = int(n.get_value())
-    NZ = int(nz.get_value())
-    NB = int(nb.get_value())
+    gan.N = N = int(n.get_value())
+    gan.NZ = NZ = int(nz.get_value())
+    gan.NB = NB = int(nb.get_value())
     ###
 
     BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness, contrast)
@@ -280,6 +304,7 @@ def learn(
     #function to get W given Z
     W = theano.function([Z],ww,allow_input_downcast = True,on_unused_input = "ignore")
     W_test = theano.function([Z],ww2,allow_input_downcast = True,on_unused_input = "ignore")
+    gan.W = W
 
     #get deriv. of W given Z
     DWj = theano.function([Z],dwdj,allow_input_downcast = True,on_unused_input = "ignore")
@@ -423,7 +448,8 @@ def learn(
  
         exit()
 
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func = make_functions(
+    make_functions(
+        gan,
         rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
         sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
@@ -436,42 +462,47 @@ def learn(
 
     #Now we set up values to use in testing.
 
-    inp = BAND_IN
+    gan.inp = inp = BAND_IN
 
     def saverow_learning(row):
         datastore.tables.saverow("learning.csv", row, echo=not quiet)
     saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused,rate_penalty")
 
-    saveheader_disc_param_stats(datastore, discriminator)
+    saveheader_disc_param_stats(datastore, gan.discriminator)
     datastore.tables.saverow('disc_learning.csv', [
         'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
         'SSsolve_time', 'gradient_time',
     ])
 
     if track_offset_identity:
-        truth_size_per_batch = NZ
+        gan.truth_size_per_batch = NZ
     else:
-        truth_size_per_batch = NZ * len(sample_sites)
+        gan.truth_size_per_batch = NZ * len(sample_sites)
 
     if disc_param_save_on_error:
         train_update = lasagne_param_file.wrap_with_save_on_error(
-            discriminator, datastore.path('disc_param', 'pre_error.npz'),
+            gan.discriminator,
+            datastore.path('disc_param', 'pre_error.npz'),
             datastore.path('disc_param', 'post_error.npz'),
         )(train_update)
 
     for k in range(iterations):
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat = WGAN_n_critic0 if k == 0 else WGAN_n_critic,gen_step=k,datastore=datastore)
+        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(
+            gan,
+            WG_repeat=WGAN_n_critic0 if k == 0 else WGAN_n_critic,
+            gen_step=k,
+            **vars(gan))
 
         saverow_learning(
-            [k, Gloss, Dloss, D_acc(rtest, true),
+            [k, Gloss, Dloss, gan.D_acc(rtest, true),
              SSsolve_time,
              gradient_time,
              model_info.rejections,
              model_info.unused,
-             rate_penalty_func(rtest)])
+             gan.rate_penalty_func(rtest)])
 
-        GZmean = get_reduced(rtest).mean(axis = 0)
+        GZmean = gan.get_reduced(rtest).mean(axis=0)
         Dmean = true.mean(axis = 0)
 
         datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
@@ -485,7 +516,7 @@ def learn(
 
         if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
             lasagne_param_file.dump(
-                discriminator,
+                gan.discriminator,
                 datastore.path('disc_param', disc_param_template.format(k)))
 
         maybe_quit(
@@ -501,7 +532,7 @@ def learn(
     ), 'exit.json')
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
+def WGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -550,7 +581,8 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
+
+def RGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -585,7 +617,8 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
 
     return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update):
+
+def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update, **_):
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -676,9 +709,20 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func
+    # Put objects to be used elsewhere in the shared namespace `gan`.
+    # We avoid using "gan.G_train_func = ..." etc. above to keep git
+    # history readable.
+    gan.G_train_func = G_train_func
+    gan.G_loss_func = G_loss_func
+    gan.D_train_func = D_train_func
+    gan.D_loss_func = D_loss_func
+    gan.D_acc = D_acc
+    gan.get_reduced = get_reduced
+    gan.discriminator = discriminator
+    gan.rate_penalty_func = rate_penalty_func
 
-def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update):
+
+def make_WGAN_functions(gan,rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,**_):
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -775,7 +819,15 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func
+    # See the same part in `make_RGAN_functions`.
+    gan.G_train_func = G_train_func
+    gan.G_loss_func = G_loss_func
+    gan.D_train_func = D_train_func
+    gan.D_loss_func = D_loss_func
+    gan.D_acc = D_acc
+    gan.get_reduced = get_reduced
+    gan.discriminator = discriminator
+    gan.rate_penalty_func = rate_penalty_func
 
 
 def main(args=None):

@@ -225,6 +225,15 @@ class GANDriver(object):
             'SSsolve_time', 'gradient_time',
         ])
 
+    def post_disc_update(self, gen_step, disc_step, Dloss, Daccuracy,
+                         SSsolve_time, gradient_time):
+        saverow_disc_param_stats(self.datastore, self.gan.discriminator,
+                                 gen_step, disc_step)
+        self.datastore.tables.saverow('disc_learning.csv', [
+            gen_step, disc_step, Dloss, Daccuracy,
+            SSsolve_time, gradient_time,
+        ])
+
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(self.gan, gen_step, update_result)
 
@@ -626,7 +635,7 @@ def learn(
 
     def update_func(k):
         update_result = train_update(
-            gan,
+            driver,
             WG_repeat=WGAN_n_critic0 if k == 0 else WGAN_n_critic,
             gen_step=k,
             **vars(gan))
@@ -637,7 +646,7 @@ def learn(
     driver.iterate(update_func)
 
 
-def WGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
+def WGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -673,11 +682,10 @@ def WGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,g
         with gradient_time:
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
-        saverow_disc_param_stats(datastore, discriminator, gen_step, rep)
-        datastore.tables.saverow('disc_learning.csv', [
+        driver.post_disc_update(
             gen_step, rep, Dloss, D_acc(rtest, true),
             SSsolve_time.times[-1], gradient_time.times[-1],
-        ])
+        )
 
     #end D loop
 
@@ -695,7 +703,7 @@ def WGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,g
     )
 
 
-def RGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
+def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -722,11 +730,10 @@ def RGAN_update(gan,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,g
         Dloss = D_train_func(rtest,true)
         Gloss = G_train_func(rtest,inp,Ztest)
 
-    saverow_disc_param_stats(datastore, discriminator, gen_step, 0)
-    datastore.tables.saverow('disc_learning.csv', [
+    driver.post_disc_update(
         gen_step, 0, Dloss, D_acc(rtest, true),
         SSsolve_time.times[-1], gradient_time.times[-1],
-    ])
+    )
 
     return UpdateResult(
         Dloss=Dloss,

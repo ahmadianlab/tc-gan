@@ -108,8 +108,8 @@ def learn(
         return np.array([stimuli.input(bandwidths, pos_num, smoothness,[c[0]],[c[1]]) for c in cond])
 
     temp_con = np.tile(np.reshape(conditions,[len(conditions),1,2]),[1,n_samples,1])
-    temp_con = np.reshape(temp_con,[-1,2])
-    
+    gan.temp_con = temp_con = np.reshape(temp_con, [-1, 2])
+
     BAND_IN = input_function(temp_con)
     
     data = []
@@ -269,7 +269,7 @@ def learn(
 
     def update_func(k):
         update_result = train_update(
-            gan,
+            driver,
             data_cond=conditions,
             input_function=input_function,
             WG_repeat=WGAN_n_critic0 if k == 0 else WGAN_n_critic,
@@ -282,7 +282,7 @@ def learn(
     driver.iterate(update_func)
 
 
-def WGAN_update(gan,D_train_func,G_train_func,N,NZ,NB,data,data_cond,W,input_function,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat, **_):
+def WGAN_update(driver,D_train_func,G_train_func,N,NZ,NB,data,data_cond,W,input_function,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat,gen_step,temp_con, **_):
 
     '''
     Conditional WGAN update function:
@@ -357,6 +357,12 @@ def WGAN_update(gan,D_train_func,G_train_func,N,NZ,NB,data,data_cond,W,input_fun
         
         with gradient_time:
             Dloss = D_train_func(rtest,conditions,true,conditions,eps*true + (1. - eps)*get_reduced(rtest),conditions)
+
+        driver.post_disc_update(
+            gen_step, rep, Dloss,
+            D_acc(rtest, temp_con, true, temp_con),
+            SSsolve_time.times[-1], gradient_time.times[-1],
+        )
 
     #end D loop
 

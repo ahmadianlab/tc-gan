@@ -65,18 +65,31 @@ def layer_normalized_dense_layer(incoming, num_units,
     return L.NonlinearityLayer(layer, nonlinearity=nonlinearity)
 
 
+normalization_types = {
+    'none': L.DenseLayer,
+    'layer': layer_normalized_dense_layer,
+}
+
+
+def _validate_norm(normalization, n_layers):
+    if isinstance(normalization, (list, tuple)):
+        assert len(normalization) == n_layers
+        assert all(n in normalization_types for n in normalization)
+        return normalization
+    else:
+        assert normalization in normalization_types
+        return (normalization,) * n_layers
+
+
 def make_net(in_shape, LOSS, layers=[], normalization='none'):
 
     net = L.InputLayer(in_shape)
 
-    assert normalization in ('none', 'layer')
-    if normalization == 'none':
-        make_layer = L.DenseLayer
-    else:
-        make_layer = layer_normalized_dense_layer
+    normalization = _validate_norm(normalization, len(layers))
 
-    for l in range(len(layers)):
-        net = make_layer(net,layers[l],b=lasagne.init.Normal(.01,0))
+    for width, layer_type in zip(layers, normalization):
+        make_layer = normalization_types[layer_type]
+        net = make_layer(net, width, b=lasagne.init.Normal(.01, 0))
 
     if LOSS == "LS":
         net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))

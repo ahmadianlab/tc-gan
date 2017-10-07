@@ -260,7 +260,7 @@ class GANDriver(object):
         maybe_quit(
             self.datastore,
             JDS_fake=list(map(np.exp, [jj, dd, ss])),
-            JDS_true=[self.J0, self.D0, self.S0],
+            JDS_true=list(map(SSsolve.DEFAULT_PARAMS.get, 'JDS')),
             quit_JDS_threshold=self.quit_JDS_threshold,
         )
 
@@ -1190,9 +1190,6 @@ def init_driver(
         disc_param_template=disc_param_template,
         disc_param_save_on_error=disc_param_save_on_error,
         quit_JDS_threshold=quit_JDS_threshold,
-        J0=run_config['J0'],
-        D0=run_config['D0'],
-        S0=run_config['S0'],
     )
 
     return dict(run_config, datastore=datastore, gan=gan, driver=driver)

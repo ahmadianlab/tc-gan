@@ -18,8 +18,7 @@ import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from .. import ssnode as SSsolve
-from .. import lasagne_param_file
-from .gan import GenerativeAdversarialNetwork, \
+from .gan import GenerativeAdversarialNetwork, GANDriver, UpdateResult, \
     add_learning_options, do_learning
 
 import time
@@ -48,7 +47,16 @@ def learn(
         track_offset_identity=track_offset_identity,
         rate_cost=float(rate_cost),
         loss_type=loss,
+        J0=J0, D0=D0, S0=S0,
     )
+    driver = GANDriver(
+        gan, iterations=iterations, quiet=quiet,
+        disc_param_save_interval=disc_param_save_interval,
+        disc_param_template=disc_param_template,
+        disc_param_save_on_error=disc_param_save_on_error,
+        quit_JDS_threshold=-1,
+    )
+    gan.rate_penalty_func = lambda _: np.nan  # TODO: implement
 
     print(datastore)
 
@@ -248,10 +256,6 @@ def learn(
 
     #Now we set up values to use in testing.
 
-    def saverow_learning(row):
-        datastore.tables.saverow("learning.csv", row, echo=not quiet)
-    saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
-
     if track_offset_identity:
         gan.truth_size_per_batch = n_samples
     else:
@@ -263,47 +267,19 @@ def learn(
     # len(sample_sites) == 1 by default.
     gan.truth_size_per_batch = n_samples
 
-    if disc_param_save_on_error:
-        train_update = lasagne_param_file.wrap_with_save_on_error(
-            gan.discriminator,
-            datastore.path('disc_param', 'pre_error.npz'),
-            datastore.path('disc_param', 'post_error.npz'),
-        )(train_update)
-
-    for k in range(iterations):
-
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(
+    def update_func(k):
+        update_result = train_update(
             gan,
             data_cond=conditions,
             input_function=input_function,
             WG_repeat=WGAN_n_critic0 if k == 0 else WGAN_n_critic,
             gen_step=k,
             **vars(gan))
+        update_result.Daccuracy = gan.D_acc(
+            update_result.rtest, temp_con, update_result.true, temp_con)
+        return update_result
 
-        saverow_learning(
-            [k, Gloss, Dloss,
-             gan.D_acc(rtest, temp_con, true, temp_con),
-             SSsolve_time,
-             gradient_time,
-             model_info.rejections,
-             model_info.unused])
-
-        GZmean = gan.get_reduced(rtest).mean(axis=0)
-        Dmean = true.mean(axis = 0)
-
-        datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
-
-        jj = J.get_value()
-        dd = D.get_value()
-        ss = S.get_value()
-        
-        allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-        datastore.tables.saverow('generator.csv', [k] + allpar)
-
-        if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
-            lasagne_param_file.dump(
-                gan.discriminator,
-                datastore.path('disc_param', disc_param_template.format(k)))
+    driver.iterate(update_func)
 
 
 def WGAN_update(gan,D_train_func,G_train_func,N,NZ,NB,data,data_cond,W,input_function,ssn_params,D_acc,get_reduced,J,D,S,truth_size_per_batch,WG_repeat, **_):
@@ -387,7 +363,15 @@ def WGAN_update(gan,D_train_func,G_train_func,N,NZ,NB,data,data_cond,W,input_fun
     with gradient_time:
         Gloss = G_train_func(rtest,conditions,input_function(conditions),ztest)
 
-    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
+    return UpdateResult(
+        Dloss=Dloss,
+        Gloss=Gloss,
+        rtest=rtest,
+        true=true,
+        model_info=model_info,
+        SSsolve_time=SSsolve_time.sum(),
+        gradient_time=gradient_time.sum(),
+    )
 
 
 def make_WGAN_functions(gan,rate_vector,sample_sites,NZ,NB,NCOND,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,**_):

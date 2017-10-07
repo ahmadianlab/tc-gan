@@ -81,7 +81,18 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
     attributes of this namespace as keyword arguments, i.e., like
     this: ``f(gan, **vars(gan))``.
 
-    .. todo:: Move to class-based approach (eventually).
+    .. method:: get_reduced(fixed_points : array) -> array
+
+       Convert an input array `fixed_points` of shape ``(NZ, NB, 2N)``
+       to an array of `INSHAPE` which is appropriate as an input of
+       the `.discriminator`.  The shape of the output array is
+       ``(NZ, NB * len(sample_sites))`` if `.track_offset_identity` is
+       set to true or otherwise ``(NZ * len(sample_sites), NB)``.
+       See also `.subsample_neurons`.
+
+    Todo
+    ----
+    Move to class-based approach (eventually).
 
     """
 

@@ -260,7 +260,7 @@ class GANDriver(object):
         maybe_quit(
             self.datastore,
             JDS_fake=list(map(np.exp, [jj, dd, ss])),
-            JDS_true=[self.gan.J0, self.gan.D0, self.gan.S0],
+            JDS_true=[self.J0, self.D0, self.S0],
             quit_JDS_threshold=self.quit_JDS_threshold,
         )
 
@@ -310,34 +310,22 @@ def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
 
 
 def learn(
-        iterations, seed,
+        driver, gan, datastore,
+        seed,
         loss, n_samples,
         WGAN_n_critic0, WGAN_n_critic,
         rate_cost,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
-        sample_sites, track_offset_identity, init_disturbance, quiet,
+        sample_sites, track_offset_identity, init_disturbance,
         contrast,
-        disc_param_save_interval, disc_param_template,
-        disc_param_save_on_error,
-        datastore, J0, D0, S0, quit_JDS_threshold,
+        J0, D0, S0,
         timetest, convtest, testDW, DRtest,
         **make_func_kwargs):
 
-    gan = GenerativeAdversarialNetwork(
-        datastore=datastore,
-        track_offset_identity=track_offset_identity,
-        rate_cost=float(rate_cost),
-        loss_type=loss,
-        J0=J0, D0=D0, S0=S0,
-    )
-    driver = GANDriver(
-        gan, iterations=iterations, quiet=quiet,
-        disc_param_save_interval=disc_param_save_interval,
-        disc_param_template=disc_param_template,
-        disc_param_save_on_error=disc_param_save_on_error,
-        quit_JDS_threshold=quit_JDS_threshold,
-    )
+    gan.track_offset_identity = track_offset_identity
+    gan.rate_cost = float(rate_cost)
+    gan.loss_type = loss
 
     print(datastore)
 
@@ -968,9 +956,6 @@ def main(args=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=__doc__)
     parser.add_argument(
-        '--iterations', default=100000, type=int,
-        help='Number of iterations (default: %(default)s)')
-    parser.add_argument(
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
     parser.add_argument(
@@ -980,12 +965,6 @@ def main(args=None):
         elements are used for the disturbance for J, D (delta),
         S (sigma), respectively.  It accepts any Python expression.
         (default: %(default)s)''')
-    parser.add_argument(
-        '--quit-JDS-threshold', default=-1, type=float,
-        help='''Threshold in l2 norm distance in (J, D, S)-space form
-        the true parameter.  If the distance exceeds this threshold,
-        the simulation is terminated.  -1 (default) means never
-        terminate.''')
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')
@@ -1090,29 +1069,6 @@ def main(args=None):
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
-    parser.add_argument(
-        '--disc-param-save-interval', default=5, type=int,
-        help='''Save parameters for discriminator for each given
-        generator step. -1 means to never save.
-        (default: %(default)s)''')
-    parser.add_argument(
-        '--disc-param-template', default='last.npz',
-        help='''Python string format for the name of the file to save
-        discriminator parameters.  First argument "{}" to the format
-        is the number of generator updates.  Not using "{}" means to
-        overwrite to existing file (default) which is handy if you are
-        only interested in the latest parameter.  Use "{}.npz" for
-        recording the history of evolution of the discriminator.
-        (default: %(default)s)''')
-    parser.add_argument(
-        '--disc-param-save-on-error', action='store_true',
-        help='''Save discriminator parameter just before something
-        when wrong (e.g., having NaN).
-        (default: %(default)s)''')
-
-    parser.add_argument(
-        '--quiet', action='store_true',
-        help='Do not print loss values per epoch etc.')
 
     parser.add_argument(
         '--timetest',default=False, action='store_true',
@@ -1133,6 +1089,40 @@ def main(args=None):
 
 
 def add_learning_options(parser):
+    # Arguments for `driver` (handled in `init_gan`):
+    parser.add_argument(
+        '--iterations', default=100000, type=int,
+        help='Number of iterations (default: %(default)s)')
+    parser.add_argument(
+        '--quit-JDS-threshold', default=-1, type=float,
+        help='''Threshold in l2 norm distance in (J, D, S)-space form
+        the true parameter.  If the distance exceeds this threshold,
+        the simulation is terminated.  -1 (default) means never
+        terminate.''')
+    parser.add_argument(
+        '--quiet', action='store_true',
+        help='Do not print loss values per epoch etc.')
+    parser.add_argument(
+        '--disc-param-save-interval', default=5, type=int,
+        help='''Save parameters for discriminator for each given
+        generator step. -1 means to never save.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-template', default='last.npz',
+        help='''Python string format for the name of the file to save
+        discriminator parameters.  First argument "{}" to the format
+        is the number of generator updates.  Not using "{}" means to
+        overwrite to existing file (default) which is handy if you are
+        only interested in the latest parameter.  Use "{}.npz" for
+        recording the history of evolution of the discriminator.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-save-on-error', action='store_true',
+        help='''Save discriminator parameter just before something
+        when wrong (e.g., having NaN).
+        (default: %(default)s)''')
+
+    # Arguments handled in `preprocess`:
     parser.add_argument(
         '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
         help='Number of bandwidths (default: %(default)s)')
@@ -1145,6 +1135,9 @@ def add_learning_options(parser):
 
 
 def preprocess(run_config):
+    """
+    Pre-process `run_config` before it is dumped to ``info.json``.
+    """
     # Set `bandwidths` outside the `learn` function, so that
     # `bandwidths` is stored in info.json:
     n_bandwidths = run_config.pop('n_bandwidths')
@@ -1183,12 +1176,35 @@ def preprocess(run_config):
         run_config[key] = utils.tolist_if_not(run_config[key])
 
 
+def init_driver(
+        datastore,
+        iterations, quit_JDS_threshold, quiet,
+        disc_param_save_interval, disc_param_template,
+        disc_param_save_on_error,
+        **run_config):
+
+    gan = GenerativeAdversarialNetwork(datastore=datastore)
+    driver = GANDriver(
+        gan, iterations=iterations, quiet=quiet,
+        disc_param_save_interval=disc_param_save_interval,
+        disc_param_template=disc_param_template,
+        disc_param_save_on_error=disc_param_save_on_error,
+        quit_JDS_threshold=quit_JDS_threshold,
+        J0=run_config['J0'],
+        D0=run_config['D0'],
+        S0=run_config['S0'],
+    )
+
+    return dict(run_config, datastore=datastore, gan=gan, driver=driver)
+
+
 def do_learning(learn, run_config):
     """
     Wrap `.execution.do_learning` with some pre-processing.
     """
     execution.do_learning(
-        learn, run_config,
+        lambda **run_config: learn(**init_driver(**run_config)),
+        run_config,
         preprocess=preprocess,
         extra_info=dict(
             n_bandwidths=run_config['n_bandwidths'],

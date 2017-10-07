@@ -18,8 +18,7 @@ import discriminators.simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from .. import ssnode as SSsolve
-from .gan import GenerativeAdversarialNetwork, GANDriver, UpdateResult, \
-    add_learning_options, do_learning
+from .gan import UpdateResult, add_learning_options, do_learning
 
 import time
 
@@ -27,35 +26,23 @@ from .. import stimuli
 
 
 def learn(
-        iterations, seed,
+        driver, gan, datastore,
+        seed,
         loss, n_samples,
         WGAN_n_critic, WGAN_n_critic0,
         rate_cost,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
-        sample_sites, track_offset_identity, init_disturbance, quiet,
+        sample_sites, track_offset_identity, init_disturbance,
         contrast,
         offsets,
-        disc_param_save_interval, disc_param_template,
-        disc_param_save_on_error,
-        datastore, J0, D0, S0,
+        J0, D0, S0,
         timetest, convtest, testDW, DRtest,
         **make_func_kwargs):
 
-    gan = GenerativeAdversarialNetwork(
-        datastore=datastore,
-        track_offset_identity=track_offset_identity,
-        rate_cost=float(rate_cost),
-        loss_type=loss,
-        J0=J0, D0=D0, S0=S0,
-    )
-    driver = GANDriver(
-        gan, iterations=iterations, quiet=quiet,
-        disc_param_save_interval=disc_param_save_interval,
-        disc_param_template=disc_param_template,
-        disc_param_save_on_error=disc_param_save_on_error,
-        quit_JDS_threshold=-1,
-    )
+    gan.track_offset_identity = track_offset_identity
+    gan.rate_cost = float(rate_cost)
+    gan.loss_type = loss
     gan.rate_penalty_func = lambda _: np.nan  # TODO: implement
 
     print(datastore)
@@ -498,9 +485,6 @@ def main(args=None):
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--iterations', default=100000, type=int,
-        help='Number of iterations (default: %(default)s)')
-    parser.add_argument(
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
     parser.add_argument(
@@ -612,29 +596,6 @@ def main(args=None):
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
-    parser.add_argument(
-        '--disc-param-save-interval', default=5, type=int,
-        help='''Save parameters for discriminator for each given
-        generator step. -1 means to never save.
-        (default: %(default)s)''')
-    parser.add_argument(
-        '--disc-param-template', default='last.npz',
-        help='''Python string format for the name of the file to save
-        discriminator parameters.  First argument "{}" to the format
-        is the number of generator updates.  Not using "{}" means to
-        overwrite to existing file (default) which is handy if you are
-        only interested in the latest parameter.  Use "{}.npz" for
-        recording the history of evolution of the discriminator.
-        (default: %(default)s)''')
-    parser.add_argument(
-        '--disc-param-save-on-error', action='store_true',
-        help='''Save discriminator parameter just before something
-        when wrong (e.g., having NaN).
-        (default: %(default)s)''')
-
-    parser.add_argument(
-        '--quiet', action='store_true',
-        help='Do not print loss values per epoch etc.')
 
     parser.add_argument(
         '--timetest',default=False, action='store_true',

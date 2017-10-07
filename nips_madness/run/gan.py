@@ -1169,9 +1169,9 @@ def preprocess(run_config):
         J0, D0, S0 = np.exp(lastrow).reshape((3, 2, 2))
         run_config.update(J0=J0, D0=D0, S0=S0)
     else:
-        run_config.setdefault('J0', [[0.0957, 0.0638], [0.1197, 0.0479]])
-        run_config.setdefault('D0', [[0.7660, 0.5106], [0.9575, 0.3830]])
-        run_config.setdefault('S0', [[0.08333375, 0.025], [0.166625, 0.025]])
+        run_config.setdefault('J0', SSsolve.DEFAULT_PARAMS['J'])
+        run_config.setdefault('D0', SSsolve.DEFAULT_PARAMS['D'])
+        run_config.setdefault('S0', SSsolve.DEFAULT_PARAMS['S'])
     for key in ('J0', 'D0', 'S0'):
         run_config[key] = utils.tolist_if_not(run_config[key])
 

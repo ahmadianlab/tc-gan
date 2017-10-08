@@ -109,6 +109,9 @@ class UpdateResult(SimpleNamespace):
         the value from the last iteration.
     Gloss : float
         Value of the generator loss.
+    Daccuracy : float
+        Accuracy of generator.  For WGAN, it's the estimate of
+        negative Wasserstein distance.
     rtest : array of shape (NZ, len(inp), 2N)
         Fixed-points of the fake SSN.  This is the second element
         (`Rs`) returned by `.find_fixed_points`.
@@ -212,6 +215,20 @@ class LearningRecorder(object):
 
 class GANDriver(object):
 
+    """
+    GAN learning driver.
+
+    It does all algorithm-independent ugly stuff such as:
+
+    * Calculate learning statistics.
+    * Save learning statistics and parameters at the right point.
+    * Make sure the parameters are finite; otherwise save information
+      as much as possible and then abort.
+
+    The main interfaces are `iterate` and `post_disc_update`.
+
+    """
+
     def __init__(self, gan, **kwargs):
         self.gan = gan
         self.datastore = gan.datastore
@@ -228,6 +245,24 @@ class GANDriver(object):
 
     def post_disc_update(self, gen_step, disc_step, Dloss, Daccuracy,
                          SSsolve_time, gradient_time):
+        """
+        Method to be called after a discriminator update.
+
+        Parameters
+        ----------
+        gen_step : int
+            See `.iterate`
+        disc_step : int
+            If there are multiple discriminator updates (WGAN), the
+            loop index must be given as `disc_step` argument.
+            Otherwise, pass 0.
+        Dloss : float
+        Daccuracy : float
+        SSsolve_time : float
+        gradient_time : float
+            See the attributes of `.UpdateResult` with the same name.
+
+        """
         saverow_disc_param_stats(self.datastore, self.gan.discriminator,
                                  gen_step, disc_step)
         self.datastore.tables.saverow('disc_learning.csv', [
@@ -272,6 +307,19 @@ class GANDriver(object):
         ), 'exit.json')
 
     def iterate(self, update_func):
+        """
+        Iteratively call `update_func` for `.iterations` times.
+
+        A callable `update_func` must have the following signature:
+
+        .. function:: update_func(gen_step : int) -> UpdateResult
+
+           It must accept a positional argument which is the generator
+           update step.  It then must return an instance of
+           `.UpdateResult` with all mandatory attributes mentioned in
+           the document of `.UpdateResult`.
+
+        """
         if self.disc_param_save_on_error:
             update_func = lasagne_param_file.wrap_with_save_on_error(
                 self.gan.discriminator,

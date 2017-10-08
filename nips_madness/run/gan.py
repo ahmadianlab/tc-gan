@@ -73,13 +73,53 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
     this for staying compatible with old function-based code-base (so
     that git log is still readable, etc.).
 
-    This is done by slightly modifying the functions to accept this
-    namespace (an instance of this class) as the first positional
-    argument (``gan``; like ``self`` in instance methods) and to
-    ignore any unused keyword arguments (so add ``**_`` in the
-    function signature).  Then, those functions are called with the
-    attributes of this namespace as keyword arguments, i.e., like
-    this: ``f(gan, **vars(gan))``.
+    The idea is to put all parameters used from those functions as the
+    attributes to this namespace object ``gan`` and then call such
+    function as ``f(..., **vars(gan))``.  Here is how to define two
+    such function used in `.learn`:
+
+    .. function:: make_functions(gan, **gan_kwargs)
+
+       It defines functions (such as `get_reduced`) later used for
+       training in `train_update`.
+
+       For a safety reason (see blow) it is recommended to explicitly
+       ignore unused keyword arguments::
+
+           def make_WGAN_functions(
+                   gan,
+                   # Parameters:
+                   rate_vector, sample_sites, # ... and so on...
+                   # Ignored parameters:
+                   loss_type,
+                   ):
+               gan.G_train_func = define_G_train_func()
+               gan.D_train_func = define_D_train_func()
+               # ... and so on ...
+
+       See: `.gan.make_WGAN_functions`, `.gan.make_RGAN_functions`,
+       `.cgan.make_WGAN_functions`.
+
+    .. function:: train_update(driver, **gan_kwargs, **_)
+
+       It updates generator and discriminator parameters.
+       `driver` is an instance of `GANDriver`.
+
+       Unlike `make_functions`, it is OK to implicitly ignore unused
+       arguments by putting ``**_`` at the end of the function
+       signature.
+
+       See: `.gan.WGAN_update`, `.gan.RGAN_update`, `.cagn.WGAN_update`
+
+    .. note:: Since `.gan.learn` and `.cgan.learn` pass-through
+       keyword arguments to `make_functions` (via
+       ``**make_func_kwargs``), it is very dangerous to implicitly
+       ignore unused keyword arguments in `make_functions`.  Those
+       arguments are probably meant to be used elsewhere but they were
+       not, by some bugs.  If `make_functions` does not raise an
+       error, we'll never notice such bugs.
+
+    *"Methods"* defined in `.make_functions`:
 
     .. method:: get_reduced(fixed_points : array) -> array
 
@@ -229,9 +269,9 @@ class GANDriver(object):
 
     """
 
-    def __init__(self, gan, **kwargs):
+    def __init__(self, gan, datastore, **kwargs):
         self.gan = gan
-        self.datastore = gan.datastore
+        self.datastore = datastore
         self.__dict__.update(kwargs)
 
     def pre_loop(self):
@@ -396,7 +436,7 @@ def learn(
     coe_value = 0.01  # k
     exp_value = 2.2   # n
 
-    gan.ssn_params = ssn_params = dict(
+    ssn_params = dict(
         dt=dt,
         max_iter=max_iter,
         rate_soft_bound=rate_soft_bound,
@@ -421,7 +461,7 @@ def learn(
         track_offset_identity=track_offset_identity,
         **dict(ssn_params, io_type=true_IO_type))
     print("DONE")
-    gan.data = data = np.array(data.T)      # shape: (N_data, nb)
+    data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
     n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
@@ -511,7 +551,6 @@ def learn(
     #function to get W given Z
     W = theano.function([Z],ww,allow_input_downcast = True,on_unused_input = "ignore")
     W_test = theano.function([Z],ww2,allow_input_downcast = True,on_unused_input = "ignore")
-    gan.W = W
 
     #get deriv. of W given Z
     DWj = theano.function([Z],dwdj,allow_input_downcast = True,on_unused_input = "ignore")
@@ -663,7 +702,11 @@ def learn(
 
     #Now we set up values to use in testing.
 
+    # Variables to be used from train_update (but not from make_functions):
     gan.inp = inp = BAND_IN
+    gan.ssn_params = ssn_params
+    gan.data = data
+    gan.W = W
 
     if track_offset_identity:
         gan.truth_size_per_batch = NZ
@@ -683,7 +726,7 @@ def learn(
     driver.iterate(update_func)
 
 
-def WGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
+def WGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -740,7 +783,7 @@ def WGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_ac
     )
 
 
-def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore,**_):
+def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -783,7 +826,13 @@ def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_ac
     )
 
 
-def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update, **_):
+def make_RGAN_functions(
+        gan,
+        # Parameters:
+        rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update,
+        # Ignored parameters:
+        WGAN_lambda,
+        ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
 
@@ -889,7 +938,13 @@ def make_RGAN_functions(gan,rate_vector,sample_sites,NZ,NB,loss_type,layers,disc
     gan.rate_penalty_func = rate_penalty_func
 
 
-def make_WGAN_functions(gan,rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,**_):
+def make_WGAN_functions(
+        gan,
+        # Parameters:
+        rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,
+        # Ignored parameters:
+        loss_type,
+        ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
 
@@ -1232,9 +1287,10 @@ def init_driver(
         disc_param_save_on_error,
         **run_config):
 
-    gan = GenerativeAdversarialNetwork(datastore=datastore)
+    gan = GenerativeAdversarialNetwork()
     driver = GANDriver(
-        gan, iterations=iterations, quiet=quiet,
+        gan, datastore,
+        iterations=iterations, quiet=quiet,
         disc_param_save_interval=disc_param_save_interval,
         disc_param_template=disc_param_template,
         disc_param_save_on_error=disc_param_save_on_error,

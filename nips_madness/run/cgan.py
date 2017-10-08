@@ -43,7 +43,6 @@ def learn(
     gan.track_offset_identity = track_offset_identity
     gan.rate_cost = float(rate_cost)
     gan.loss_type = loss
-    gan.rate_penalty_func = lambda _: np.nan  # TODO: implement
 
     print(datastore)
 
@@ -60,7 +59,7 @@ def learn(
     coe_value = .01 #k
     exp_value = 2.2 #n
 
-    gan.ssn_params = ssn_params = dict(
+    ssn_params = dict(
         dt=dt,
         max_iter=max_iter,
         rate_soft_bound=rate_soft_bound,
@@ -95,7 +94,7 @@ def learn(
         return np.array([stimuli.input(bandwidths, pos_num, smoothness,[c[0]],[c[1]]) for c in cond])
 
     temp_con = np.tile(np.reshape(conditions,[len(conditions),1,2]),[1,n_samples,1])
-    gan.temp_con = temp_con = np.reshape(temp_con, [-1, 2])
+    temp_con = np.reshape(temp_con, [-1, 2])
 
     BAND_IN = input_function(temp_con)
     
@@ -122,7 +121,6 @@ def learn(
         data.append(DAT)
     print("DONE")
     data = np.array([d.T for d in data])      # shape: (ncondition,N_data, nb)
-    gan.data = data
     print(data.shape)
         
     # Check for sanity:
@@ -197,7 +195,6 @@ def learn(
     #function to get W given Z
     W = theano.function([Z],ww,allow_input_downcast = True,on_unused_input = "ignore")
     W_test = theano.function([Z],ww2,allow_input_downcast = True,on_unused_input = "ignore")
-    gan.W = W
 
     #get deriv. of W given Z
     DWj = theano.function([Z],dwdj,allow_input_downcast = True,on_unused_input = "ignore")
@@ -242,6 +239,13 @@ def learn(
         **dict(make_func_kwargs, **vars(gan)))
 
     #Now we set up values to use in testing.
+
+    # Variables to be used from train_update (but not from make_functions):
+    gan.ssn_params = ssn_params
+    gan.data = data
+    gan.W = W
+    gan.temp_con = temp_con
+    gan.rate_penalty_func = lambda _: np.nan  # TODO: implement
 
     if track_offset_identity:
         gan.truth_size_per_batch = n_samples
@@ -367,7 +371,13 @@ def WGAN_update(driver,D_train_func,G_train_func,N,NZ,NB,data,data_cond,W,input_
     )
 
 
-def make_WGAN_functions(gan,rate_vector,sample_sites,NZ,NB,NCOND,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,**_):
+def make_WGAN_functions(
+        gan,
+        # Parameters:
+        rate_vector,sample_sites,NZ,NB,NCOND,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,
+        # Ignored parameters:
+        loss_type,
+        ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
 

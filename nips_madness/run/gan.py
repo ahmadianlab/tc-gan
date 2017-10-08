@@ -219,6 +219,7 @@ class GANDriver(object):
 
     def pre_loop(self):
         self.learning_recorder = LearningRecorder(self.datastore, self.quiet)
+        self.learning_recorder.write_header()
         saveheader_disc_param_stats(self.datastore, self.gan.discriminator)
         self.datastore.tables.saverow('disc_learning.csv', [
             'gen_step', 'disc_step', 'Dloss', 'Daccuracy',

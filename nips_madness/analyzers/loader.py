@@ -73,6 +73,13 @@ class GANData(object):
             idx = np.arange(len(gen)).reshape((-1, 1))
             gen = np.concatenate([idx, gen], axis=1)
 
+        if not main_names:
+            warnings.warn('learning.csv has no header line; '
+                          'assuming the default.')
+            from ..run.gan import LearningRecorder
+            assert main.shape[1] == len(LearningRecorder.column_names)
+            main_names = LearningRecorder.column_names
+
         with open(os.path.join(dirname, 'info.json')) as file:
             info = json.load(file)
 

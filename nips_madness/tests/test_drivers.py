@@ -74,9 +74,6 @@ def make_driver(
     rc.gan.rate_penalty_func = mock.Mock()
     rc.gan.rate_penalty_func.side_effect = lambda _: np.nan
 
-    rc.gan.get_reduced = mock.Mock()
-    rc.gan.get_reduced.side_effect = lambda _: np.array([[0]])
-
     for name in 'JDS':
         fake_shared = mock.Mock()
         fake_shared.get_value.side_effect \
@@ -166,11 +163,6 @@ def test_gan_driver_iterate(iterations):
         for rec in gen_update_results.history
     ]
 
-    assert rc.gan.get_reduced.call_args_list == [
-        mock.call(rec.result.rtest)
-        for rec in gen_update_results.history
-    ]
-
     empty_calls = [mock.call()] * iterations
     assert rc.gan.J.get_value.call_args_list == empty_calls
     assert rc.gan.D.get_value.call_args_list == empty_calls
@@ -198,15 +190,6 @@ def test_gan_driver_iterate(iterations):
     rc.datastore.tables.saverow.assert_any_call('disc_param_stats.csv',
                                                 disc_param_stats_column_names)
 
-    tc_mean_size = (rc.gan.get_reduced.side_effect(None).shape[1] +
-                    gen_update_results.history[-1].result.true.shape[1])
-    """
-    Number of columns in ``TC_mean.csv``.
-
-    This is twice the dimension of :term:`tuning curve domain`.
-    See `GZmean` and `Dmean` in `GANDriver.post_update`.
-    """
-
     for name, skiprows, width, length in [
             ('learning.csv', 1, len(LearningRecorder.column_names),
              iterations),
@@ -215,7 +198,6 @@ def test_gan_driver_iterate(iterations):
             ('disc_param_stats.csv', 1, len(disc_param_stats_column_names),
              iterations * n_critic),
             ('generator.csv', 0, 13, iterations),
-            ('TC_mean.csv', 0, tc_mean_size, iterations),
             ]:
         # "Assert" that DataTables._open is called once:
         stream, = rc.datastore.path.side_effect.returned[name, ]

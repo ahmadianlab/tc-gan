@@ -322,12 +322,6 @@ class GANDriver(object):
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(self.gan, gen_step, update_result)
 
-        GZmean = self.gan.get_reduced(update_result.rtest).mean(axis=0)
-        Dmean = update_result.true.mean(axis=0)
-
-        self.datastore.tables.saverow('TC_mean.csv',
-                                      list(GZmean) + list(Dmean))
-
         jj = self.gan.J.get_value()
         dd = self.gan.D.get_value()
         ss = self.gan.S.get_value()
@@ -730,6 +724,13 @@ def learn(
             **vars(gan))
         update_result.Daccuracy = gan.D_acc(update_result.rtest,
                                             update_result.true)
+
+        # Save fake and tuning curves averaged over Zs:
+        GZmean = gan.get_reduced(update_result.rtest).mean(axis=0)
+        Dmean = update_result.true.mean(axis=0)
+        datastore.tables.saverow('TC_mean.csv',
+                                 list(GZmean) + list(Dmean))
+
         return update_result
 
     driver.iterate(update_func)

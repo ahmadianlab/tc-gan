@@ -7,6 +7,7 @@ import lasagne
 import numpy as np
 import pytest
 
+from ..execution import DataTables
 from ..run.gan import init_driver, LearningRecorder
 from ..ssnode import DEFAULT_PARAMS
 
@@ -17,9 +18,12 @@ class FakeDataStorePath(object):
         self.returned = collections.defaultdict(list)
 
     def __call__(self, *args):
-        bio = io.BytesIO()
-        self.returned[args].append(bio)
-        return bio
+        if args[-1].endswith('.csv'):
+            stream = io.StringIO()
+        else:
+            stream = io.BytesIO()
+        self.returned[args].append(stream)
+        return stream
 
 
 def make_discriminator():
@@ -40,9 +44,15 @@ def make_driver(
         S0=DEFAULT_PARAMS['S'],
         **run_config):
 
-    # Setup Fake datastore
+    # Setup fake DataStore:
     datastore = mock.Mock()
-    datastore.path.side_effect = FakeDataStorePath()
+    datastore.path.side_effect = dspath = FakeDataStorePath()
+
+    # Setup fake DataTables:
+    # Connect mocked saverow to true saverow for testing file contents.
+    tables = DataTables(None)   # `directory` ignored since `_open` is patched
+    tables._open = dspath
+    datastore.tables.saverow.side_effect = tables.saverow
 
     rc = SimpleNamespace(**init_driver(
         datastore,
@@ -72,6 +82,8 @@ def make_driver(
             = lambda: np.arange(4).reshape((2, 2))
         setattr(rc.gan, name, fake_shared)
 
+    # For debugging:
+    rc._tables = tables
     return rc
 
 
@@ -171,13 +183,54 @@ def test_gan_driver_iterate(iterations):
         LearningRecorder.column_names,
         echo=not driver.quiet
     )
-    rc.datastore.tables.saverow.assert_any_call('disc_learning.csv', [
+    disc_learning_column_names = [
         'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
         'SSsolve_time', 'gradient_time',
-    ])
+    ]
+    rc.datastore.tables.saverow.assert_any_call('disc_learning.csv',
+                                                disc_learning_column_names)
     discriminator = rc.gan.discriminator
-    header = ['gen_step', 'disc_step'] + [
+    disc_param_stats_column_names = ['gen_step', 'disc_step'] + [
         '{}.nnorm'.format(p.name)  # Normalized NORM
         for p in lasagne.layers.get_all_params(discriminator, trainable=True)
     ]
-    rc.datastore.tables.saverow.assert_any_call('disc_param_stats.csv', header)
+    rc.datastore.tables.saverow.assert_any_call('disc_param_stats.csv',
+                                                disc_param_stats_column_names)
+
+    tc_mean_size = (rc.gan.get_reduced.side_effect(None).shape[1] +
+                    gen_update_results.history[-1].result.true.shape[1])
+    """
+    Number of columns in ``TC_mean.csv``.
+
+    This is twice the dimension of :term:`tuning curve domain`.
+    See `GZmean` and `Dmean` in `GANDriver.post_update`.
+    """
+
+    for name, skiprows, width, length in [
+            ('learning.csv', 1, len(LearningRecorder.column_names),
+             iterations),
+            ('disc_learning.csv', 1, len(disc_learning_column_names),
+             iterations * n_critic),
+            ('disc_param_stats.csv', 1, len(disc_param_stats_column_names),
+             iterations * n_critic),
+            ('generator.csv', 0, 13, iterations),
+            ('TC_mean.csv', 0, tc_mean_size, iterations),
+            ]:
+        # "Assert" that DataTables._open is called once:
+        stream, = rc.datastore.path.side_effect.returned[name, ]
+        stream.seek(0)
+        loaded = np.loadtxt(stream, delimiter=',', skiprows=skiprows)
+        if loaded.ndim == 1:
+            loaded = loaded.reshape((1, -1))
+        assert loaded.shape == (length, width)
+
+    def load_json(name):
+        for (obj, filename), _ in rc.datastore.dump_json.call_args_list:
+            if filename == name:
+                return obj
+
+    exit_info = load_json('exit.json')
+    assert exit_info == dict(
+        reason='end_of_iteration',
+        good=True,
+    )

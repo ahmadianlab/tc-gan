@@ -119,7 +119,16 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
        not, by some bugs.  If `make_functions` does not raise an
        error, we'll never notice such bugs.
 
-    *"Methods"* defined in `.make_functions`:
+    "Methods" and attributes defined in `.make_functions`:
+
+    .. attribute:: discriminator
+
+       Output layer of the discriminator.
+       A `lasagne.layers.Layer` object.
+
+    .. method:: rate_penalty_func(rtest : array) -> float
+
+       Given a `.UpdateResult.rtest` calculate the rate penalty.
 
     .. method:: get_reduced(fixed_points : array) -> array
 

@@ -71,9 +71,6 @@ def make_driver(
     # Setup Fake GAN
     rc.gan.discriminator = make_discriminator()
 
-    rc.gan.rate_penalty_func = mock.Mock()
-    rc.gan.rate_penalty_func.side_effect = lambda _: np.nan
-
     for name in 'JDS':
         fake_shared = mock.Mock()
         fake_shared.get_value.side_effect \
@@ -122,6 +119,7 @@ class GenFakeUpdateResults(BaseFakeUpdateResults):
         'gradient_time',
         'model_info.rejections',
         'model_info.unused',
+        'rate_penalty',
     )
     size = len(fields)
 
@@ -157,11 +155,6 @@ def test_gan_driver_iterate(iterations):
 
     assert len(disc_update_results.history) == iterations * n_critic
     assert len(gen_update_results.history) == iterations
-
-    assert rc.gan.rate_penalty_func.call_args_list == [
-        mock.call(rec.result.rtest)
-        for rec in gen_update_results.history
-    ]
 
     empty_calls = [mock.call()] * iterations
     assert rc.gan.J.get_value.call_args_list == empty_calls

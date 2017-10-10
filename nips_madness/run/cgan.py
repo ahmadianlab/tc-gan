@@ -268,6 +268,7 @@ def learn(
             **vars(gan))
         update_result.Daccuracy = gan.D_acc(
             update_result.rtest, temp_con, update_result.true, temp_con)
+        update_result.rate_penalty = gan.rate_penalty_func(update_result.rtest)
 
         # Save fake and tuning curves averaged over Zs:
         GZmean = gan.get_reduced(update_result.rtest).mean(axis=0)

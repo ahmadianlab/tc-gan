@@ -846,6 +846,8 @@ def make_RGAN_functions(
         rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update,
         # Ignored parameters:
         WGAN_lambda,
+        # Optional parameters:
+        gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
@@ -908,7 +910,8 @@ def make_RGAN_functions(
     D_updates = get_updater(
         disc_update, true_loss_exp,
         lasagne.layers.get_all_params(discriminator, trainable=True),
-        d_lr)
+        d_lr,
+        **disc_update_config)
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector],true_loss_exp,allow_input_downcast = True)
@@ -931,7 +934,8 @@ def make_RGAN_functions(
     dLdS = theano.function([rate_vector,ivec,Z],dLdS_exp,allow_input_downcast = True)
 
     G_updates = get_updater(gen_update, [dLdJ_exp, dLdD_exp, dLdS_exp],
-                            [J, D, S], g_lr)
+                            [J, D, S], g_lr,
+                            **gen_update_config)
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true],true_loss_exp,updates = D_updates,allow_input_downcast = True)
@@ -958,6 +962,8 @@ def make_WGAN_functions(
         rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,
         # Ignored parameters:
         loss_type,
+        # Optional parameters:
+        gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
@@ -1045,11 +1051,13 @@ def make_WGAN_functions(
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     G_updates = get_updater(gen_update, [dLdJ_exp, dLdD_exp, dLdS_exp],
-                            [J, D, S], g_lr)
+                            [J, D, S], g_lr,
+                            **gen_update_config)
     D_updates = get_updater(
         disc_update, true_loss_exp,
         lasagne.layers.get_all_params(discriminator, trainable=True),
-        d_lr)
+        d_lr,
+        **disc_update_config)
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,updates = D_updates,allow_input_downcast = True)

@@ -31,9 +31,11 @@ class DiscriminatorLog(object):
         self.learning['disc_updates'] = range(len(self.learning))
         self.param_stats['disc_updates'] = range(len(self.param_stats))
 
-    def plot_learning(self, **kwargs):
+    def plot_learning(self, yscale='symlog', **kwargs):
         losses = ['Dloss', 'Daccuracy']
-        self.learning.plot('disc_updates', losses, **kwargs)
+        ax = self.learning.plot('disc_updates', losses, **kwargs)
+        ax.set_yscale(yscale)
+        return ax
 
     def plot_param_stats(self, logy=True, **kwargs):
         self.param_stats.plot('disc_updates', self.param_stats_names,

@@ -65,6 +65,134 @@ import time
 from .. import stimuli
 
 
+class GenerativeAdversarialNetwork(SimpleNamespace):
+    """
+    Namespace to put GAN-related objects to be used in various places.
+
+    This is a "poor man's object-oriented'ish programming."  We do
+    this for staying compatible with old function-based code-base (so
+    that git log is still readable, etc.).
+
+    The idea is to put all parameters used from those functions as the
+    attributes to this namespace object ``gan`` and then call such
+    function as ``f(..., **vars(gan))``.  Here is how to define two
+    such function used in `.learn`:
+
+    .. function:: make_functions(gan, **gan_kwargs)
+
+       It defines functions (such as `get_reduced`) later used for
+       training in `train_update`.
+
+       For a safety reason (see blow) it is recommended to explicitly
+       ignore unused keyword arguments::
+
+           def make_WGAN_functions(
+                   gan,
+                   # Parameters:
+                   rate_vector, sample_sites, # ... and so on...
+                   # Ignored parameters:
+                   loss_type,
+                   ):
+               gan.G_train_func = define_G_train_func()
+               gan.D_train_func = define_D_train_func()
+               # ... and so on ...
+
+       See: `.gan.make_WGAN_functions`, `.gan.make_RGAN_functions`,
+       `.cgan.make_WGAN_functions`.
+
+    .. function:: train_update(driver, **gan_kwargs, **_)
+
+       It updates generator and discriminator parameters.
+       `driver` is an instance of `GANDriver`.
+
+       Unlike `make_functions`, it is OK to implicitly ignore unused
+       arguments by putting ``**_`` at the end of the function
+       signature.
+
+       See: `.gan.WGAN_update`, `.gan.RGAN_update`, `.cagn.WGAN_update`
+
+    .. note:: Since `.gan.learn` and `.cgan.learn` pass-through
+       keyword arguments to `make_functions` (via
+       ``**make_func_kwargs``), it is very dangerous to implicitly
+       ignore unused keyword arguments in `make_functions`.  Those
+       arguments are probably meant to be used elsewhere but they were
+       not, by some bugs.  If `make_functions` does not raise an
+       error, we'll never notice such bugs.
+
+    "Methods" and attributes defined in `.make_functions`:
+
+    .. attribute:: discriminator
+
+       Output layer of the discriminator.
+       A `lasagne.layers.Layer` object.
+
+    .. method:: rate_penalty_func(rtest : array) -> float
+
+       Given a `.UpdateResult.rtest` calculate the rate penalty.
+
+    .. method:: get_reduced(fixed_points : array) -> array
+
+       Convert an input array `fixed_points` of shape ``(NZ, NB, 2N)``
+       to an array of `INSHAPE` which is appropriate as an input of
+       the `.discriminator`.  The shape of the output array is
+       ``(NZ, NB * len(sample_sites))`` if `.track_offset_identity` is
+       set to true or otherwise ``(NZ * len(sample_sites), NB)``.
+       See also `.subsample_neurons`.
+
+    Todo
+    ----
+    Move to class-based approach (eventually).
+
+    """
+
+
+class UpdateResult(SimpleNamespace):
+    """
+    Result of a generator update.
+
+    Attributes
+    ----------
+    Dloss : float
+        Value of the discriminator loss.  If there are multiple
+        discriminator updates per generator update (in WGAN), this is
+        the value from the last iteration.
+    Gloss : float
+        Value of the generator loss.
+    Daccuracy : float
+        Accuracy of generator.  For WGAN, it's the estimate of
+        negative Wasserstein distance.
+    rtest : array of shape (NZ, len(inp), 2N)
+        Fixed-points of the fake SSN.  This is the second element
+        (`Rs`) returned by `.find_fixed_points`.
+    true : array
+        True tuning curves.  This is the fixed-point "reduced" by
+        `.subsample_neurons`.  The shape of this array is
+        ``(NZ, NB * len(sample_sites))`` if `track_offset_identity` is
+        set to true or otherwise ``(NZ * len(sample_sites), NB)``.
+        See `make_WGAN_functions` and  `make_RGAN_functions`.
+    model_info : `.FixedPointsInfo` or `.SimpleNamespace`
+        An object with attribute `rejections` and `unused` which are
+        the sum of the value in the same field of all
+        `.FixedPointsInfo` objects returned by `.find_fixed_points`
+        calls in `.WGAN_update`.  In case of `.RGAN_update`, it simply
+        is `.FixedPointsInfo` since there is only one generator
+        update.
+    SSsolve_time : float
+        Total wall time spent for solving fixed points in update
+        function.
+    gradient_time : float
+        Total wall time spent for calculating gradient and updating
+        parameters.
+    rate_penalty : float
+        Rate penalty evaluated on `rtest`.
+
+    Todo
+    ----
+    Rename parameters like `.rtest`, `.true` to more descriptive ones.
+
+    """
+
+
 def saveheader_disc_param_stats(datastore, discriminator):
     header = ['gen_step', 'disc_step'] + [
         '{}.nnorm'.format(p.name)  # Normalized NORM
@@ -104,6 +232,153 @@ def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
                 exit_code=3)
 
 
+class LearningRecorder(object):
+
+    filename = "learning.csv"
+    column_names = (
+        "epoch", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
+        "gradient_time", "model_convergence", "model_unused",
+        "rate_penalty")
+
+    def __init__(self, datastore, quiet):
+        self.datastore = datastore
+        self.quiet = quiet
+
+    def _saverow(self, row):
+        assert len(row) == len(self.column_names)
+        self.datastore.tables.saverow(self.filename, row, echo=not self.quiet)
+
+    def write_header(self):
+        self._saverow(self.column_names)
+
+    def record(self, gen_step, update_result):
+        self._saverow([
+            gen_step,
+            update_result.Gloss,
+            update_result.Dloss,
+            update_result.Daccuracy,
+            update_result.SSsolve_time,
+            update_result.gradient_time,
+            update_result.model_info.rejections,
+            update_result.model_info.unused,
+            update_result.rate_penalty,
+        ])
+
+
+class GANDriver(object):
+
+    """
+    GAN learning driver.
+
+    It does all algorithm-independent ugly stuff such as:
+
+    * Calculate learning statistics.
+    * Save learning statistics and parameters at the right point.
+    * Make sure the parameters are finite; otherwise save information
+      as much as possible and then abort.
+
+    The main interfaces are `iterate` and `post_disc_update`.
+
+    """
+
+    def __init__(self, gan, datastore, **kwargs):
+        self.gan = gan
+        self.datastore = datastore
+        self.__dict__.update(kwargs)
+
+    def pre_loop(self):
+        self.learning_recorder = LearningRecorder(self.datastore, self.quiet)
+        self.learning_recorder.write_header()
+        saveheader_disc_param_stats(self.datastore, self.gan.discriminator)
+        self.datastore.tables.saverow('disc_learning.csv', [
+            'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
+            'SSsolve_time', 'gradient_time',
+        ])
+
+    def post_disc_update(self, gen_step, disc_step, Dloss, Daccuracy,
+                         SSsolve_time, gradient_time):
+        """
+        Method to be called after a discriminator update.
+
+        Parameters
+        ----------
+        gen_step : int
+            See `.iterate`
+        disc_step : int
+            If there are multiple discriminator updates (WGAN), the
+            loop index must be given as `disc_step` argument.
+            Otherwise, pass 0.
+        Dloss : float
+        Daccuracy : float
+        SSsolve_time : float
+        gradient_time : float
+            See the attributes of `.UpdateResult` with the same name.
+
+        """
+        saverow_disc_param_stats(self.datastore, self.gan.discriminator,
+                                 gen_step, disc_step)
+        self.datastore.tables.saverow('disc_learning.csv', [
+            gen_step, disc_step, Dloss, Daccuracy,
+            SSsolve_time, gradient_time,
+        ])
+
+    def post_update(self, gen_step, update_result):
+        self.learning_recorder.record(gen_step, update_result)
+
+        jj = self.gan.J.get_value()
+        dd = self.gan.D.get_value()
+        ss = self.gan.S.get_value()
+
+        allpar = np.reshape(np.concatenate([jj, dd, ss]), [-1]).tolist()
+        self.datastore.tables.saverow('generator.csv', [gen_step] + allpar)
+
+        if self.disc_param_save_interval > 0 \
+                and gen_step % self.disc_param_save_interval == 0:
+            lasagne_param_file.dump(
+                self.gan.discriminator,
+                self.datastore.path('disc_param',
+                                    self.disc_param_template.format(gen_step)))
+
+        maybe_quit(
+            self.datastore,
+            JDS_fake=list(map(np.exp, [jj, dd, ss])),
+            JDS_true=[self.J0, self.D0, self.S0],
+            quit_JDS_threshold=self.quit_JDS_threshold,
+        )
+
+    def post_loop(self):
+        self.datastore.dump_json(dict(
+            reason='end_of_iteration',
+            good=True,
+        ), 'exit.json')
+
+    def iterate(self, update_func):
+        """
+        Iteratively call `update_func` for `.iterations` times.
+
+        A callable `update_func` must have the following signature:
+
+        .. function:: update_func(gen_step : int) -> UpdateResult
+
+           It must accept a positional argument which is the generator
+           update step.  It then must return an instance of
+           `.UpdateResult` with all mandatory attributes mentioned in
+           the document of `.UpdateResult`.
+
+        """
+        if self.disc_param_save_on_error:
+            update_func = lasagne_param_file.wrap_with_save_on_error(
+                self.gan.discriminator,
+                self.datastore.path('disc_param', 'pre_error.npz'),
+                self.datastore.path('disc_param', 'post_error.npz'),
+            )(update_func)
+
+        self.pre_loop()
+        for gen_step in range(self.iterations):
+            self.post_update(gen_step, update_func(gen_step))
+        self.post_loop()
+
+
 def get_updater(update_name, *args, **kwds):
     if update_name == 'adam-wgan':
         return lasagne.updates.adam(*args,
@@ -130,35 +405,37 @@ def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
 
 
 def learn(
-        iterations, seed, gen_learn_rate, disc_learn_rate,
-        loss, layers, n_samples, WGAN_lambda,
+        driver, gan, datastore,
+        seed,
+        loss, n_samples,
         WGAN_n_critic0, WGAN_n_critic,
-        rate_cost, rate_penalty_threshold, rate_penalty_no_I,
+        rate_cost,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
-        sample_sites, track_offset_identity, init_disturbance, quiet,
+        sample_sites, track_offset_identity, init_disturbance,
         contrast,
-        disc_normalization, disc_param_save_interval, disc_param_template,
-        disc_param_save_on_error,
-        datastore, J0, D0, S0, quit_JDS_threshold,
+        J0, D0, S0,
         timetest, convtest, testDW, DRtest,
         **make_func_kwargs):
+
+    gan.track_offset_identity = track_offset_identity
+    gan.rate_cost = float(rate_cost)
+    gan.loss_type = loss
 
     print(datastore)
 
     bandwidths = np.array(bandwidths)
-    sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
+    gan.sample_sites = \
+        sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
 
     WGAN = loss == 'WD'
     if WGAN:
-        def make_functions(**kwds):
-            return make_WGAN_functions(WGAN_lambda=WGAN_lambda, **kwds)
+        make_functions = make_WGAN_functions
         train_update = WGAN_update
     else:
         make_functions = make_RGAN_functions
         train_update = RGAN_update
 
-    rate_cost = float(rate_cost)
     np.random.seed(seed)
 
     smoothness = 0.03125
@@ -225,9 +502,9 @@ def learn(
     D_dis = np.array(D_dis) * np.ones((2, 2))
     S_dis = np.array(S_dis) * np.ones((2, 2))
 
-    J = theano.shared(J2.get_value() + J_dis, name = "j")
-    D = theano.shared(D2.get_value() + D_dis, name = "d")
-    S = theano.shared(S2.get_value() + S_dis, name = "s")
+    gan.J = J = theano.shared(J2.get_value() + J_dis, name="j")
+    gan.D = D = theano.shared(D2.get_value() + D_dis, name="d")
+    gan.S = S = theano.shared(S2.get_value() + S_dis, name="s")
 
 #    J = theano.shared(np.log(np.array([[.01,.01],[.02,.01]])).astype("float64"),name = "j")
 #    D = theano.shared(np.log(np.array([[.2,.2],[.3,.2]])).astype("float64"),name = "d")
@@ -251,9 +528,9 @@ def learn(
     X = theano.shared(np.linspace(-.5,.5,n.get_value()).astype("float32"),name = "positions")
 
     ##getting regular nums##
-    N = int(n.get_value())
-    NZ = int(nz.get_value())
-    NB = int(nb.get_value())
+    gan.N = N = int(n.get_value())
+    gan.NZ = NZ = int(nz.get_value())
+    gan.NB = NB = int(nb.get_value())
     ###
 
     BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness, contrast)
@@ -261,7 +538,7 @@ def learn(
     print(BAND_IN.shape)
 
     #theano variable for the random samples
-    Z = T.tensor3("z","float32")
+    gan.Z = Z = T.tensor3("z", "float32")
 
     #symbolic W
     ww = make_w.make_W_with_x(Z,Jp,Dp,Sp,n,X)
@@ -295,8 +572,8 @@ def learn(
     #now we need to get a function to generate dr/dth from dw/dth
 
     #variables for rates and inputs
-    rvec = T.tensor3("rvec","float32")
-    ivec = T.matrix("ivec","float32")
+    gan.rate_vector = rvec = T.tensor3("rvec", "float32")
+    gan.ivec = ivec = T.matrix("ivec", "float32")
 
     #DrDth tensor expressions
     WRgrad_params = dict(
@@ -423,85 +700,47 @@ def learn(
  
         exit()
 
-    G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func = make_functions(
-        rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss, LAYERS=layers,
-        sample_sites=sample_sites, track_offset_identity=track_offset_identity,
-        d_lr=disc_learn_rate, g_lr=gen_learn_rate, rate_cost=rate_cost,
-        rate_penalty_threshold=rate_penalty_threshold,
-        rate_penalty_no_I=rate_penalty_no_I,
-        ivec=ivec, Z=Z, J=J, D=D, S=S, N=N,
-        disc_normalization=disc_normalization,
+    assert not set(vars(gan)) & set(make_func_kwargs)  # no common keys
+    make_functions(
+        gan,
         R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp],
-        **make_func_kwargs)
+        **dict(make_func_kwargs, **vars(gan)))
 
     #Now we set up values to use in testing.
 
-    inp = BAND_IN
-
-    def saverow_learning(row):
-        datastore.tables.saverow("learning.csv", row, echo=not quiet)
-    saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused,rate_penalty")
-
-    saveheader_disc_param_stats(datastore, discriminator)
-    datastore.tables.saverow('disc_learning.csv', [
-        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
-        'SSsolve_time', 'gradient_time',
-    ])
+    # Variables to be used from train_update (but not from make_functions):
+    gan.inp = inp = BAND_IN
+    gan.ssn_params = ssn_params
+    gan.data = data
+    gan.W = W
 
     if track_offset_identity:
-        truth_size_per_batch = NZ
+        gan.truth_size_per_batch = NZ
     else:
-        truth_size_per_batch = NZ * len(sample_sites)
+        gan.truth_size_per_batch = NZ * len(sample_sites)
 
-    if disc_param_save_on_error:
-        train_update = lasagne_param_file.wrap_with_save_on_error(
-            discriminator, datastore.path('disc_param', 'pre_error.npz'),
-            datastore.path('disc_param', 'post_error.npz'),
-        )(train_update)
+    def update_func(k):
+        update_result = train_update(
+            driver,
+            WG_repeat=WGAN_n_critic0 if k == 0 else WGAN_n_critic,
+            gen_step=k,
+            **vars(gan))
+        update_result.Daccuracy = gan.D_acc(update_result.rtest,
+                                            update_result.true)
+        update_result.rate_penalty = gan.rate_penalty_func(update_result.rtest)
 
-    for k in range(iterations):
+        # Save fake and tuning curves averaged over Zs:
+        GZmean = gan.get_reduced(update_result.rtest).mean(axis=0)
+        Dmean = update_result.true.mean(axis=0)
+        datastore.tables.saverow('TC_mean.csv',
+                                 list(GZmean) + list(Dmean))
 
-        Dloss,Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat = WGAN_n_critic0 if k == 0 else WGAN_n_critic,gen_step=k,datastore=datastore)
+        return update_result
 
-        saverow_learning(
-            [k, Gloss, Dloss, D_acc(rtest, true),
-             SSsolve_time,
-             gradient_time,
-             model_info.rejections,
-             model_info.unused,
-             rate_penalty_func(rtest)])
-
-        GZmean = get_reduced(rtest).mean(axis = 0)
-        Dmean = true.mean(axis = 0)
-
-        datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
-
-        jj = J.get_value()
-        dd = D.get_value()
-        ss = S.get_value()
-        
-        allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
-        datastore.tables.saverow('generator.csv', [k] + allpar)
-
-        if disc_param_save_interval > 0 and k % disc_param_save_interval == 0:
-            lasagne_param_file.dump(
-                discriminator,
-                datastore.path('disc_param', disc_param_template.format(k)))
-
-        maybe_quit(
-            datastore,
-            JDS_fake=list(map(np.exp, [jj, dd, ss])),
-            JDS_true=[J0, D0, S0],
-            quit_JDS_threshold=quit_JDS_threshold,
-        )
-
-    datastore.dump_json(dict(
-        reason='end_of_iteration',
-        good=True,
-    ), 'exit.json')
+    driver.iterate(update_func)
 
 
-def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
+def WGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -537,20 +776,28 @@ def WGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         with gradient_time:
             Dloss = D_train_func(rtest,true,eps*true + (1. - eps)*get_reduced(rtest))
 
-        saverow_disc_param_stats(datastore, discriminator, gen_step, rep)
-        datastore.tables.saverow('disc_learning.csv', [
+        driver.post_disc_update(
             gen_step, rep, Dloss, D_acc(rtest, true),
             SSsolve_time.times[-1], gradient_time.times[-1],
-        ])
+        )
 
     #end D loop
 
     with gradient_time:
         Gloss = G_train_func(rtest,inp,Ztest)
 
-    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
+    return UpdateResult(
+        Dloss=Dloss,
+        Gloss=Gloss,
+        rtest=rtest,
+        true=true,
+        model_info=model_info,
+        SSsolve_time=SSsolve_time.sum(),
+        gradient_time=gradient_time.sum(),
+    )
 
-def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,datastore):
+
+def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_acc,get_reduced,discriminator,J,D,S,truth_size_per_batch,WG_repeat,gen_step,**_):
 
     SSsolve_time = utils.StopWatch()
     gradient_time = utils.StopWatch()
@@ -577,15 +824,31 @@ def RGAN_update(D_train_func,G_train_func,iterations,N,NZ,NB,data,W,W_test,inp,s
         Dloss = D_train_func(rtest,true)
         Gloss = G_train_func(rtest,inp,Ztest)
 
-    saverow_disc_param_stats(datastore, discriminator, gen_step, 0)
-    datastore.tables.saverow('disc_learning.csv', [
+    driver.post_disc_update(
         gen_step, 0, Dloss, D_acc(rtest, true),
         SSsolve_time.times[-1], gradient_time.times[-1],
-    ])
+    )
 
-    return Dloss,Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
+    return UpdateResult(
+        Dloss=Dloss,
+        Gloss=Gloss,
+        rtest=rtest,
+        true=true,
+        model_info=model_info,
+        SSsolve_time=SSsolve_time.sum(),
+        gradient_time=gradient_time.sum(),
+    )
 
-def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update):
+
+def make_RGAN_functions(
+        gan,
+        # Parameters:
+        rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update,
+        # Ignored parameters:
+        WGAN_lambda,
+        ):
+    d_lr = disc_learn_rate
+    g_lr = gen_learn_rate
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -611,7 +874,7 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    discriminator = SD.make_net(INSHAPE, LOSS, LAYERS,
+    discriminator = SD.make_net(INSHAPE, loss_type, layers,
                                 normalization=disc_normalization)
 
     #get the outputs
@@ -621,11 +884,11 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     D_acc = theano.function([rate_vector,red_R_true],(true_dis_out.sum() + (1 - fake_dis_out).sum())/(2*NZ),allow_input_downcast = True)
 
     #make the loss functions
-    if LOSS == "CE":
+    if loss_type == "CE":
         SM = .9
         true_loss_exp = -SM*np.log(true_dis_out).mean() - (1. - SM)*np.log(1. - true_dis_out).mean() - np.log(1. - fake_dis_out).mean()#discriminator loss
         fake_loss_exp = -np.log(fake_dis_out).mean()#generative loss
-    elif LOSS == "LS":
+    elif loss_type == "LS":
         true_loss_exp = ((true_dis_out - 1.)**2).mean() + ((fake_dis_out + 1.)**2).mean()#discriminator loss
         fake_loss_exp = ((fake_dis_out - 1.)**2).mean()#generative loss
     else:
@@ -676,9 +939,28 @@ def make_RGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func,G_loss_func,D_train_func,D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func
+    # Put objects to be used elsewhere in the shared namespace `gan`.
+    # We avoid using "gan.G_train_func = ..." etc. above to keep git
+    # history readable.
+    gan.G_train_func = G_train_func
+    gan.G_loss_func = G_loss_func
+    gan.D_train_func = D_train_func
+    gan.D_loss_func = D_loss_func
+    gan.D_acc = D_acc
+    gan.get_reduced = get_reduced
+    gan.discriminator = discriminator
+    gan.rate_penalty_func = rate_penalty_func
 
-def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update):
+
+def make_WGAN_functions(
+        gan,
+        # Parameters:
+        rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,
+        # Ignored parameters:
+        loss_type,
+        ):
+    d_lr = disc_learn_rate
+    g_lr = gen_learn_rate
 
     #Defines the input shape for the discriminator network
     if track_offset_identity:
@@ -704,7 +986,7 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
 
     #I want to make a network that takes red_R and gives a scalar output
 
-    discriminator = SD.make_net(INSHAPE, "WGAN", LAYERS,
+    discriminator = SD.make_net(INSHAPE, "WGAN", layers,
                                 normalization=disc_normalization)
 
     #get the outputs
@@ -775,7 +1057,15 @@ def make_WGAN_functions(rate_vector,sample_sites,NZ,NB,LOSS,LAYERS,d_lr,g_lr,rat
     G_loss_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
     D_loss_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
-    return G_train_func, G_loss_func, D_train_func, D_loss_func,D_acc,get_reduced,discriminator,rate_penalty_func
+    # See the same part in `make_RGAN_functions`.
+    gan.G_train_func = G_train_func
+    gan.G_loss_func = G_loss_func
+    gan.D_train_func = D_train_func
+    gan.D_loss_func = D_loss_func
+    gan.D_acc = D_acc
+    gan.get_reduced = get_reduced
+    gan.discriminator = discriminator
+    gan.rate_penalty_func = rate_penalty_func
 
 
 def main(args=None):
@@ -783,9 +1073,6 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=__doc__)
-    parser.add_argument(
-        '--iterations', default=100000, type=int,
-        help='Number of iterations (default: %(default)s)')
     parser.add_argument(
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
@@ -796,12 +1083,6 @@ def main(args=None):
         elements are used for the disturbance for J, D (delta),
         S (sigma), respectively.  It accepts any Python expression.
         (default: %(default)s)''')
-    parser.add_argument(
-        '--quit-JDS-threshold', default=-1, type=float,
-        help='''Threshold in l2 norm distance in (J, D, S)-space form
-        the true parameter.  If the distance exceeds this threshold,
-        the simulation is terminated.  -1 (default) means never
-        terminate.''')
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')
@@ -906,29 +1187,6 @@ def main(args=None):
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
-    parser.add_argument(
-        '--disc-param-save-interval', default=5, type=int,
-        help='''Save parameters for discriminator for each given
-        generator step. -1 means to never save.
-        (default: %(default)s)''')
-    parser.add_argument(
-        '--disc-param-template', default='last.npz',
-        help='''Python string format for the name of the file to save
-        discriminator parameters.  First argument "{}" to the format
-        is the number of generator updates.  Not using "{}" means to
-        overwrite to existing file (default) which is handy if you are
-        only interested in the latest parameter.  Use "{}.npz" for
-        recording the history of evolution of the discriminator.
-        (default: %(default)s)''')
-    parser.add_argument(
-        '--disc-param-save-on-error', action='store_true',
-        help='''Save discriminator parameter just before something
-        when wrong (e.g., having NaN).
-        (default: %(default)s)''')
-
-    parser.add_argument(
-        '--quiet', action='store_true',
-        help='Do not print loss values per epoch etc.')
 
     parser.add_argument(
         '--timetest',default=False, action='store_true',
@@ -949,6 +1207,40 @@ def main(args=None):
 
 
 def add_learning_options(parser):
+    # Arguments for `driver` (handled in `init_gan`):
+    parser.add_argument(
+        '--iterations', default=100000, type=int,
+        help='Number of iterations (default: %(default)s)')
+    parser.add_argument(
+        '--quit-JDS-threshold', default=-1, type=float,
+        help='''Threshold in l2 norm distance in (J, D, S)-space form
+        the true parameter.  If the distance exceeds this threshold,
+        the simulation is terminated.  -1 (default) means never
+        terminate.''')
+    parser.add_argument(
+        '--quiet', action='store_true',
+        help='Do not print loss values per epoch etc.')
+    parser.add_argument(
+        '--disc-param-save-interval', default=5, type=int,
+        help='''Save parameters for discriminator for each given
+        generator step. -1 means to never save.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-template', default='last.npz',
+        help='''Python string format for the name of the file to save
+        discriminator parameters.  First argument "{}" to the format
+        is the number of generator updates.  Not using "{}" means to
+        overwrite to existing file (default) which is handy if you are
+        only interested in the latest parameter.  Use "{}.npz" for
+        recording the history of evolution of the discriminator.
+        (default: %(default)s)''')
+    parser.add_argument(
+        '--disc-param-save-on-error', action='store_true',
+        help='''Save discriminator parameter just before something
+        when wrong (e.g., having NaN).
+        (default: %(default)s)''')
+
+    # Arguments handled in `preprocess`:
     parser.add_argument(
         '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
         help='Number of bandwidths (default: %(default)s)')
@@ -961,6 +1253,9 @@ def add_learning_options(parser):
 
 
 def preprocess(run_config):
+    """
+    Pre-process `run_config` before it is dumped to ``info.json``.
+    """
     # Set `bandwidths` outside the `learn` function, so that
     # `bandwidths` is stored in info.json:
     n_bandwidths = run_config.pop('n_bandwidths')
@@ -999,12 +1294,36 @@ def preprocess(run_config):
         run_config[key] = utils.tolist_if_not(run_config[key])
 
 
+def init_driver(
+        datastore,
+        iterations, quit_JDS_threshold, quiet,
+        disc_param_save_interval, disc_param_template,
+        disc_param_save_on_error,
+        **run_config):
+
+    gan = GenerativeAdversarialNetwork()
+    driver = GANDriver(
+        gan, datastore,
+        iterations=iterations, quiet=quiet,
+        disc_param_save_interval=disc_param_save_interval,
+        disc_param_template=disc_param_template,
+        disc_param_save_on_error=disc_param_save_on_error,
+        quit_JDS_threshold=quit_JDS_threshold,
+        J0=run_config['J0'],
+        D0=run_config['D0'],
+        S0=run_config['S0'],
+    )
+
+    return dict(run_config, datastore=datastore, gan=gan, driver=driver)
+
+
 def do_learning(learn, run_config):
     """
     Wrap `.execution.do_learning` with some pre-processing.
     """
     execution.do_learning(
-        learn, run_config,
+        lambda **run_config: learn(**init_driver(**run_config)),
+        run_config,
         preprocess=preprocess,
         extra_info=dict(
             n_bandwidths=run_config['n_bandwidths'],

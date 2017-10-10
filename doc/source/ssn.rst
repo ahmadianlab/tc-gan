@@ -30,6 +30,7 @@ where
   curve conditions :math:`s \in S` to a (lower dimensional) tuning
   curve which in turn fed into the discriminator.  This is analogous
   to neural recordings in actual experiments.
+  (cf., `.get_reduced`)
 
 Note that both input-constructing function :math:`I` and probe
 function :math:`P` can "see" the condition :math:`c \in C`.  This

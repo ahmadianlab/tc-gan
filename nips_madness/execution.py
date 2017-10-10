@@ -56,7 +56,7 @@ class DataTables(object):
         return self._files[name]
 
     def saverow(self, name, row, echo=False):
-        if isinstance(row, list):
+        if isinstance(row, (list, tuple)):
             row = ','.join(map(str, row))
 
         file = self._get_file(name)

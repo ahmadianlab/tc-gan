@@ -97,6 +97,7 @@ def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
 
 
 def plot_gan_cost_and_rate_penalty(data, df=None, ax=None,
+                                   ymax_dacc=1, ymin_dacc=-0.05,
                                    yscale_dacc='symlog',
                                    yscale_rate_penalty='log'):
     if ax is None:
@@ -109,6 +110,12 @@ def plot_gan_cost_and_rate_penalty(data, df=None, ax=None,
         lines = ax.plot(
             df['epoch'], -df['Daccuracy'],
             label='Wasserstein distance', color=color)
+
+        ymin0, ymax0 = ax.get_ylim()
+        ymax = ymax_dacc if ymax0 < ymax_dacc else None
+        ymin = ymin_dacc if ymin0 > ymin_dacc else None
+        if not (ymax is None and ymin is None):
+            ax.set_ylim(ymin, ymax)
     else:
         lines = ax.plot(
             'epoch', 'Daccuracy', data=df,
@@ -158,7 +165,7 @@ def plot_learning(data, title_params=None):
 
     axes[1, 2].plot(df['epoch'], gen_param_mean_relative_error(data),
                     label='G param. rel. MAE')
-    axes[1, 2].legend(loc='upper left')
+    axes[1, 2].legend(loc='best')
     clip_ymax(axes[1, 2], 1)
 
     plot_gen_params(data, axes=axes[2, :])

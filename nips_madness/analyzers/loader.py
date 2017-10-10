@@ -73,6 +73,13 @@ class GANData(object):
             idx = np.arange(len(gen)).reshape((-1, 1))
             gen = np.concatenate([idx, gen], axis=1)
 
+        if not main_names:
+            warnings.warn('learning.csv has no header line; '
+                          'assuming the default.')
+            from ..run.gan import LearningRecorder
+            assert main.shape[1] == len(LearningRecorder.column_names)
+            main_names = LearningRecorder.column_names
+
         with open(os.path.join(dirname, 'info.json')) as file:
             info = json.load(file)
 
@@ -102,6 +109,16 @@ class GANData(object):
                            self.log_D[indices],
                            self.log_S[indices]):
             yield list(map(np.exp, log_JDS))
+
+    def fake_JDS(self):
+        return np.exp(self.gen[:, 1:])
+
+    def true_JDS(self):
+        return np.concatenate([
+            self.info['run_config']['J0'],
+            self.info['run_config']['D0'],
+            self.info['run_config']['S0'],
+        ]).flatten()
 
     @property
     def track_offset_identity(self):

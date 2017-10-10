@@ -9,28 +9,50 @@ from ..utils import csv_line
 from .loader import load_gandata
 
 
-def plot_errors(data, legend=True, ax=None):
+def clip_ymax(ax, ymax, ymin=0):
+    if ax.get_ylim()[1] > ymax:
+        ax.set_ylim(ymin, ymax)
+    else:
+        ax.set_ylim(ymin, None)
+
+
+def gen_param_mean_relative_error(data):
+    true = data.true_JDS().reshape((1, -1))
+    fake = data.fake_JDS()
+    return np.abs((fake - true) / true).mean(axis=-1)
+
+
+def plot_tc_errors(data, legend=True, ax=None, per_stim=False):
+    """Plot tuning curve (TC) relative mean absolute error (MAE)."""
     if ax is None:
         _, ax = pyplot.subplots()
-    from numpy.linalg import norm
     import matplotlib.patheffects as pe
 
     model = data.model_tuning
     true = data.true_tuning
-    per_stim_error = abs(model - true) / abs(true)
-    total_error = norm(model - true, axis=-1) / norm(true, axis=-1)
+    total_error = np.abs((model - true) / true).mean(axis=-1)
 
-    per_stim_lines = ax.plot(per_stim_error, alpha=0.4)
     total_error_lines = ax.plot(
         total_error,
         path_effects=[pe.Stroke(linewidth=5, foreground='white'),
                       pe.Normal()])
+    if per_stim:
+        per_stim_error = abs(model - true) / abs(true)
+        per_stim_lines = ax.plot(per_stim_error, alpha=0.4)
+    else:
+        per_stim_error = per_stim_lines = None
 
     if legend:
-        leg = ax.legend(
-            total_error_lines + per_stim_lines,
-            ['rel. l2 error'] + list(range(len(per_stim_lines))),
-            loc='center left')
+        if per_stim:
+            leg = ax.legend(
+                total_error_lines + per_stim_lines,
+                ['TC rel. MAE'] + list(range(len(per_stim_lines))),
+                loc='center left')
+        else:
+            leg = ax.legend(
+                total_error_lines,
+                ['TC rel. MAE'],
+                loc='upper left')
         leg.set_frame_on(True)
         leg.get_frame().set_facecolor('white')
 
@@ -74,13 +96,56 @@ def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
     return axes
 
 
+def plot_gan_cost_and_rate_penalty(data, df=None, ax=None,
+                                   yscale_dacc='symlog',
+                                   yscale_rate_penalty='log'):
+    if ax is None:
+        _, ax = pyplot.subplots()
+    if df is None:
+        df = data.to_dataframe()
+
+    color = 'C0'
+    if data.gan_type == 'WGAN':
+        lines = ax.plot(
+            df['epoch'], -df['Daccuracy'],
+            label='Wasserstein distance', color=color)
+    else:
+        lines = ax.plot(
+            'epoch', 'Daccuracy', data=df,
+            label='Daccuracy', color=color)
+    ax.tick_params('y', colors=color)
+
+    if 'rate_penalty' in df:
+        color = 'C1'
+        ax_rate_penalty = ax.twinx()
+        lines += ax_rate_penalty.plot(
+            'epoch', 'rate_penalty', data=df,
+            label='rate_penalty', color=color, alpha=0.8)
+        ax_rate_penalty.tick_params('y', colors=color)
+        ax_rate_penalty.set_yscale(yscale_rate_penalty)
+
+    ax.legend(
+        lines, [l.get_label() for l in lines],
+        loc='best')
+
+    ax.set_yscale(yscale_dacc)
+
+
 def plot_learning(data, title_params=None):
     df = data.to_dataframe()
     fig, axes = pyplot.subplots(nrows=4, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 8))
-    df.plot('epoch', ['Gloss', 'Dloss'], ax=axes[0, 0], alpha=0.8, logy=True)
-    df.plot('epoch', ['Daccuracy'], ax=axes[0, 1])
+
+    plot_kwargs = dict(ax=axes[0, 0], alpha=0.8)
+    if data.gan_type == 'WGAN':
+        df['Lip. penalty'] = df['Dloss'] - df['Daccuracy']
+        df.plot('epoch', ['Gloss', 'Dloss', 'Lip. penalty'], **plot_kwargs)
+    else:
+        df.plot('epoch', ['Gloss', 'Dloss'], **plot_kwargs)
+
+    plot_gan_cost_and_rate_penalty(data, df=df, ax=axes[0, 1])
+
     df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0],
             logy=True)
     df.plot('epoch', ['model_convergence'], ax=axes[1, 1], logy=True)
@@ -88,18 +153,13 @@ def plot_learning(data, title_params=None):
     ax_loss = axes[0, 0]
     ax_loss.set_yscale('symlog')
 
-    ax_dacc = axes[0, 1]
-    ax_dacc.set_yscale('symlog')
-    # q1, q3 = np.percentile(df.loc[:, 'Daccuracy'], [25, 75])
-    # iqr = q3 - q1
-    # linthreshy = max((df.loc[:, 'Daccuracy'] < q3 + 1.5 * iqr).max(),
-    #                  -(df.loc[:, 'Daccuracy'] < q1 - 1.5 * iqr).min())
-    # ax_dacc.set_yscale('symlog', linthreshy=linthreshy)
+    err1 = plot_tc_errors(data, ax=axes[0, 2])
+    clip_ymax(err1['ax'], 2)
 
-    err1 = plot_errors(data, ax=axes[0, 2])
-    err2 = plot_errors(data, ax=axes[1, 2], legend=False)
-    err1['ax'].set_ylim(0, 1)
-    err2['ax'].set_yscale('log')
+    axes[1, 2].plot(df['epoch'], gen_param_mean_relative_error(data),
+                    label='G param. rel. MAE')
+    axes[1, 2].legend(loc='upper left')
+    clip_ymax(axes[1, 2], 1)
 
     plot_gen_params(data, axes=axes[2, :])
     plot_gen_params(data, axes=axes[3, :],

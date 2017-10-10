@@ -327,9 +327,10 @@ def find_fixed_points(num, Z_W_gen, exts, method='parallel', **common_kwargs):
     """
     Find `num` sets of fixed points using weight matrices from `Z_W_gen`.
 
-    Fixed points are calculated for each external input in `exts`.  A
-    set of fixed points is returned only if the fixed points are found
-    for all external inputs.
+    Fixed points are calculated for each external input in `exts`.
+    The set of fixed points is included in `Rs` only if they reach the
+    fixed point for all external inputs in `exts`.  The conditions for
+    reaching a fixed point is documented in function `fixed_point`.
 
     Parameters
     ----------

@@ -342,7 +342,7 @@ class GANDriver(object):
         maybe_quit(
             self.datastore,
             JDS_fake=list(map(np.exp, [jj, dd, ss])),
-            JDS_true=[self.J0, self.D0, self.S0],
+            JDS_true=list(map(SSsolve.DEFAULT_PARAMS.get, 'JDS')),
             quit_JDS_threshold=self.quit_JDS_threshold,
         )
 
@@ -846,6 +846,8 @@ def make_RGAN_functions(
         rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update,
         # Ignored parameters:
         WGAN_lambda,
+        # Optional parameters:
+        gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
@@ -908,7 +910,8 @@ def make_RGAN_functions(
     D_updates = get_updater(
         disc_update, true_loss_exp,
         lasagne.layers.get_all_params(discriminator, trainable=True),
-        d_lr)
+        d_lr,
+        **disc_update_config)
 
     #make loss functions
     true_loss = theano.function([red_R_true,rate_vector],true_loss_exp,allow_input_downcast = True)
@@ -931,7 +934,8 @@ def make_RGAN_functions(
     dLdS = theano.function([rate_vector,ivec,Z],dLdS_exp,allow_input_downcast = True)
 
     G_updates = get_updater(gen_update, [dLdJ_exp, dLdD_exp, dLdS_exp],
-                            [J, D, S], g_lr)
+                            [J, D, S], g_lr,
+                            **gen_update_config)
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true],true_loss_exp,updates = D_updates,allow_input_downcast = True)
@@ -958,6 +962,8 @@ def make_WGAN_functions(
         rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,
         # Ignored parameters:
         loss_type,
+        # Optional parameters:
+        gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
@@ -1045,11 +1051,13 @@ def make_WGAN_functions(
 
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     G_updates = get_updater(gen_update, [dLdJ_exp, dLdD_exp, dLdS_exp],
-                            [J, D, S], g_lr)
+                            [J, D, S], g_lr,
+                            **gen_update_config)
     D_updates = get_updater(
         disc_update, true_loss_exp,
         lasagne.layers.get_all_params(discriminator, trainable=True),
-        d_lr)
+        d_lr,
+        **disc_update_config)
 
     G_train_func = theano.function([rate_vector,ivec,Z],fake_loss_exp,updates = G_updates,allow_input_downcast = True)
     D_train_func = theano.function([rate_vector,red_R_true,red_fake_for_grad],true_loss_exp,updates = D_updates,allow_input_downcast = True)
@@ -1287,9 +1295,9 @@ def preprocess(run_config):
         J0, D0, S0 = np.exp(lastrow).reshape((3, 2, 2))
         run_config.update(J0=J0, D0=D0, S0=S0)
     else:
-        run_config.setdefault('J0', [[0.0957, 0.0638], [0.1197, 0.0479]])
-        run_config.setdefault('D0', [[0.7660, 0.5106], [0.9575, 0.3830]])
-        run_config.setdefault('S0', [[0.08333375, 0.025], [0.166625, 0.025]])
+        run_config.setdefault('J0', SSsolve.DEFAULT_PARAMS['J'])
+        run_config.setdefault('D0', SSsolve.DEFAULT_PARAMS['D'])
+        run_config.setdefault('S0', SSsolve.DEFAULT_PARAMS['S'])
     for key in ('J0', 'D0', 'S0'):
         run_config[key] = utils.tolist_if_not(run_config[key])
 
@@ -1309,9 +1317,6 @@ def init_driver(
         disc_param_template=disc_param_template,
         disc_param_save_on_error=disc_param_save_on_error,
         quit_JDS_threshold=quit_JDS_threshold,
-        J0=run_config['J0'],
-        D0=run_config['D0'],
-        S0=run_config['S0'],
     )
 
     return dict(run_config, datastore=datastore, gan=gan, driver=driver)

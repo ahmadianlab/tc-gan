@@ -7,6 +7,8 @@ import lasagne
 import numpy as np
 import pytest
 
+from .. import lasagne_param_file
+from ..execution import DataTables
 from ..run.gan import init_driver, LearningRecorder
 from ..ssnode import DEFAULT_PARAMS
 
@@ -17,9 +19,12 @@ class FakeDataStorePath(object):
         self.returned = collections.defaultdict(list)
 
     def __call__(self, *args):
-        bio = io.BytesIO()
-        self.returned[args].append(bio)
-        return bio
+        if args[-1].endswith('.csv'):
+            stream = io.StringIO()
+        else:
+            stream = io.BytesIO()
+        self.returned[args].append(stream)
+        return stream
 
 
 def make_discriminator():
@@ -40,9 +45,15 @@ def make_driver(
         S0=DEFAULT_PARAMS['S'],
         **run_config):
 
-    # Setup Fake datastore
+    # Setup fake DataStore:
     datastore = mock.Mock()
-    datastore.path.side_effect = FakeDataStorePath()
+    datastore.path.side_effect = dspath = FakeDataStorePath()
+
+    # Setup fake DataTables:
+    # Connect mocked saverow to true saverow for testing file contents.
+    tables = DataTables(None)   # `directory` ignored since `_open` is patched
+    tables._open = dspath
+    datastore.tables.saverow.side_effect = tables.saverow
 
     rc = SimpleNamespace(**init_driver(
         datastore,
@@ -60,18 +71,14 @@ def make_driver(
     # Setup Fake GAN
     rc.gan.discriminator = make_discriminator()
 
-    rc.gan.rate_penalty_func = mock.Mock()
-    rc.gan.rate_penalty_func.side_effect = lambda _: np.nan
-
-    rc.gan.get_reduced = mock.Mock()
-    rc.gan.get_reduced.side_effect = lambda _: np.array([[0]])
-
     for name in 'JDS':
         fake_shared = mock.Mock()
         fake_shared.get_value.side_effect \
             = lambda: np.arange(4).reshape((2, 2))
         setattr(rc.gan, name, fake_shared)
 
+    # For debugging:
+    rc._tables = tables
     return rc
 
 
@@ -112,6 +119,7 @@ class GenFakeUpdateResults(BaseFakeUpdateResults):
         'gradient_time',
         'model_info.rejections',
         'model_info.unused',
+        'rate_penalty',
     )
     size = len(fields)
 
@@ -148,16 +156,6 @@ def test_gan_driver_iterate(iterations):
     assert len(disc_update_results.history) == iterations * n_critic
     assert len(gen_update_results.history) == iterations
 
-    assert rc.gan.rate_penalty_func.call_args_list == [
-        mock.call(rec.result.rtest)
-        for rec in gen_update_results.history
-    ]
-
-    assert rc.gan.get_reduced.call_args_list == [
-        mock.call(rec.result.rtest)
-        for rec in gen_update_results.history
-    ]
-
     empty_calls = [mock.call()] * iterations
     assert rc.gan.J.get_value.call_args_list == empty_calls
     assert rc.gan.D.get_value.call_args_list == empty_calls
@@ -171,13 +169,53 @@ def test_gan_driver_iterate(iterations):
         LearningRecorder.column_names,
         echo=not driver.quiet
     )
-    rc.datastore.tables.saverow.assert_any_call('disc_learning.csv', [
+    disc_learning_column_names = [
         'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
         'SSsolve_time', 'gradient_time',
-    ])
+    ]
+    rc.datastore.tables.saverow.assert_any_call('disc_learning.csv',
+                                                disc_learning_column_names)
     discriminator = rc.gan.discriminator
-    header = ['gen_step', 'disc_step'] + [
+    disc_param_stats_column_names = ['gen_step', 'disc_step'] + [
         '{}.nnorm'.format(p.name)  # Normalized NORM
         for p in lasagne.layers.get_all_params(discriminator, trainable=True)
     ]
-    rc.datastore.tables.saverow.assert_any_call('disc_param_stats.csv', header)
+    rc.datastore.tables.saverow.assert_any_call('disc_param_stats.csv',
+                                                disc_param_stats_column_names)
+
+    for name, skiprows, width, length in [
+            ('learning.csv', 1, len(LearningRecorder.column_names),
+             iterations),
+            ('disc_learning.csv', 1, len(disc_learning_column_names),
+             iterations * n_critic),
+            ('disc_param_stats.csv', 1, len(disc_param_stats_column_names),
+             iterations * n_critic),
+            ('generator.csv', 0, 13, iterations),
+            ]:
+        # "Assert" that DataTables._open is called once:
+        stream, = rc.datastore.path.side_effect.returned[name, ]
+        stream.seek(0)
+        loaded = np.loadtxt(stream, delimiter=',', skiprows=skiprows)
+        if loaded.ndim == 1:
+            loaded = loaded.reshape((1, -1))
+        assert loaded.shape == (length, width)
+
+    def load_json(name):
+        for (obj, filename), _ in rc.datastore.dump_json.call_args_list:
+            if filename == name:
+                return obj
+
+    exit_info = load_json('exit.json')
+    assert exit_info == dict(
+        reason='end_of_iteration',
+        good=True,
+    )
+
+    def lasagne_load(name):
+        stream, = rc.datastore.path.side_effect.returned['disc_param', name]
+        stream.seek(0)
+        return lasagne_param_file.load(stream)
+
+    stored_values = lasagne_load(driver.disc_param_template)
+    desired_values = lasagne.layers.get_all_param_values(rc.gan.discriminator)
+    np.testing.assert_equal(stored_values, desired_values)

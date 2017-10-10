@@ -183,6 +183,8 @@ class UpdateResult(SimpleNamespace):
     gradient_time : float
         Total wall time spent for calculating gradient and updating
         parameters.
+    rate_penalty : float
+        Rate penalty evaluated on `rtest`.
 
     Todo
     ----
@@ -249,7 +251,7 @@ class LearningRecorder(object):
     def write_header(self):
         self._saverow(self.column_names)
 
-    def record(self, gan, gen_step, update_result):
+    def record(self, gen_step, update_result):
         self._saverow([
             gen_step,
             update_result.Gloss,
@@ -259,7 +261,8 @@ class LearningRecorder(object):
             update_result.gradient_time,
             update_result.model_info.rejections,
             update_result.model_info.unused,
-            gan.rate_penalty_func(update_result.rtest)])
+            update_result.rate_penalty,
+        ])
 
 
 class GANDriver(object):
@@ -320,13 +323,7 @@ class GANDriver(object):
         ])
 
     def post_update(self, gen_step, update_result):
-        self.learning_recorder.record(self.gan, gen_step, update_result)
-
-        GZmean = self.gan.get_reduced(update_result.rtest).mean(axis=0)
-        Dmean = update_result.true.mean(axis=0)
-
-        self.datastore.tables.saverow('TC_mean.csv',
-                                      list(GZmean) + list(Dmean))
+        self.learning_recorder.record(gen_step, update_result)
 
         jj = self.gan.J.get_value()
         dd = self.gan.D.get_value()
@@ -730,6 +727,14 @@ def learn(
             **vars(gan))
         update_result.Daccuracy = gan.D_acc(update_result.rtest,
                                             update_result.true)
+        update_result.rate_penalty = gan.rate_penalty_func(update_result.rtest)
+
+        # Save fake and tuning curves averaged over Zs:
+        GZmean = gan.get_reduced(update_result.rtest).mean(axis=0)
+        Dmean = update_result.true.mean(axis=0)
+        datastore.tables.saverow('TC_mean.csv',
+                                 list(GZmean) + list(Dmean))
+
         return update_result
 
     driver.iterate(update_func)

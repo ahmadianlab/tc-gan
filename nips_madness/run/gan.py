@@ -293,10 +293,11 @@ class GANDriver(object):
         self.datastore.tables.saverow('disc_learning.csv', [
             'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
             'SSsolve_time', 'gradient_time',
+            "model_convergence", "model_unused",
         ])
 
     def post_disc_update(self, gen_step, disc_step, Dloss, Daccuracy,
-                         SSsolve_time, gradient_time):
+                         SSsolve_time, gradient_time, model_info):
         """
         Method to be called after a discriminator update.
 
@@ -312,6 +313,7 @@ class GANDriver(object):
         Daccuracy : float
         SSsolve_time : float
         gradient_time : float
+        model_info : `.FixedPointsInfo`
             See the attributes of `.UpdateResult` with the same name.
 
         """
@@ -320,6 +322,7 @@ class GANDriver(object):
         self.datastore.tables.saverow('disc_learning.csv', [
             gen_step, disc_step, Dloss, Daccuracy,
             SSsolve_time, gradient_time,
+            model_info.rejections, model_info.unused,
         ])
 
     def post_update(self, gen_step, update_result):
@@ -779,6 +782,7 @@ def WGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_ac
         driver.post_disc_update(
             gen_step, rep, Dloss, D_acc(rtest, true),
             SSsolve_time.times[-1], gradient_time.times[-1],
+            minfo,
         )
 
     #end D loop
@@ -827,6 +831,7 @@ def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_ac
     driver.post_disc_update(
         gen_step, 0, Dloss, D_acc(rtest, true),
         SSsolve_time.times[-1], gradient_time.times[-1],
+        model_info,
     )
 
     return UpdateResult(

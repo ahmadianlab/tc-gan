@@ -11,6 +11,9 @@ except NameError:
     string_types = (str,)
 
 
+LogFile = collections.namedtuple('LogFile', ['names', 'data'])
+
+
 def load_logfile(path):
     with open(path, 'rt') as file:
         first = file.readline()
@@ -22,7 +25,10 @@ def load_logfile(path):
         else:
             skiprows = 0
             names = []
-    return names, np.loadtxt(path, delimiter=',', skiprows=skiprows)
+    data = np.loadtxt(path, delimiter=',', skiprows=skiprows)
+    if data.ndim == 1:
+        data = data.reshape((1, -1))
+    return LogFile(names, data)
 
 
 def parse_tag(tag):

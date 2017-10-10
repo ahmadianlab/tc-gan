@@ -361,6 +361,7 @@ def WGAN_update(driver,D_train_func,G_train_func,N,NZ,NB,data,data_cond,W,input_
             gen_step, rep, Dloss,
             D_acc(rtest, temp_con, true, temp_con),
             SSsolve_time.times[-1], gradient_time.times[-1],
+            model_info,
         )
 
     #end D loop

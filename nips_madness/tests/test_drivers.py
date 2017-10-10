@@ -104,8 +104,17 @@ class BaseFakeUpdateResults(object):
 
 
 class DiscFakeUpdateResults(BaseFakeUpdateResults):
-    fields = ('Dloss', 'Daccuracy', 'SSsolve_time', 'gradient_time')
+    fields = ('Dloss', 'Daccuracy', 'SSsolve_time', 'gradient_time',
+              'model_convergence', 'model_unused')
     size = len(fields)
+
+    def make_result(self):
+        result = super(DiscFakeUpdateResults, self).make_result()
+        model_info = SimpleNamespace(
+            rejections=result[-2],
+            unused=result[-1],
+        )
+        return list(result[:-2]) + [model_info]
 
 
 class GenFakeUpdateResults(BaseFakeUpdateResults):
@@ -169,10 +178,8 @@ def test_gan_driver_iterate(iterations):
         LearningRecorder.column_names,
         echo=not driver.quiet
     )
-    disc_learning_column_names = [
-        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
-        'SSsolve_time', 'gradient_time',
-    ]
+    disc_learning_column_names = ['gen_step', 'disc_step']
+    disc_learning_column_names.extend(DiscFakeUpdateResults.fields)
     rc.datastore.tables.saverow.assert_any_call('disc_learning.csv',
                                                 disc_learning_column_names)
     discriminator = rc.gan.discriminator

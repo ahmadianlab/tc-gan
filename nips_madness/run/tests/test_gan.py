@@ -8,6 +8,7 @@ import pytest
 from .. import gan
 from ... import execution
 from ... import ssnode
+from ...analyzers import load_logfile
 
 
 def single_g_step(args):
@@ -20,12 +21,9 @@ def single_g_step(args):
     ] + args)
 
 
-def load_table(directory, name, skiprows):
+def load_table(directory, name):
     path, = glob.glob(str(directory.join('logfiles', '*', name)))
-    data = np.loadtxt(path, delimiter=',', skiprows=skiprows)
-    if data.ndim == 1:
-        return data.reshape((1, -1))
-    return data
+    return load_logfile(path)
 
 
 @pytest.mark.parametrize('args', [
@@ -41,8 +39,11 @@ def test_smoke_slowtest(args, cleancwd):
     assert cleancwd.join('logfiles').check()
 
     n_bandwidths = 4
-    tc_mean = load_table(cleancwd, 'TC_mean.csv', skiprows=0)
+    _, tc_mean = load_table(cleancwd, 'TC_mean.csv')
     assert tc_mean.shape[1] == n_bandwidths * 2
+
+    disc_learning = load_table(cleancwd, 'disc_learning.csv')
+    assert len(disc_learning.names) == disc_learning.data.shape[1] == 8
 
 
 def test_disc_param_save_slowtest(cleancwd, single_g_step=single_g_step):

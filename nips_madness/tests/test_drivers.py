@@ -8,8 +8,11 @@ import numpy as np
 import pytest
 
 from .. import lasagne_param_file
+from .. import drivers
+from .. import execution
 from ..execution import DataTables
-from ..run.gan import init_driver, LearningRecorder
+from ..recorders import LearningRecorder
+from ..run.gan import init_driver
 from ..ssnode import DEFAULT_PARAMS
 
 
@@ -226,3 +229,48 @@ def test_gan_driver_iterate(iterations):
     stored_values = lasagne_load(driver.disc_param_template)
     desired_values = lasagne.layers.get_all_param_values(rc.gan.discriminator)
     np.testing.assert_equal(stored_values, desired_values)
+
+
+def test_disc_param_isfinite():
+    datastore = mock.Mock()
+    l0 = lasagne.layers.InputLayer((2, 3))
+    l1 = lasagne.layers.DenseLayer(l0, 5)
+    W = l1.W.get_value()
+    W[0, 0] = np.nan
+    l1.W.set_value(W)
+    with pytest.raises(execution.KnownError):
+        drivers.saverow_disc_param_stats(datastore, l1, 0, 0)
+
+
+def test_quit_JDS_threshold_quit():
+    datastore = mock.Mock()
+    JDS_true = [DEFAULT_PARAMS[k] for k in 'JDS']
+    log_JDS = [  # from t017/28
+        [[-2.725132882048388, -2.4531698490543286],
+         [-2.1680251198864506, -3.1575330875403287]],
+        [[-0.6751161156746839, -0.3826601625506246],
+         [-0.34232003427022, -1.1335422836893538]],
+        [[-2.7327504049935936, -4.210179719643937],
+         [-1.9547447679855652, -3.5791486928972325]],
+    ]
+    with pytest.raises(execution.KnownError):
+        drivers.maybe_quit(
+            datastore,
+            JDS_fake=list(map(np.exp, log_JDS)),
+            JDS_true=JDS_true,
+            quit_JDS_threshold=0.4,
+        )
+    datastore.dump_json.assert_called_once()
+
+
+def test_quit_JDS_threshold_noquit():
+    datastore = mock.Mock()
+    JDS_true = [DEFAULT_PARAMS[k] for k in 'JDS']
+    JDS_fake = np.array(JDS_true) + 0.01
+    drivers.maybe_quit(
+        datastore,
+        JDS_fake=JDS_fake,
+        JDS_true=JDS_true,
+        quit_JDS_threshold=0.4,
+    )
+    datastore.dump_json.assert_not_called()

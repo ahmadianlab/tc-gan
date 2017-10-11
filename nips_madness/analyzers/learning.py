@@ -166,7 +166,7 @@ def plot_learning(data, title_params=None):
     axes[1, 2].plot(df['epoch'], gen_param_mean_relative_error(data),
                     label='G param. rel. MAE')
     axes[1, 2].legend(loc='best')
-    clip_ymax(axes[1, 2], 1)
+    # clip_ymax(axes[1, 2], 1)
 
     plot_gen_params(data, axes=axes[2, :])
     plot_gen_params(data, axes=axes[3, :],

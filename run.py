@@ -31,7 +31,7 @@ conda list --prefix "{project_root}/env" --export > conda-list.txt
 
 
 def run_module(module, arguments, use_pdb, assert_repo_is_clean,
-               record_env):
+               record_env, mpl_style):
     here = os.path.realpath(os.path.dirname(__file__))
     if os.path.isfile(module) and module.endswith('.py'):
         relpath = os.path.relpath(os.path.realpath(module), here)
@@ -52,6 +52,9 @@ def run_module(module, arguments, use_pdb, assert_repo_is_clean,
             shell=True,
             executable='/bin/bash',
             cwd=record_env)
+    if mpl_style:
+        import matplotlib
+        matplotlib.style.use(mpl_style)
     try:
         loaded.main(arguments)
     except Exception as err:
@@ -94,6 +97,9 @@ def main(args=None):
         '--record-env',
         help='''Directory in which environment information is saved.
         Do nothing if not given.''')
+    parser.add_argument(
+        '--mpl-style',
+        help='If given, call matplotlib.style.use.')
     ns = parser.parse_args(args)
     sys.exit(run_module(**vars(ns)))
 

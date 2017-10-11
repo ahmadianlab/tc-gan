@@ -47,6 +47,7 @@ class DiscriminatorLog(object):
         fig, axes = pyplot.subplots(ncols=2, sharex=True, squeeze=False,
                                     figsize=figsize)
         self.plot_learning(ax=axes[0, 0])
+        axes[0, 0].axhline(0, color='0.5')
         self.plot_param_stats(ax=axes[0, 1])
         fig.suptitle(self.pretty_title(title_params))
         return fig

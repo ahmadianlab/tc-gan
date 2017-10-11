@@ -5,6 +5,8 @@ import warnings
 
 import numpy as np
 
+from .. import ssnode
+
 try:
     string_types = (str, unicode)
 except NameError:
@@ -120,11 +122,8 @@ class GANData(object):
         return np.exp(self.gen[:, 1:])
 
     def true_JDS(self):
-        return np.concatenate([
-            self.info['run_config']['J0'],
-            self.info['run_config']['D0'],
-            self.info['run_config']['S0'],
-        ]).flatten()
+        JDS = list(map(ssnode.DEFAULT_PARAMS.get, 'JDS'))
+        return np.concatenate(JDS).flatten()
 
     @property
     def track_offset_identity(self):

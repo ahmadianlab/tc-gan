@@ -58,6 +58,7 @@ class DiscriminatorLog(object):
     def pretty_title(self, title_params):
         info = self.get_info()
         run_config = dict(info['extra_info'], **info['run_config'])
+        run_config['n_bandwidths'] = len(run_config['bandwidths'])
         return ' '.join('{}={}'.format(k, run_config[k]) for k in title_params)
 
 

@@ -1090,7 +1090,7 @@ def main(args=None):
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
     parser.add_argument(
-        '--init-disturbance', default=0.5, type=eval,
+        '--init-disturbance', default=-1.5, type=eval,
         help='''Initial disturbance to the parameter.  If it is
         evaluated to be a tuple or list with three elements, these
         elements are used for the disturbance for J, D (delta),

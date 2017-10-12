@@ -31,11 +31,12 @@ conda list --prefix "{project_root}/env" --export > conda-list.txt
 
 
 def run_module(module, arguments, use_pdb, assert_repo_is_clean,
-               record_env):
+               record_env, mpl_style):
     here = os.path.realpath(os.path.dirname(__file__))
     if os.path.isfile(module) and module.endswith('.py'):
         relpath = os.path.relpath(os.path.realpath(module), here)
         module = relpath[:-len('.py')].replace(os.path.sep, '.')
+    from nips_madness.execution import KnownError
     loaded = importlib.import_module(module)
     if not hasattr(loaded, 'main'):
         print('Module', module, 'do not have main function.')
@@ -51,13 +52,19 @@ def run_module(module, arguments, use_pdb, assert_repo_is_clean,
             shell=True,
             executable='/bin/bash',
             cwd=record_env)
+    if mpl_style:
+        import matplotlib
+        matplotlib.style.use(mpl_style)
     try:
         loaded.main(arguments)
-    except Exception:
+    except Exception as err:
         if use_pdb:
             traceback.print_exc()
             print()
             pdb.post_mortem()
+        elif isinstance(err, KnownError):
+            print(err)
+            return err.exit_code
         else:
             raise
 
@@ -90,6 +97,9 @@ def main(args=None):
         '--record-env',
         help='''Directory in which environment information is saved.
         Do nothing if not given.''')
+    parser.add_argument(
+        '--mpl-style',
+        help='If given, call matplotlib.style.use.')
     ns = parser.parse_args(args)
     sys.exit(run_module(**vars(ns)))
 

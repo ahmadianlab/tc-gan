@@ -31,9 +31,11 @@ class DiscriminatorLog(object):
         self.learning['disc_updates'] = range(len(self.learning))
         self.param_stats['disc_updates'] = range(len(self.param_stats))
 
-    def plot_learning(self, **kwargs):
+    def plot_learning(self, yscale='symlog', **kwargs):
         losses = ['Dloss', 'Daccuracy']
-        self.learning.plot('disc_updates', losses, **kwargs)
+        ax = self.learning.plot('disc_updates', losses, **kwargs)
+        ax.set_yscale(yscale)
+        return ax
 
     def plot_param_stats(self, logy=True, **kwargs):
         self.param_stats.plot('disc_updates', self.param_stats_names,
@@ -45,6 +47,7 @@ class DiscriminatorLog(object):
         fig, axes = pyplot.subplots(ncols=2, sharex=True, squeeze=False,
                                     figsize=figsize)
         self.plot_learning(ax=axes[0, 0])
+        axes[0, 0].axhline(0, color='0.5')
         self.plot_param_stats(ax=axes[0, 1])
         fig.suptitle(self.pretty_title(title_params))
         return fig
@@ -56,6 +59,7 @@ class DiscriminatorLog(object):
     def pretty_title(self, title_params):
         info = self.get_info()
         run_config = dict(info['extra_info'], **info['run_config'])
+        run_config['n_bandwidths'] = len(run_config['bandwidths'])
         return ' '.join('{}={}'.format(k, run_config[k]) for k in title_params)
 
 

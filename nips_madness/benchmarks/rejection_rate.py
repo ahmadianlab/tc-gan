@@ -1,3 +1,7 @@
+"""
+Benchmark rejection rate and wall-time of fixed-point solver varying dt.
+"""
+
 from __future__ import print_function, division
 
 from .. import utils

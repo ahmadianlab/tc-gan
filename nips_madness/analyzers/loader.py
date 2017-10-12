@@ -5,10 +5,15 @@ import warnings
 
 import numpy as np
 
+from .. import ssnode
+
 try:
     string_types = (str, unicode)
 except NameError:
     string_types = (str,)
+
+
+LogFile = collections.namedtuple('LogFile', ['names', 'data'])
 
 
 def load_logfile(path):
@@ -22,7 +27,10 @@ def load_logfile(path):
         else:
             skiprows = 0
             names = []
-    return names, np.loadtxt(path, delimiter=',', skiprows=skiprows)
+    data = np.loadtxt(path, delimiter=',', skiprows=skiprows)
+    if data.ndim == 1:
+        data = data.reshape((1, -1))
+    return LogFile(names, data)
 
 
 def parse_tag(tag):
@@ -73,6 +81,13 @@ class GANData(object):
             idx = np.arange(len(gen)).reshape((-1, 1))
             gen = np.concatenate([idx, gen], axis=1)
 
+        if not main_names:
+            warnings.warn('learning.csv has no header line; '
+                          'assuming the default.')
+            from ..run.gan import LearningRecorder
+            assert main.shape[1] == len(LearningRecorder.column_names)
+            main_names = LearningRecorder.column_names
+
         with open(os.path.join(dirname, 'info.json')) as file:
             info = json.load(file)
 
@@ -102,6 +117,13 @@ class GANData(object):
                            self.log_D[indices],
                            self.log_S[indices]):
             yield list(map(np.exp, log_JDS))
+
+    def fake_JDS(self):
+        return np.exp(self.gen[:, 1:])
+
+    def true_JDS(self):
+        JDS = list(map(ssnode.DEFAULT_PARAMS.get, 'JDS'))
+        return np.concatenate(JDS).flatten()
 
     @property
     def track_offset_identity(self):

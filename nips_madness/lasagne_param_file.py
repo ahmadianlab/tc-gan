@@ -20,8 +20,8 @@ def load(path):
 
 
 @contextlib.contextmanager
-def save_on_error(layer, path):
-    """Save parameter of `layer` to `path` upon an exception."""
+def save_on_error(layer, pre_path, post_path):
+    """Save parameter of `layer` upon an exception."""
     haserror = True
     values = get_all_param_values_as_dict(layer)
     try:
@@ -29,13 +29,15 @@ def save_on_error(layer, path):
         haserror = False
     finally:
         if haserror:
-            np.savez_compressed(path, **values)
+            np.savez_compressed(pre_path, **values)
+            np.savez_compressed(post_path,
+                                **get_all_param_values_as_dict(layer))
 
 
-def wrap_with_save_on_error(layer, path):
+def wrap_with_save_on_error(layer, pre_path, post_path):
     def decorator(func):
         def wrapper(*args, **kwds):
-            with save_on_error(layer, path):
+            with save_on_error(layer, pre_path, post_path):
                 return func(*args, **kwds)
         return wrapper
     return decorator

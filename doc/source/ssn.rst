@@ -30,11 +30,14 @@ where
   curve conditions :math:`s \in S` to a (lower dimensional) tuning
   curve which in turn fed into the discriminator.  This is analogous
   to neural recordings in actual experiments.
+  (cf., `.get_reduced`)
 
 Note that both input-constructing function :math:`I` and probe
 function :math:`P` can "see" the condition :math:`c \in C`.  This
 allows us to represent :term:`cGAN-conditions` as sliding probes or
-sliding stimuli.
+sliding stimuli.  Since the first argument to :math:`P` is a tuple of
+:math:`|S|` fixed points, :math:`P` may include some normalization of
+the tuning curve.
 
 .. [#] We assume such fixed-point is uniquely determined (say, the SSN
    is monostable and :math:`F` returns only stable one).
@@ -68,6 +71,11 @@ input (which is set by the input-constructing function :math:`I`).
 Below, for an arbitrary neuron :math:`i`, we denote its type by
 :math:`\alpha(i)\in \{E,I\}` and its topographic location by
 :math:`x_i`.
+
+The fixed-point solver :math:`F: Z \times X \to Y` produces a fixed
+point :math:`\hat{\mathbf{r}} \in Y` given the noise :math:`z \in Z`
+(which in turn sets :math:`\mathbf{W}`) and the input
+:math:`\mathbf{I} \in X`.
 
 
 Stimulus to SSN

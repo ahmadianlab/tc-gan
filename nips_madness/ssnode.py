@@ -327,9 +327,10 @@ def find_fixed_points(num, Z_W_gen, exts, method='parallel', **common_kwargs):
     """
     Find `num` sets of fixed points using weight matrices from `Z_W_gen`.
 
-    Fixed points are calculated for each external input in `exts`.  A
-    set of fixed points is returned only if the fixed points are found
-    for all external inputs.
+    Fixed points are calculated for each external input in `exts`.
+    The set of fixed points is included in `Rs` only if they reach the
+    fixed point for all external inputs in `exts`.  The conditions for
+    reaching a fixed point is documented in function `fixed_point`.
 
     Parameters
     ----------
@@ -584,11 +585,14 @@ def sample_fixed_points(
 
 
 def sample_tuning_curves(sample_sites=[0], track_offset_identity=False,
+                         include_inhibitory_neurons=False,
                          **kwargs):
     _, rates, _ = sample = sample_fixed_points(**kwargs)
     rates = np.array(rates)
-    tunings = subsample_neurons(rates, sample_sites,
-                                track_offset_identity=track_offset_identity).T
+    tunings = subsample_neurons(
+        rates, sample_sites,
+        include_inhibitory_neurons=include_inhibitory_neurons,
+        track_offset_identity=track_offset_identity).T
     return tunings, sample
 
 

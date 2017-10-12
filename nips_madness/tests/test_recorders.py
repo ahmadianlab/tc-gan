@@ -3,6 +3,7 @@ from unittest import mock
 import numpy as np
 import pytest
 
+from discriminators.simple_discriminator import make_net
 from .. import recorders
 from .test_drivers import fake_datastore, setup_fake_gan, \
     GenFakeUpdateResults
@@ -102,3 +103,13 @@ def test_generator_param_order():
     driver.datastore.tables.saverow.assert_called_with(
         recclass.filename, [0] + flat_JDS, echo=False)
     assert len(flat_JDS) == len(set(flat_JDS))
+
+
+def test_paramstats_layernorm():
+    recclass = recorders.DiscParamStatsRecorder
+    driver = fake_driver()
+    layers = [16, 16]
+    normalization = ['none', 'layer']
+    driver.gan.discriminator = make_net((2, 3), 'WGAN', layers, normalization)
+    rec = recclass.from_driver(driver)
+    rec.record(0, 0)

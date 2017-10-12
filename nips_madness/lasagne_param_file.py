@@ -4,9 +4,9 @@ import lasagne
 import numpy as np
 
 
-def get_all_param_values_as_dict(layer):
-    return {str(i): p for i, p in
-            enumerate(lasagne.layers.get_all_param_values(layer))}
+def get_all_param_values_as_dict(layer, trainable=True):
+    values = lasagne.layers.get_all_param_values(layer, trainable=trainable)
+    return {str(i): p for i, p in enumerate(values)}
 
 
 def dump(layer, path):

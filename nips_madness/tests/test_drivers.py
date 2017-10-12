@@ -183,8 +183,10 @@ def test_gan_driver_iterate(iterations):
     )
     disc_learning_column_names = ['gen_step', 'disc_step']
     disc_learning_column_names.extend(DiscFakeUpdateResults.fields)
+    disc_learning_column_names = tuple(disc_learning_column_names)
     rc.datastore.tables.saverow.assert_any_call('disc_learning.csv',
-                                                disc_learning_column_names)
+                                                disc_learning_column_names,
+                                                echo=False)
     discriminator = rc.gan.discriminator
     disc_param_stats_column_names = ['gen_step', 'disc_step'] + [
         '{}.nnorm'.format(p.name)  # Normalized NORM

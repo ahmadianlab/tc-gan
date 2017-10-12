@@ -64,11 +64,18 @@ class BaseRecorder(object):
     def write_header(self):
         self._saverow(self.column_names)
 
+    def record(self, *row):
+        self._saverow(row)
+
     @classmethod
     def make(cls, *args, **kwargs):
         self = cls(*args, **kwargs)
         self.write_header()
         return self
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore)
 
 
 class LearningRecorder(BaseRecorder):
@@ -95,6 +102,16 @@ class LearningRecorder(BaseRecorder):
     @classmethod
     def from_driver(cls, driver):
         return cls.make(driver.datastore, quiet=driver.quiet)
+
+
+class DiscLearningRecorder(BaseRecorder):
+
+    filename = 'disc_learning.csv'
+    column_names = (
+        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
+        'SSsolve_time', 'gradient_time',
+        "model_convergence", "model_unused",
+    )
 
 
 def _genparam_names():

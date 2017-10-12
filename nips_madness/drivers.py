@@ -5,7 +5,7 @@ from . import execution
 from . import lasagne_param_file
 from . import ssnode
 from .recorders import LearningRecorder, GenParamRecorder, \
-    DiscParamStatsRecorder
+    DiscLearningRecorder, DiscParamStatsRecorder
 
 
 def net_isfinite(layer):
@@ -38,11 +38,7 @@ class GANDriver(object):
         self.learning_recorder = LearningRecorder.from_driver(self)
         self.generator_recorder = GenParamRecorder.from_driver(self)
         self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
-        self.datastore.tables.saverow('disc_learning.csv', [
-            'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
-            'SSsolve_time', 'gradient_time',
-            "model_convergence", "model_unused",
-        ])
+        self.disclearning_recorder = DiscLearningRecorder.from_driver(self)
 
     def post_disc_update(self, gen_step, disc_step, Dloss, Daccuracy,
                          SSsolve_time, gradient_time, model_info):
@@ -65,11 +61,11 @@ class GANDriver(object):
             See the attributes of `.UpdateResult` with the same name.
 
         """
-        self.datastore.tables.saverow('disc_learning.csv', [
+        self.disclearning_recorder.record(
             gen_step, disc_step, Dloss, Daccuracy,
             SSsolve_time, gradient_time,
             model_info.rejections, model_info.unused,
-        ])
+        )
 
         nnorms = self.discparamstats_recorder.record(gen_step, disc_step)
         check_disc_param(self.datastore, self.gan.discriminator, nnorms)

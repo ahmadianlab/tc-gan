@@ -51,36 +51,9 @@ class UpdateResult(SimpleNamespace):
     """
 
 
-def saveheader_disc_param_stats(datastore, discriminator):
-    header = ['gen_step', 'disc_step'] + [
-        '{}.nnorm'.format(p.name)  # Normalized NORM
-        for p in lasagne.layers.get_all_params(discriminator, trainable=True)
-    ]
-    datastore.tables.saverow('disc_param_stats.csv', header)
+class BaseRecorder(object):
 
-
-def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
-    """
-    Save normalized norms of `discriminator`.
-    """
-    nnorms = [
-        np.linalg.norm(arr.flatten()) / arr.size
-        for arr in lasagne.layers.get_all_param_values(discriminator)
-    ]
-    row = [gen_step, disc_step] + nnorms
-    datastore.tables.saverow('disc_param_stats.csv', row)
-    return nnorms
-
-
-class LearningRecorder(object):
-
-    filename = "learning.csv"
-    column_names = (
-        "epoch", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
-        "gradient_time", "model_convergence", "model_unused",
-        "rate_penalty")
-
-    def __init__(self, datastore, quiet):
+    def __init__(self, datastore, quiet=True):
         self.datastore = datastore
         self.quiet = quiet
 
@@ -90,6 +63,21 @@ class LearningRecorder(object):
 
     def write_header(self):
         self._saverow(self.column_names)
+
+    @classmethod
+    def make(cls, *args, **kwargs):
+        self = cls(*args, **kwargs)
+        self.write_header()
+        return self
+
+
+class LearningRecorder(BaseRecorder):
+
+    filename = "learning.csv"
+    column_names = (
+        "epoch", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
+        "gradient_time", "model_convergence", "model_unused",
+        "rate_penalty")
 
     def record(self, gen_step, update_result):
         self._saverow([
@@ -103,3 +91,35 @@ class LearningRecorder(object):
             update_result.model_info.unused,
             update_result.rate_penalty,
         ])
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, quiet=driver.quiet)
+
+
+class DiscParamStatsRecorder(BaseRecorder):
+
+    filename = 'disc_param_stats.csv'
+
+    def __init__(self, datastore, discriminator):
+        self.discriminator = discriminator
+        super(DiscParamStatsRecorder, self).__init__(datastore)
+
+        params = lasagne.layers.get_all_params(discriminator, trainable=True)
+        self.column_names = tuple(['gen_step', 'disc_step'] + [
+            '{}.nnorm'.format(p.name)  # Normalized NORM
+            for p in params
+        ])
+
+    def record(self, gen_step, disc_step):
+        nnorms = [
+            np.linalg.norm(arr.flatten()) / arr.size
+            for arr in lasagne.layers.get_all_param_values(self.discriminator)
+        ]
+        # TODO: implement it using Theano function
+        self._saverow([gen_step, disc_step] + nnorms)
+        return nnorms
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, driver.gan.discriminator)

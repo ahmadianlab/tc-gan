@@ -190,8 +190,10 @@ def test_gan_driver_iterate(iterations):
         '{}.nnorm'.format(p.name)  # Normalized NORM
         for p in lasagne.layers.get_all_params(discriminator, trainable=True)
     ]
+    disc_param_stats_column_names = tuple(disc_param_stats_column_names)
     rc.datastore.tables.saverow.assert_any_call('disc_param_stats.csv',
-                                                disc_param_stats_column_names)
+                                                disc_param_stats_column_names,
+                                                echo=False)
 
     for name, skiprows, width, length in [
             ('learning.csv', 1, len(LearningRecorder.column_names),

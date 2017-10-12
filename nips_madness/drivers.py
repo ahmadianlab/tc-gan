@@ -4,8 +4,7 @@ import numpy as np
 from . import execution
 from . import lasagne_param_file
 from . import ssnode
-from .recorders import LearningRecorder, saveheader_disc_param_stats, \
-    saverow_disc_param_stats
+from .recorders import LearningRecorder, DiscParamStatsRecorder
 
 
 def net_isfinite(layer):
@@ -35,9 +34,8 @@ class GANDriver(object):
         self.__dict__.update(kwargs)
 
     def pre_loop(self):
-        self.learning_recorder = LearningRecorder(self.datastore, self.quiet)
-        self.learning_recorder.write_header()
-        saveheader_disc_param_stats(self.datastore, self.gan.discriminator)
+        self.learning_recorder = LearningRecorder.from_driver(self)
+        self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
         self.datastore.tables.saverow('disc_learning.csv', [
             'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
             'SSsolve_time', 'gradient_time',
@@ -65,15 +63,13 @@ class GANDriver(object):
             See the attributes of `.UpdateResult` with the same name.
 
         """
-        nnorms = saverow_disc_param_stats(
-            self.datastore, self.gan.discriminator,
-            gen_step, disc_step)
         self.datastore.tables.saverow('disc_learning.csv', [
             gen_step, disc_step, Dloss, Daccuracy,
             SSsolve_time, gradient_time,
             model_info.rejections, model_info.unused,
         ])
 
+        nnorms = self.discparamstats_recorder.record(gen_step, disc_step)
         check_disc_param(self.datastore, self.gan.discriminator, nnorms)
 
     def post_update(self, gen_step, update_result):

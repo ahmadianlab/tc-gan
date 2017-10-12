@@ -4,6 +4,7 @@ import json
 import pytest
 
 from .. import gan
+from ... import recorders
 from ...analyzers import load_logfile
 
 
@@ -17,15 +18,23 @@ def single_g_step(args):
     ] + args)
 
 
-def load_table(directory, name):
+def logfile(directory, name):
     path, = glob.glob(str(directory.join('logfiles', '*', name)))
-    return load_logfile(path)
+    return path
+
+
+def load_table(directory, name):
+    return load_logfile(logfile(directory, name))
 
 
 def load_json(directory, name):
-    path, = glob.glob(str(directory.join('logfiles', '*', name)))
-    with open(path) as file:
+    with open(logfile(directory, name)) as file:
         return json.load(file)
+
+
+def load_gandata(directory):
+    from ...analyzers import load_gandata
+    return load_gandata(logfile(directory, 'info.json'))
 
 
 def make_gan(n_samples, bandwidths, contrast, **run_config):
@@ -58,6 +67,16 @@ def test_single_g_step_slowtest(args, cleancwd):
 
     disc_learning = load_table(cleancwd, 'disc_learning.csv')
     assert len(disc_learning.names) == disc_learning.data.shape[1] == 8
+
+    with pytest.warns(None) as record:
+        data = load_gandata(cleancwd)
+    assert len(record) == 0
+
+    assert data.main.shape == (1, len(recorders.LearningRecorder.column_names))
+    assert data.main_names == list(recorders.LearningRecorder.column_names)
+
+    assert data.gen.shape == (1, len(recorders.GenParamRecorder.column_names))
+    assert data.gen_names == list(recorders.GenParamRecorder.column_names)
 
 
 def test_disc_param_save_slowtest(cleancwd, single_g_step=single_g_step):

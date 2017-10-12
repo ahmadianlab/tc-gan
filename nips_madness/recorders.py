@@ -115,6 +115,10 @@ class DiscLearningRecorder(BaseRecorder):
 
 
 def _genparam_names():
+    """
+    >>> _genparam_names()                              # doctest: +ELLIPSIS
+    ('J_EE', 'J_EI', 'J_IE', 'J_II', 'D_EE', ...)
+    """
     def names(prefix):
         J = (prefix + '_{}').format
         return np.array([

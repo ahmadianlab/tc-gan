@@ -36,6 +36,32 @@ def make_discriminator():
     return l1
 
 
+def fake_datastore():
+    # Setup fake DataStore:
+    datastore = mock.Mock()
+    datastore.path.side_effect = dspath = FakeDataStorePath()
+
+    # Setup fake DataTables:
+    # Connect mocked saverow to true saverow for testing file contents.
+    tables = DataTables(None)   # `directory` ignored since `_open` is patched
+    tables._open = dspath
+    datastore.tables.saverow.side_effect = tables.saverow
+
+    # For debugging:
+    datastore._tables = tables
+    return datastore
+
+
+def setup_fake_gan(gan):
+    gan.discriminator = make_discriminator()
+
+    for i, name in enumerate('JDS'):
+        fake_shared = mock.Mock()
+        fake_shared.get_value.return_value \
+            = np.arange(4).reshape((2, 2)) + 10 ** i
+        setattr(gan, name, fake_shared)
+
+
 def make_driver(
         iterations,
         quit_JDS_threshold=-1,
@@ -48,18 +74,8 @@ def make_driver(
         S0=DEFAULT_PARAMS['S'],
         **run_config):
 
-    # Setup fake DataStore:
-    datastore = mock.Mock()
-    datastore.path.side_effect = dspath = FakeDataStorePath()
-
-    # Setup fake DataTables:
-    # Connect mocked saverow to true saverow for testing file contents.
-    tables = DataTables(None)   # `directory` ignored since `_open` is patched
-    tables._open = dspath
-    datastore.tables.saverow.side_effect = tables.saverow
-
     rc = SimpleNamespace(**init_driver(
-        datastore,
+        fake_datastore(),
         iterations=iterations,
         quiet=quiet,
         disc_param_save_interval=disc_param_save_interval,
@@ -71,17 +87,8 @@ def make_driver(
         S0=S0,
         **run_config))
 
-    # Setup Fake GAN
-    rc.gan.discriminator = make_discriminator()
+    setup_fake_gan(rc.gan)
 
-    for name in 'JDS':
-        fake_shared = mock.Mock()
-        fake_shared.get_value.side_effect \
-            = lambda: np.arange(4).reshape((2, 2))
-        setattr(rc.gan, name, fake_shared)
-
-    # For debugging:
-    rc._tables = tables
     return rc
 
 

@@ -97,6 +97,38 @@ class LearningRecorder(BaseRecorder):
         return cls.make(driver.datastore, quiet=driver.quiet)
 
 
+def _genparam_names():
+    def names(prefix):
+        J = (prefix + '_{}').format
+        return np.array([
+            [J('EE'), J('EI')],
+            [J('IE'), J('II')],
+        ])
+    return tuple(np.concatenate([names('J'), names('D'), names('S')]).flat)
+
+
+class GenParamRecorder(BaseRecorder):
+
+    filename = 'generator.csv'
+    column_names = ('gen_step',) + _genparam_names()
+
+    def __init__(self, datastore, gan):
+        self.gan = gan
+        super(GenParamRecorder, self).__init__(datastore)
+
+    def record(self, gen_step):
+        jj = self.gan.J.get_value()
+        dd = self.gan.D.get_value()
+        ss = self.gan.S.get_value()
+
+        self._saverow([gen_step] + list(np.concatenate([jj, dd, ss]).flat))
+        return [jj, dd, ss]
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, driver.gan)
+
+
 class DiscParamStatsRecorder(BaseRecorder):
 
     filename = 'disc_param_stats.csv'

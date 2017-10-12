@@ -4,7 +4,8 @@ import numpy as np
 from . import execution
 from . import lasagne_param_file
 from . import ssnode
-from .recorders import LearningRecorder, DiscParamStatsRecorder
+from .recorders import LearningRecorder, GenParamRecorder, \
+    DiscParamStatsRecorder
 
 
 def net_isfinite(layer):
@@ -35,6 +36,7 @@ class GANDriver(object):
 
     def pre_loop(self):
         self.learning_recorder = LearningRecorder.from_driver(self)
+        self.generator_recorder = GenParamRecorder.from_driver(self)
         self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
         self.datastore.tables.saverow('disc_learning.csv', [
             'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
@@ -74,13 +76,7 @@ class GANDriver(object):
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
-
-        jj = self.gan.J.get_value()
-        dd = self.gan.D.get_value()
-        ss = self.gan.S.get_value()
-
-        allpar = np.reshape(np.concatenate([jj, dd, ss]), [-1]).tolist()
-        self.datastore.tables.saverow('generator.csv', [gen_step] + allpar)
+        jj, dd, ss = self.generator_recorder.record(gen_step)
 
         if self.disc_param_save_interval > 0 \
                 and gen_step % self.disc_param_save_interval == 0:

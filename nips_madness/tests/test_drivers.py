@@ -202,7 +202,7 @@ def test_gan_driver_iterate(iterations):
              iterations * n_critic),
             ('disc_param_stats.csv', 1, len(disc_param_stats_column_names),
              iterations * n_critic),
-            ('generator.csv', 0, 13, iterations),
+            ('generator.csv', 1, 13, iterations),
             ]:
         # "Assert" that DataTables._open is called once:
         stream, = rc.datastore.path.side_effect.returned[name, ]

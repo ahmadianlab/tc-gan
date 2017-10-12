@@ -3,8 +3,6 @@ from types import SimpleNamespace
 import lasagne
 import numpy as np
 
-from . import execution
-
 
 class UpdateResult(SimpleNamespace):
     """
@@ -64,12 +62,6 @@ def saveheader_disc_param_stats(datastore, discriminator):
 def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
     """
     Save normalized norms of `discriminator`.
-
-    This function also checks for finiteness of the parameter and
-    raises an error when found.  "Downloading" discriminator parameter
-    is (likely) a time-consuming operation so it makes sense to do it
-    here.
-
     """
     nnorms = [
         np.linalg.norm(arr.flatten()) / arr.size
@@ -77,19 +69,7 @@ def saverow_disc_param_stats(datastore, discriminator, gen_step, disc_step):
     ]
     row = [gen_step, disc_step] + nnorms
     datastore.tables.saverow('disc_param_stats.csv', row)
-
-    isfinite_nnorms = np.isfinite(nnorms)
-    if not isfinite_nnorms.all():
-        if not all(np.isfinite(arr).all() for arr in
-                   lasagne.layers.get_all_param_values(discriminator)):
-            datastore.dump_json(dict(
-                reason='disc_param_has_nan',
-                isfinite_nnorms=isfinite_nnorms.tolist(),
-                good=False,
-            ), 'exit.json')
-            raise execution.KnownError(
-                "Discriminator parameter is not finite.",
-                exit_code=3)
+    return nnorms
 
 
 class LearningRecorder(object):

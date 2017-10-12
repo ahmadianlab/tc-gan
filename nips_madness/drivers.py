@@ -1,3 +1,4 @@
+import lasagne
 import numpy as np
 
 from . import execution
@@ -5,6 +6,11 @@ from . import lasagne_param_file
 from . import ssnode
 from .recorders import LearningRecorder, saveheader_disc_param_stats, \
     saverow_disc_param_stats
+
+
+def net_isfinite(layer):
+    return all(np.isfinite(arr).all() for arr in
+               lasagne.layers.get_all_param_values(layer))
 
 
 class GANDriver(object):
@@ -59,13 +65,16 @@ class GANDriver(object):
             See the attributes of `.UpdateResult` with the same name.
 
         """
-        saverow_disc_param_stats(self.datastore, self.gan.discriminator,
-                                 gen_step, disc_step)
+        nnorms = saverow_disc_param_stats(
+            self.datastore, self.gan.discriminator,
+            gen_step, disc_step)
         self.datastore.tables.saverow('disc_learning.csv', [
             gen_step, disc_step, Dloss, Daccuracy,
             SSsolve_time, gradient_time,
             model_info.rejections, model_info.unused,
         ])
+
+        check_disc_param(self.datastore, self.gan.discriminator, nnorms)
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
@@ -140,3 +149,16 @@ def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
             ' to the true parameter exceed threshold (= {}).'
             .format(JDS_distance, quit_JDS_threshold),
             exit_code=4)
+
+
+def check_disc_param(datastore, discriminator, nnorms):
+    isfinite_nnorms = np.isfinite(nnorms)
+    if not isfinite_nnorms.all() and not net_isfinite(discriminator):
+        datastore.dump_json(dict(
+            reason='disc_param_has_nan',
+            isfinite_nnorms=isfinite_nnorms.tolist(),
+            good=False,
+        ), 'exit.json')
+        raise execution.KnownError(
+            "Discriminator parameter is not finite.",
+            exit_code=3)

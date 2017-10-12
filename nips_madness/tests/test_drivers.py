@@ -238,8 +238,9 @@ def test_disc_param_isfinite():
     W = l1.W.get_value()
     W[0, 0] = np.nan
     l1.W.set_value(W)
+    nnorms = np.array([np.nan])
     with pytest.raises(execution.KnownError):
-        drivers.saverow_disc_param_stats(datastore, l1, 0, 0)
+        drivers.check_disc_param(datastore, l1, nnorms)
 
 
 def test_quit_JDS_threshold_quit():

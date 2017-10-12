@@ -146,6 +146,20 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
 
     """
 
+    @property
+    def n_sample_sites(self):
+        if self.include_inhibitory_neurons:
+            return len(self.sample_sites) * 2
+        else:
+            return len(self.sample_sites)
+
+    @property
+    def disc_input_shape(self):
+        if self.track_offset_identity:
+            return (self.NZ, self.NB * self.n_sample_sites)
+        else:
+            return (self.NZ * self.n_sample_sites, self.NB)
+
 
 def get_updater(update_name, *args, **kwds):
     if update_name == 'adam-wgan':
@@ -163,12 +177,13 @@ def learn(
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity, init_disturbance,
-        contrast,
+        contrast, include_inhibitory_neurons,
         J0, D0, S0,
         timetest, convtest, testDW, DRtest,
         **make_func_kwargs):
 
     gan.track_offset_identity = track_offset_identity
+    gan.include_inhibitory_neurons = include_inhibitory_neurons
     gan.rate_cost = float(rate_cost)
     gan.loss_type = loss
 
@@ -203,6 +218,11 @@ def learn(
         r0=np.zeros(2 * n_sites),
     )
 
+    gan.subsample_kwargs = subsample_kwargs = dict(
+        track_offset_identity=track_offset_identity,
+        include_inhibitory_neurons=include_inhibitory_neurons,
+    )
+
     if not true_IO_type:
         true_IO_type = IO_type
     print("Generating the truth...")
@@ -214,15 +234,15 @@ def learn(
         smoothness=smoothness,
         contrast=contrast,
         N=n_sites,
-        track_offset_identity=track_offset_identity,
-        **dict(ssn_params, io_type=true_IO_type))
+        **dict(ssn_params, io_type=true_IO_type,
+               **subsample_kwargs))
     print("DONE")
     data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
     n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
     if track_offset_identity:
-        assert n_stim * len(sample_sites) == data.shape[-1]
+        assert n_stim * gan.n_sample_sites == data.shape[-1]
     else:
         assert n_stim == data.shape[-1]
 
@@ -467,7 +487,7 @@ def learn(
     if track_offset_identity:
         gan.truth_size_per_batch = NZ
     else:
-        gan.truth_size_per_batch = NZ * len(sample_sites)
+        gan.truth_size_per_batch = NZ * gan.n_sample_sites
 
     def update_func(k):
         update_result = train_update(
@@ -595,20 +615,16 @@ def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_ac
 def make_RGAN_functions(
         gan,
         # Parameters:
-        rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,disc_normalization,gen_update,disc_update,
+        rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,disc_normalization,gen_update,disc_update,subsample_kwargs,
         # Ignored parameters:
         WGAN_lambda,
+        track_offset_identity, include_inhibitory_neurons,
         # Optional parameters:
         gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
-
-    #Defines the input shape for the discriminator network
-    if track_offset_identity:
-        INSHAPE = [NZ, NB * len(sample_sites)]
-    else:
-        INSHAPE = [NZ * len(sample_sites), NB]
+    INSHAPE = gan.disc_input_shape
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -617,7 +633,7 @@ def make_RGAN_functions(
     # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
-                                   track_offset_identity=track_offset_identity)
+                                   **subsample_kwargs)
 
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
 
@@ -711,20 +727,16 @@ def make_RGAN_functions(
 def make_WGAN_functions(
         gan,
         # Parameters:
-        rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,WGAN_lambda,disc_normalization,gen_update,disc_update,
+        rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,WGAN_lambda,disc_normalization,gen_update,disc_update,subsample_kwargs,
         # Ignored parameters:
         loss_type,
+        track_offset_identity, include_inhibitory_neurons,
         # Optional parameters:
         gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
-
-    #Defines the input shape for the discriminator network
-    if track_offset_identity:
-        INSHAPE = [NZ, NB * len(sample_sites)]
-    else:
-        INSHAPE = [NZ * len(sample_sites), NB]
+    INSHAPE = gan.disc_input_shape
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -733,7 +745,7 @@ def make_WGAN_functions(
     # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
-                                   track_offset_identity=track_offset_identity)
+                                   **subsample_kwargs)
 
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
 
@@ -886,6 +898,9 @@ def main(args=None):
         If True, stack samples into NB axis; i.e., let discriminator
         know that those neurons are from the different offset of the
         same SSN.''')
+    parser.add_argument(
+        '--include-inhibitory-neurons', action='store_true',
+        help='Sample TCs from inhibitory neurons if given.')
     parser.add_argument(
         '--contrast',
         default=[5, 10, 30],

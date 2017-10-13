@@ -162,13 +162,13 @@ def plot_learning(data, title_params=None):
     ax_loss = axes[0, 0]
     ax_loss.set_yscale('symlog')
 
-    err1 = plot_tc_errors(data, ax=axes[0, 2])
-    clip_ymax(err1['ax'], 2)
+    plot_tc_errors(data, ax=axes[0, 2])
+    axes[0, 2].set_yscale('log')
 
     axes[1, 2].plot(df['epoch'], gen_param_mean_relative_error(data),
                     label='G param. rel. MAE')
     axes[1, 2].legend(loc='best')
-    # clip_ymax(axes[1, 2], 1)
+    axes[1, 2].set_yscale('log')
 
     plot_gen_params(data, axes=axes[2, :])
     plot_gen_params(data, axes=axes[3, :],

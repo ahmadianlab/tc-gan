@@ -82,7 +82,7 @@ class LearningRecorder(BaseRecorder):
 
     filename = "learning.csv"
     column_names = (
-        "epoch", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
+        "gen_step", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
         "gradient_time", "model_convergence", "model_unused",
         "rate_penalty")
 

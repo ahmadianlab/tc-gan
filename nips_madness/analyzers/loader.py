@@ -216,7 +216,15 @@ class GANData(object):
 
     def to_dataframe(self):
         import pandas
-        return pandas.DataFrame(self.main, columns=self.main_names)
+        df = pandas.DataFrame(self.main, columns=self.main_names)
+        if 'epoch' in df:
+            df['gen_step'] = df['epoch']
+
+        truth_size = self.info['run_config']['truth_size']  # data size
+        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        df['epoch'] = df['gen_step'] * n_samples / truth_size
+
+        return df
 
     @property
     def gan_type(self):

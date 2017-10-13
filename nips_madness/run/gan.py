@@ -171,16 +171,14 @@ def get_updater(update_name, *args, **kwds):
 def learn(
         driver, gan, datastore,
         seed,
-        loss, n_samples,
+        loss,
         WGAN_n_critic0, WGAN_n_critic,
         rate_cost,
         n_sites, IO_type, rate_hard_bound, rate_soft_bound, dt, max_iter,
         true_IO_type, truth_size, truth_seed, bandwidths,
-        sample_sites, track_offset_identity, init_disturbance,
+        sample_sites, track_offset_identity,
         contrast, include_inhibitory_neurons,
-        J0, D0, S0,
-        timetest, convtest, testDW, DRtest,
-        **make_func_kwargs):
+        **setup_gan_kwargs):
 
     gan.track_offset_identity = track_offset_identity
     gan.include_inhibitory_neurons = include_inhibitory_neurons
@@ -192,14 +190,6 @@ def learn(
     bandwidths = np.array(bandwidths)
     gan.sample_sites = \
         sample_sites = sample_sites_from_stim_space(sample_sites, n_sites)
-
-    WGAN = loss == 'WD'
-    if WGAN:
-        make_functions = make_WGAN_functions
-        train_update = WGAN_update
-    else:
-        make_functions = make_RGAN_functions
-        train_update = RGAN_update
 
     np.random.seed(seed)
 
@@ -246,9 +236,36 @@ def learn(
     else:
         assert n_stim == data.shape[-1]
 
-    #defining all the parameters that we might want to train
-
     print(n_sites)
+
+    setup_gan(
+        gan, ssn_params=ssn_params,
+        bandwidths=bandwidths, smoothness=smoothness, contrast=contrast,
+        n_sites=n_sites, n_stim=n_stim,
+        **setup_gan_kwargs)
+
+    gan.data = data
+    gan.WGAN_n_critic0 = WGAN_n_critic0
+    gan.WGAN_n_critic = WGAN_n_critic
+    train_gan(driver, gan, datastore, **vars(gan))
+
+
+def setup_gan(
+        gan, ssn_params, J0, D0, S0, init_disturbance,
+        bandwidths, smoothness, contrast, n_sites, n_samples, n_stim,
+        # "Test" flags:  # TODO: remove
+        timetest=False, convtest=False, testDW=False, DRtest=False,
+        **make_func_kwargs):
+    exp_value = ssn_params['n']
+    coe_value = ssn_params['k']
+    IO_type = ssn_params['io_type']
+    rate_soft_bound = ssn_params['rate_soft_bound']
+    rate_hard_bound = ssn_params['rate_hard_bound']
+
+    if gan.loss_type == 'WD':
+        make_functions = make_WGAN_functions
+    else:
+        make_functions = make_RGAN_functions
 
     exp = theano.shared(exp_value,name = "exp")
     coe = theano.shared(coe_value,name = "coe")
@@ -476,18 +493,27 @@ def learn(
         R_grad=[dRdJ_exp, dRdD_exp, dRdS_exp],
         **dict(make_func_kwargs, **vars(gan)))
 
-    #Now we set up values to use in testing.
-
     # Variables to be used from train_update (but not from make_functions):
     gan.inp = inp = BAND_IN
     gan.ssn_params = ssn_params
-    gan.data = data
     gan.W = W
 
-    if track_offset_identity:
+    if gan.track_offset_identity:
         gan.truth_size_per_batch = NZ
     else:
         gan.truth_size_per_batch = NZ * gan.n_sample_sites
+
+    return gan
+
+
+def train_gan(driver, gan, datastore,
+              WGAN_n_critic0, WGAN_n_critic,
+              **_):
+
+    if gan.loss_type == 'WD':
+        train_update = WGAN_update
+    else:
+        train_update = RGAN_update
 
     def update_func(k):
         update_result = train_update(

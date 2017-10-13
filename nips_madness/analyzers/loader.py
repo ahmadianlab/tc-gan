@@ -133,11 +133,22 @@ class GANData(object):
             return False
 
     @property
+    def include_inhibitory_neurons(self):
+        try:
+            return self.info['run_config']['include_inhibitory_neurons']
+        except (AttributeError, KeyError):
+            return False
+
+    @property
     def n_sample_sites(self):
         try:
-            return len(self.info['run_config']['sample_sites'])
+            sample_sites = self.info['run_config']['sample_sites']
         except (AttributeError, KeyError):
             return 1
+        if self.include_inhibitory_neurons:
+            return len(sample_sites) * 2
+        else:
+            return len(sample_sites)
 
     @property
     def n_bandwidths(self):
@@ -153,9 +164,20 @@ class GANData(object):
     @property
     def n_bandwidths_viz(self):
         if self.track_offset_identity:
-            return self.n_bandwidths * self.n_sample_sites
+            return self.n_stim * self.n_sample_sites
         else:
-            return self.n_bandwidths
+            return self.n_stim
+
+    @property
+    def n_contrasts(self):
+        try:
+            return len(self.info['run_config']['contrast'])
+        except (AttributeError, KeyError):
+            return 1
+
+    @property
+    def n_stim(self):
+        return self.n_bandwidths * self.n_contrasts
 
     @property
     def model_tuning(self):
@@ -194,7 +216,15 @@ class GANData(object):
 
     def to_dataframe(self):
         import pandas
-        return pandas.DataFrame(self.main, columns=self.main_names)
+        df = pandas.DataFrame(self.main, columns=self.main_names)
+        if 'epoch' in df:
+            df['gen_step'] = df['epoch']
+
+        truth_size = self.info['run_config']['truth_size']  # data size
+        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        df['epoch'] = df['gen_step'] * n_samples / truth_size
+
+        return df
 
     @property
     def gan_type(self):

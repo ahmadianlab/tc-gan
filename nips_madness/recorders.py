@@ -82,7 +82,7 @@ class LearningRecorder(BaseRecorder):
 
     filename = "learning.csv"
     column_names = (
-        "epoch", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
+        "gen_step", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
         "gradient_time", "model_convergence", "model_unused",
         "rate_penalty")
 
@@ -167,7 +167,8 @@ class DiscParamStatsRecorder(BaseRecorder):
     def record(self, gen_step, disc_step):
         nnorms = [
             np.linalg.norm(arr.flatten()) / arr.size
-            for arr in lasagne.layers.get_all_param_values(self.discriminator)
+            for arr in lasagne.layers.get_all_param_values(self.discriminator,
+                                                           trainable=True)
         ]
         # TODO: implement it using Theano function
         self._saverow([gen_step, disc_step] + nnorms)

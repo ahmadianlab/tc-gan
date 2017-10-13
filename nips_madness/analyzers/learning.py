@@ -172,6 +172,9 @@ def plot_learning(data, title_params=None):
     plot_gen_params(data, axes=axes[3, :],
                     yscale='log', legend=False, ylim=False)
 
+    for ax in axes[-1]:
+        ax.set_xlabel('epoch')
+
     fig.suptitle(data.pretty_spec(title_params))
     return fig
 

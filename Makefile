@@ -6,13 +6,13 @@ ext: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=nips_madness/ext
 
 test: prepare
-	misc/with-env pytest
+	misc/pytest
 
 test-quick: prepare
-	misc/with-env pytest -k 'not slowtest'
+	misc/pytest -k 'not slowtest'
 
 test-flakes: prepare
-	misc/with-env pytest -m flakes
+	misc/pytest -m flakes
 
 doc: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=doc html

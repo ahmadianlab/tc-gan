@@ -1,0 +1,21 @@
+#!/bin/bash -e
+
+# Usage:
+#   misc/pytest [ARGUMENTS_TO_PYTEST]
+#
+# Run py.test with THEANORC set to misc/test.theanorc to use Theano in
+# FAST_COMPILE mode.
+
+thisdir="$(dirname "${BASH_SOURCE[0]}")"
+
+test_theanorc="$thisdir/test.theanorc"
+if [ -n "$THEANORC" ]
+then
+    export THEANORC="$THEANORC:$test_theanorc"
+else
+    export THEANORC="$test_theanorc"
+fi
+# See:
+# http://deeplearning.net/software/theano/library/config.html#envvar-THEANORC
+
+exec "$thisdir/with-env" pytest "$@"

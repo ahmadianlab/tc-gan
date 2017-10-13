@@ -33,12 +33,13 @@ def plot_tc_errors(data, legend=True, ax=None, per_stim=False):
     total_error = np.abs((model - true) / true).mean(axis=-1)
 
     total_error_lines = ax.plot(
+        data.epochs,
         total_error,
         path_effects=[pe.Stroke(linewidth=5, foreground='white'),
                       pe.Normal()])
     if per_stim:
         per_stim_error = abs(model - true) / abs(true)
-        per_stim_lines = ax.plot(per_stim_error, alpha=0.4)
+        per_stim_lines = ax.plot(data.epochs, per_stim_error, alpha=0.4)
     else:
         per_stim_error = per_stim_lines = None
 
@@ -79,6 +80,7 @@ def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
                 linestyle='--',
                 color=color)
             axes[column].plot(
+                data.epochs,
                 fake_param[:, i, j],
                 label='${}_{{{}{}}}$'.format(name, p, q),
                 color=color)

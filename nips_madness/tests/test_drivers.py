@@ -54,6 +54,7 @@ def fake_datastore():
 
 def setup_fake_gan(gan):
     gan.discriminator = make_discriminator()
+    gan.NZ = 3  # (n_samples)
 
     for i, name in enumerate('JDS'):
         fake_shared = mock.Mock()
@@ -88,6 +89,13 @@ def make_driver(
         **run_config))
 
     setup_fake_gan(rc.gan)
+
+    def patched_pre_loop():
+        real_pre_loop()
+        # "Turn off" SSNRejectionLimiter:
+        rc.driver.rejection_limiter.rejection_limit = 1
+    real_pre_loop = rc.driver.pre_loop
+    rc.driver.pre_loop = patched_pre_loop
 
     return rc
 
@@ -286,3 +294,40 @@ def test_quit_JDS_threshold_noquit():
         quit_JDS_threshold=0.4,
     )
     datastore.dump_json.assert_not_called()
+
+
+def test_rejection_limiter_should_abort():
+    limiter = drivers.SSNRejectionLimiter(None, n_samples=10)
+    over_limit = 20
+    under_limit = 0
+
+    assert not limiter.should_abort(over_limit)
+
+    limiter.should_abort(under_limit)  # reset
+    max_over_limit = [limiter.should_abort(over_limit)
+                      for _ in range(limiter.max_consecutive_exceedings)]
+    assert not any(max_over_limit)
+    assert not limiter.should_abort(under_limit)
+
+    limiter.should_abort(under_limit)  # reset
+    max_over_limit = [limiter.should_abort(over_limit)
+                      for _ in range(limiter.max_consecutive_exceedings)]
+    assert not any(max_over_limit)
+    assert limiter.should_abort(over_limit)
+
+
+def test_rejection_limiter_exception():
+    datastore = mock.Mock()
+    limiter = drivers.SSNRejectionLimiter(datastore, n_samples=10)
+    over_limit = 20
+
+    for _ in range(limiter.max_consecutive_exceedings):
+        limiter(over_limit)
+
+    with pytest.raises(execution.KnownError):
+        limiter(over_limit)
+
+    datastore.dump_json.assert_called_once_with(dict(
+        reason='too_many_rejections',
+        good=False,
+    ), 'exit.json')

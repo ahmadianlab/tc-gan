@@ -160,6 +160,18 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
         else:
             return (self.NZ * self.n_sample_sites, self.NB)
 
+    def disc_penalty(self, discriminator):
+        penalty = 0
+        if self.disc_l1_regularization > 0:
+            penalty += lasagne.regularization.regularize_layer_params(
+                discriminator, lasagne.regularization.l1,
+            ) * self.disc_l1_regularization
+        if self.disc_l2_regularization > 0:
+            penalty += lasagne.regularization.regularize_layer_params(
+                discriminator, lasagne.regularization.l2,
+            ) * self.disc_l2_regularization
+        return penalty
+
 
 def get_updater(update_name, *args, **kwds):
     if update_name == 'adam-wgan':
@@ -253,6 +265,7 @@ def learn(
 def setup_gan(
         gan, ssn_params, J0, D0, S0, init_disturbance,
         bandwidths, smoothness, contrast, n_sites, n_samples, n_stim,
+        disc_l1_regularization=0, disc_l2_regularization=0,
         # "Test" flags:  # TODO: remove
         timetest=False, convtest=False, testDW=False, DRtest=False,
         **make_func_kwargs):
@@ -261,6 +274,9 @@ def setup_gan(
     IO_type = ssn_params['io_type']
     rate_soft_bound = ssn_params['rate_soft_bound']
     rate_hard_bound = ssn_params['rate_hard_bound']
+
+    gan.disc_l1_regularization = disc_l1_regularization
+    gan.disc_l2_regularization = disc_l2_regularization
 
     if gan.loss_type == 'WD':
         make_functions = make_WGAN_functions
@@ -645,6 +661,7 @@ def make_RGAN_functions(
         # Ignored parameters:
         WGAN_lambda,
         track_offset_identity, include_inhibitory_neurons,
+        disc_l1_regularization, disc_l2_regularization,
         # Optional parameters:
         gen_update_config={}, disc_update_config={},
         ):
@@ -690,6 +707,9 @@ def make_RGAN_functions(
     else:
         print("Invalid loss specified")
         exit()
+
+    # Apply l1 and/or l2 regularization if disc_l{1,2}_regularization > 0:
+    true_loss_exp += gan.disc_penalty(discriminator)
 
     if rate_penalty_no_I:
         penalized_rate = rate_vector[:, :, :N]
@@ -757,6 +777,7 @@ def make_WGAN_functions(
         # Ignored parameters:
         loss_type,
         track_offset_identity, include_inhibitory_neurons,
+        disc_l1_regularization, disc_l2_regularization,
         # Optional parameters:
         gen_update_config={}, disc_update_config={},
         ):
@@ -804,6 +825,9 @@ def make_WGAN_functions(
 
     true_loss_exp = fake_dis_out.mean() - true_dis_out.mean() + lam*((DGRAD - 1)**2).mean()#discriminator loss
     fake_loss_exp = -fake_dis_out.mean()#generative loss
+
+    # Apply l1 and/or l2 regularization if disc_l{1,2}_regularization > 0:
+    true_loss_exp += gan.disc_penalty(discriminator)
 
     if rate_penalty_no_I:
         penalized_rate = rate_vector[:, :, :N]
@@ -988,6 +1012,12 @@ def main(args=None):
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
+    parser.add_argument(
+        '--disc-l1-regularization', default=0, type=float,
+        help='Coefficient for l1 regularization applied to discriminator.')
+    parser.add_argument(
+        '--disc-l2-regularization', default=0, type=float,
+        help='Coefficient for l2 regularization applied to discriminator.')
 
     parser.add_argument(
         '--timetest',default=False, action='store_true',

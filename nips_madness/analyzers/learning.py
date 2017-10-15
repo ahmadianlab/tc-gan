@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 import itertools
 
 from matplotlib import pyplot
@@ -94,7 +95,7 @@ def plot_tc_errors(data, legend=True, ax=None, per_stim=False,
     if ylim:
         ax.set_ylim(ylim)
 
-    return dict(
+    return SimpleNamespace(
         ax=ax,
         per_stim_error=per_stim_error,
         per_stim_lines=per_stim_lines,
@@ -201,6 +202,8 @@ def plot_learning(data, title_params=None):
 
     plot_data_smape(data, ax=axes[0, 2], colors=2)
 
+    data.disc.plot_param_stats(ax=axes[1, 2])
+
     plot_gen_params(data, axes=axes[2, :])
     plot_gen_params(data, axes=axes[3, :],
                     yscale='log', legend=False, ylim=False)
@@ -209,7 +212,10 @@ def plot_learning(data, title_params=None):
         ax.set_xlabel('epoch')
 
     fig.suptitle(data.pretty_spec(title_params))
-    return fig
+    return SimpleNamespace(
+        fig=fig,
+        axes=axes,
+    )
 
 
 def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
@@ -259,7 +265,8 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
 
 
 def analyze_learning(logpath, show, figpath, title_params):
-    fig = plot_learning(load_gandata(logpath), title_params)
+    arts = plot_learning(load_gandata(logpath), title_params)
+    fig = arts.fig
     if show:
         pyplot.show()
     if figpath:

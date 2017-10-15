@@ -1122,7 +1122,7 @@ def preprocess(run_config):
         run_config.setdefault('D0', SSsolve.DEFAULT_PARAMS['D'])
         run_config.setdefault('S0', SSsolve.DEFAULT_PARAMS['S'])
     for key in ('J0', 'D0', 'S0'):
-        run_config[key] = utils.tolist_if_not(run_config[key])
+        run_config[key] = np.broadcast_to(run_config[key], (2, 2)).tolist()
 
 
 def init_driver(

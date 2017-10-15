@@ -265,7 +265,7 @@ def learn(
 def setup_gan(
         gan, ssn_params, J0, D0, S0, init_disturbance,
         bandwidths, smoothness, contrast, n_sites, n_samples, n_stim,
-        disc_l1_regularization=0, disc_l2_regularization=0,
+        disc_l1_regularization, disc_l2_regularization,
         # "Test" flags:  # TODO: remove
         timetest=False, convtest=False, testDW=False, DRtest=False,
         **make_func_kwargs):

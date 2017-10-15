@@ -249,6 +249,23 @@ class GANData(object):
         else:
             return gen_step + 1
 
+    def epoch_to_gen_step(self, epoch):
+        return self.disc_updates_to_gen_step(self.epoch_to_disc_updates(epoch))
+
+    def disc_updates_to_gen_step(self, disc_updates):
+        run_config = self.info['run_config']
+        if self.gan_type == 'WGAN':
+            WGAN_n_critic0 = run_config['WGAN_n_critic0']
+            WGAN_n_critic = run_config['WGAN_n_critic']
+            return (disc_updates - WGAN_n_critic0) / WGAN_n_critic
+        else:
+            return disc_updates - 1
+
+    def epoch_to_disc_updates(self, epoch):
+        truth_size = self.info['run_config']['truth_size']  # data size
+        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        return epoch * truth_size / n_samples
+
     @property
     def gan_type(self):
         loss = self.info['run_config']['loss']

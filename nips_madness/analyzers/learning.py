@@ -211,10 +211,27 @@ def plot_learning(data, title_params=None):
     for ax in axes[-1]:
         ax.set_xlabel('epoch')
 
+    def add_upper_ax(ax):
+        def sync_xlim(ax):
+            ax_up.set_xlim(*map(data.epoch_to_gen_step, ax.get_xlim()))
+
+        ax_up = ax.twiny()
+        ax_up.set_xlabel('gen_step')
+
+        sync_xlim(ax)
+        ax.callbacks.connect('xlim_changed', sync_xlim)
+        return ax_up
+
+    axes_upper = list(map(add_upper_ax, axes[0]))
+    # See:
+    # http://matplotlib.org/gallery/subplots_axes_and_figures/fahrenheit_celsius_scales.html
+    # https://github.com/matplotlib/matplotlib/issues/7161#issuecomment-249620393
+
     fig.suptitle(data.pretty_spec(title_params))
     return SimpleNamespace(
         fig=fig,
         axes=axes,
+        axes_upper=axes_upper,
     )
 
 

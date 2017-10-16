@@ -82,6 +82,27 @@ def _validate_norm(normalization, n_layers):
 
 
 def make_net(in_shape, LOSS, layers=[], normalization='none'):
+    """
+    Make a discriminator network appropriate for loss `LOSS`.
+
+    Parameters
+    ----------
+    in_shape : tuple of int
+        `shape` argument passed to `lasagne.layers.InputLayer`.
+    LOSS : {'LS', 'CE', 'WGAN'}
+        Discriminator loss type which is used to determine the output
+        layer and nonlinearity type.
+    layers : tuple/list of int
+        Numbers of units in hidden layers. Empty tuple means perceptron.
+    normalization : {'none', 'layer'} or list of them
+        (1) If it is a *simple normalization specification* such as
+        ``none`` and ``layer``, it specifies the normalization of the
+        hidden layers.
+        (2) It can be a tuple or list of simple normalization
+        specifications to specify normalization for each layer
+        explicitly.  Its length has to be equal to ``len(layers)``.
+
+    """
 
     net = L.InputLayer(in_shape)
 

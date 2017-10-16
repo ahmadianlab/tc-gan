@@ -55,7 +55,7 @@ from .. import utils
 from ..drivers import GANDriver
 from ..gradient_expressions.utils import subsample_neurons, \
     sample_sites_from_stim_space
-import discriminators.simple_discriminator as SD
+from ..networks import simple_discriminator as SD
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from ..recorders import UpdateResult

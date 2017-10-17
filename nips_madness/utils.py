@@ -6,6 +6,9 @@ import subprocess
 import sys
 import time
 
+import numpy as np
+import theano
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
@@ -136,3 +139,99 @@ def cpu_count(_environ=os.environ):
     except (KeyError, ValueError):
         pass
     return multiprocessing.cpu_count()
+
+
+class cached_property(object):
+    """
+    A decorator that converts a function into a lazy property.
+
+    The function wrapped is called the first time to retrieve the
+    result and then that calculated result is used the next time you
+    access the value::
+
+        class Foo(object):
+
+            @cached_property
+            def foo(self):
+                # calculate something important here
+                return 42
+
+    The class has to have a `__dict__` in order for this property to
+    work.
+
+    This class is stolen from `werkzeug.utils`_ with a little bit of
+    modification.  See also `Python cached property decorator`_.
+
+    * `werkzeug.utils
+      <https://github.com/mitsuhiko/werkzeug/blob/master/werkzeug/utils.py>`_
+    * toofishes.net - `Python cached property decorator
+      <http://www.toofishes.net/blog/python-cached-property-decorator/>`_
+
+    Examples:
+
+    >>> class Foo(object):
+    ...
+    ...     counter = 0
+    ...
+    ...     @cached_property
+    ...     def foo(self):
+    ...         self.counter += 1
+    ...         return self.counter
+    ...
+    >>> ya = Foo()
+    >>> ya.foo
+    1
+
+    The result is cached.  So you should get the same result as before.
+
+    >>> ya.foo
+    1
+
+    You can invalidate the cache by ``del obj.property``:
+
+    >>> del ya.foo
+    >>> ya.foo
+    2
+
+    """
+
+    # implementation detail: this property is implemented as non-data
+    # descriptor.  non-data descriptors are only invoked if there is
+    # no entry with the same name in the instance's __dict__.
+    # this allows us to completely get rid of the access function call
+    # overhead.  If one choses to invoke __get__ by hand the property
+    # will still work as expected because the lookup logic is replicated
+    # in __get__ for manual invocation.
+
+    def __init__(self, func, name=None, doc=None):
+        self.__name__ = name or func.__name__
+        self.__module__ = func.__module__
+        self.__doc__ = doc or func.__doc__
+        self.func = func
+        self._missing = object()
+
+    def __get__(self, obj, type=None):
+        if obj is None:
+            return self
+        value = obj.__dict__.get(self.__name__, self._missing)
+        if value is self._missing:
+            value = self.func(obj)
+            obj.__dict__[self.__name__] = value
+        return value
+
+
+def cartesian_product(*arrays, **kwargs):
+    dtype = kwargs.pop('dtype', theano.config.floatX)
+    assert not kwargs
+    arrays = list(map(np.asarray, arrays))
+    assert all(a.ndim == 1 for a in arrays)
+
+    prod = np.zeros([len(arrays)] + list(map(len, arrays)),
+                    dtype=dtype)
+
+    for i, a in enumerate(arrays):
+        shape = [1] * len(arrays)
+        shape[i] = -1
+        prod[i] = a.reshape(shape)
+
+    return prod.reshape((len(arrays), -1))

@@ -264,11 +264,16 @@ def learn(
              gradient_time,
              model_info.rejections,
              model_info.unused])
+       
+        GZmean = np.reshape(get_reduced(rtest),[len(conditions),-1,true.shape[-1]]).mean(axis = 1)
+        Dmean = true.mean(axis = 1)
 
-        GZmean = get_reduced(rtest).mean(axis = 0)
-        Dmean = true.mean(axis = 0)
+        GZmean = np.reshape(GZmean,[-1])
+        Dmean = np.reshape(Dmean,[-1])
+        
 
         datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
+#        datastore.tables.saverow('TC_mean.csv', list(Dmean))
 
         jj = J.get_value()
         dd = D.get_value()
@@ -337,8 +342,9 @@ def MOMENT_update(G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_
     #the data
     idx = [np.random.choice(len(d), truth_size_per_batch) for d in data]
     
-    true = np.array([data[d][idx[d]] for d in range(len(idx))])
     
+    #    true = np.array([data[d][idx[d]] for d in range(len(idx))])
+    true = data
     
     with SSsolve_time:
         rtest = []
@@ -417,7 +423,11 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,g_lr,rate_co
     b1 = .5
     b2 = .9
 
-    G_updates = lasagne.updates.sgd([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr)#,beta1 = b1,beta2 = b2)
+
+    clip = lasagne.updates.norm_constraint
+    cval = 1.
+    
+    G_updates = lasagne.updates.sgd([clip(dLdJ_exp,cval),clip(dLdD_exp,cval),clip(dLdS_exp,cval)],[J,D,S], g_lr)#,beta1 = b1,beta2 = b2)
 
     G_train_func = theano.function([rate_vector,dat_mean,dat_vari,ivec,Z],loss_exp,updates = G_updates,allow_input_downcast = True)
     
@@ -478,7 +488,7 @@ def main(args=None):
         help='Comma separated value of floats')
     parser.add_argument(
         '--offsets',
-        default=[-.5,0,.5],
+        default=[0.,.1,.2,.3,.4,.5],
         type=utils.csv_line(float),
         help='Comma separated value of floats')
     parser.add_argument(
@@ -500,7 +510,7 @@ def main(args=None):
         '--loss', default="CE",
         help='Type of loss to use. Cross-Entropy ("CE") or LSGAN ("LS"). (default: %(default)s)')
     parser.add_argument(
-        '--n_samples', default=30, type=eval,
+        '--n_samples', default=5, type=eval,
         help='Number of samples to draw from G each step (default: %(default)s)')
     parser.add_argument(
         '--rate_cost', default='0',

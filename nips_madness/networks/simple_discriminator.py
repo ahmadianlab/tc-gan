@@ -52,15 +52,22 @@ def layer_normalized_dense_layer(incoming, num_units,
                                  nonlinearity=NL.rectify,
                                  W=lasagne.init.Normal(std=1),
                                  b=lasagne.init.Constant(0.),
+                                 use_scale='auto',
                                  **kwargs):
     assert num_units > 1
+
+    assert use_scale in (True, False, 'auto')
+    if use_scale == 'auto':
+        use_scale = nonlinearity is not NL.rectify
+
     layer = L.DenseLayer(incoming, num_units,
                          W=W,
                          b=None,
                          nonlinearity=NL.linear,
                          **kwargs)
     layer = LayerNormLayer(layer)
-    layer = L.ScaleLayer(layer)
+    if use_scale:
+        layer = L.ScaleLayer(layer)
     layer = L.BiasLayer(layer, b=b)
     return L.NonlinearityLayer(layer, nonlinearity=nonlinearity)
 

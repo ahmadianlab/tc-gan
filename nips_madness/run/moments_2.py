@@ -93,33 +93,23 @@ def learn(
     
     pos_num = X.get_value()
 
-    def input_function(cond):
-        return np.array([stimuli.input(bandwidths, pos_num, smoothness,[c[0]],[c[1]]) for c in cond])
+    BAND_IN = stimuli.input(bandwidths, pos_num, smoothness,contrast)
 
-    temp_con = np.tile(np.reshape(conditions,[len(conditions),1,2]),[1,n_samples,1])
-    temp_con = np.reshape(temp_con, [-1, 2])
-
-    BAND_IN = input_function(temp_con)
+    print("OFFID", track_offset_identity)
     
-    data = []
-        
-    for CON in conditions:
-        print(CON)
-        DAT, _ = SSsolve.sample_tuning_curves(
-            sample_sites=sample_sites,
-            NZ=truth_size,
-            seed=truth_seed,
-            bandwidths=bandwidths,
-            smoothness=smoothness,
-            contrast=[CON[0]],
-            offset=[CON[1]],
-            N=n_sites,
-            track_offset_identity=track_offset_identity,
-            **dict(ssn_params, io_type=true_IO_type))
-        
-        data.append(DAT)
+    data, _ = SSsolve.sample_tuning_curves(
+        sample_sites=sample_sites,
+        NZ=truth_size,
+        seed=truth_seed,
+        bandwidths=bandwidths,
+        smoothness=smoothness,
+        contrast=contrast,
+        N=n_sites,
+        track_offset_identity=track_offset_identity,
+        **dict(ssn_params, io_type=true_IO_type))
+
     print("DONE")
-    data = np.array([d.T for d in data])      # shape: (ncondition,N_data, nb)
+    data = data.T
     print(data.shape)
     
     # Check for sanity:
@@ -127,7 +117,6 @@ def learn(
         assert len(bandwidths) * sample_sites == data.shape[-1]
     else:
         assert len(bandwidths) == data.shape[-1]
-
     #defining all the parameters that we might want to train
 
     print(n_sites)
@@ -212,7 +201,7 @@ def learn(
 
     #variables for rates and inputs
     rvec = T.tensor3("rvec","float32")
-    ivec = T.tensor3("ivec","float32")
+    ivec = T.matrix("ivec","float32")
 
     #DrDth tensor expressions
     WRgrad_params = dict(
@@ -221,7 +210,7 @@ def learn(
         io_type=IO_type,
         r0=rate_soft_bound,
         r1=rate_hard_bound,
-        CGAN = True,
+        CGAN = False,
     )
     
     dRdJ_exp = SSgrad.WRgrad_batch(DW=dwdj, **WRgrad_params)
@@ -233,7 +222,7 @@ def learn(
     dRdS = theano.function([rvec,ivec,Z],dRdS_exp,allow_input_downcast = True)
     
     G_train_func,G_loss_func,get_reduced = make_functions(
-        rate_vector=rvec, NZ=NZ, NB=NB, NCOND = len(conditions),LOSS=loss,
+        rate_vector=rvec, NZ=NZ, NB=NB, NCOND = len(contrast)*len(sample_sites),LOSS=loss,
         sample_sites=sample_sites, track_offset_identity=track_offset_identity,
         g_lr=gen_learn_rate, rate_cost=rate_cost,
         rate_penalty_threshold=rate_penalty_threshold,
@@ -256,7 +245,7 @@ def learn(
 
 
     for k in range(iterations):
-        Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test, input_function,ssn_params,get_reduced,J,D,S,n_samples)
+        Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(G_train_func,iterations,N,NZ,NB,data,conditions,W,W_test, BAND_IN,ssn_params,get_reduced,J,D,S,n_samples)
 
         saverow_learning(
             [k, Gloss,
@@ -295,7 +284,7 @@ def peak_width(TC):
     norm = T.sum(TC,axis = 1,keepdims = True)
     return 1./T.sum((TC/norm)**2,axis = 1)
                     
-def MOMENT_update(G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_function,ssn_params,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
+def MOMENT_update(G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,inp,ssn_params,get_reduced,J,D,S,truth_size_per_batch,WG_repeat = 5):
 
     '''
     Conditional WGAN update function:
@@ -336,35 +325,19 @@ def MOMENT_update(G_train_func,iterations,N,NZ,NB,data,data_cond,W,W_test,input_
     # discriminator, we generate the whole samples at once.  This
     # gives us 40% speedup in asym_tanh case:
 
-    conditions = np.reshape(np.tile(np.reshape(data_cond,[len(data_cond),1,-1]),[1,truth_size_per_batch,1]),[-1,2])
-
     
     #the data
     idx = [np.random.choice(len(d), truth_size_per_batch) for d in data]
-    
-    
+        
     #    true = np.array([data[d][idx[d]] for d in range(len(idx))])
     true = data
-    
-    with SSsolve_time:
-        rtest = []
-        ztest = []
-        external = input_function(conditions)
-        for d in range(len(idx)):
-            ztemp,rtemp,model_info = SSsolve.find_fixed_points(truth_size_per_batch,Z_W_gen(),external[d],**ssn_params)
-            rtest.append(rtemp)
-            ztest.append(ztemp)
-        rtest = np.array(rtest)
-        ztest = np.array(ztest)
-        
-    rtest = np.reshape(rtest,[len(idx)*truth_size_per_batch,data.shape[2],-1])
-    ztest = np.reshape(ztest,[len(idx)*truth_size_per_batch,rtest.shape[2],rtest.shape[2]])    
 
-    dat_mean = true.mean(axis = 1)
-    dat_vari = true.var(axis = 1)
-    
+    with SSsolve_time:
+        ztest, rtest, minfo = SSsolve.find_fixed_points(
+            NZ, Z_W_gen(), inp, **ssn_params)
+
     with gradient_time:
-        Gloss = G_train_func(rtest,dat_mean,dat_vari,input_function(conditions),ztest)
+        Gloss = G_train_func(rtest,dat_mean,dat_vari,inp,ztest)
 
     return Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
@@ -374,8 +347,7 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,g_lr,rate_co
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
                                    track_offset_identity=track_offset_identity)
-    red_R_fake = T.reshape(red_R_fake,[-1,NCOND,NB])
-    
+      
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
     
     MEAN = red_R_fake.mean(axis = 0)
@@ -384,7 +356,7 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,g_lr,rate_co
     dat_mean = T.matrix("mean","float32")
     dat_vari = T.matrix("variance","float32")
     
-    r0 = MEAN.mean(axis = 1,keepdims = True)
+    r0 = MEAN.mean()
     
     loss_exp = (((dat_mean - MEAN)/r0)**2).sum() + lam * (((dat_vari - VARI)/(r0**2))**2).sum()
     
@@ -422,7 +394,6 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,NCOND,LOSS,g_lr,rate_co
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
     b1 = .5
     b2 = .9
-
 
     clip = lasagne.updates.norm_constraint
     cval = 1.
@@ -488,7 +459,7 @@ def main(args=None):
         help='Comma separated value of floats')
     parser.add_argument(
         '--offsets',
-        default=[0.,.1,.2,.3,.4,.5],
+        default=[0.],
         type=utils.csv_line(float),
         help='Comma separated value of floats')
     parser.add_argument(

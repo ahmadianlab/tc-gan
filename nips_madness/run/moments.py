@@ -35,7 +35,7 @@ def learn(
         contrast,
         offsets,
         datastore, J0, D0, S0,
-        timetest, convtest, testDW, DRtest,
+        timetest, convtest, testDW, DRtest, truth_size_per_batch,
         # ignore:
         gan, driver):
     iterations = driver.iterations
@@ -74,7 +74,7 @@ def learn(
     #specifying the shape of model/input
     n = theano.shared(n_sites,name = "n_sites")
     nz = theano.shared(n_samples,name = 'n_samples')
-    nb = theano.shared(len(bandwidths),name = 'n_stim')
+    nb = theano.shared(len(bandwidths)*len(contrast),name = 'n_stim')
 
     ##getting regular nums##
     N = int(n.get_value())
@@ -112,10 +112,11 @@ def learn(
     print(data.shape)
         
     # Check for sanity:
+    n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
     if track_offset_identity:
-        assert len(bandwidths) * sample_sites == data.shape[-1]
+        assert n_stim * len(sample_sites) == data.shape[-1]
     else:
-        assert len(bandwidths) == data.shape[-1]
+        assert n_stim == data.shape[-1]
 
     #defining all the parameters that we might want to train
 
@@ -238,14 +239,8 @@ def learn(
         datastore.tables.saverow("learning.csv", row, echo=not quiet)
     saverow_learning("epoch,Gloss,Dloss,Daccuracy,SSsolve_time,gradient_time,model_convergence,model_unused")
 
-    if track_offset_identity:
-        truth_size_per_batch = NZ
-    else:
-        truth_size_per_batch = NZ * len(sample_sites)
-
-
     for k in range(iterations):
-        Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(G_train_func,iterations,N,NZ,NB,data,W,W_test, BAND_IN,ssn_params,get_reduced,J,D,S,n_samples)
+        Gloss,rtest,true,model_info,SSsolve_time,gradient_time = train_update(G_train_func,iterations,N,NZ,NB,data,W,W_test, BAND_IN,ssn_params,get_reduced,J,D,S,truth_size_per_batch)
 
         saverow_learning(
             [k, Gloss,
@@ -323,7 +318,7 @@ def MOMENT_update(G_train_func,iterations,N,NZ,NB,data,W,W_test,INPUT,ssn_params
     #the data
     idx = np.random.choice(len(data), truth_size_per_batch)
     true = data[idx]
-        
+
     #I need to generate the inputs for these conditions
     
     ####
@@ -334,21 +329,14 @@ def MOMENT_update(G_train_func,iterations,N,NZ,NB,data,W,W_test,INPUT,ssn_params
 
 
     with SSsolve_time:
-        ztest,rtest,model_info = SSsolve.find_fixed_points(truth_size_per_batch,Z_W_gen(),INPUT,**ssn_params)
+        ztest,rtest,model_info = SSsolve.find_fixed_points(NZ,Z_W_gen(),INPUT,**ssn_params)
 
-    rtest = np.reshape(rtest,[len(idx),len(INPUT),-1])
-    ztest = np.reshape(ztest,[len(idx),rtest.shape[-1],rtest.shape[-1]])
-        
     with gradient_time:
         Gloss = G_train_func(rtest,true.mean(axis = 0),true.var(axis = 0),INPUT,ztest)
 
     return Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
 def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,LOSS,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,lam):
-
-    INSHAPE = [NZ * len(sample_sites), NB]
-
-    print("input shape {}".format(INSHAPE))
 
     print(sample_sites)
     
@@ -384,11 +372,14 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,LOSS,g_lr,rate_cost,rat
     #We have to do this by hand because hte SS soluytion is not written in a way that theano can solve
     #
     #to get the grads w.r.t. the generators parameters we need to do a jacobian 
-    fake_dis_grad = T.jacobian(T.flatten(loss_exp_train),rate_vector) #gradient of generator loss w.r.t rates
-    fake_dis_grad = T.reshape(fake_dis_grad,[NZ,NB,2*N])
+    fake_dis_grad = T.jacobian(T.flatten(loss_exp_train),rate_vector) #gradient of generator loss w.r.t rates [30,45,402]
+    
+    nstim = NB
+        
+    fake_dis_grad = T.reshape(fake_dis_grad,[NZ,nstim,2*N])
 
     #reshape the generator gradient to fit with Dr/Dth
-    fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,NB,2*N,1,1])
+    fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,nstim,2*N,1,1])
 
     #putthem together and sum of the z,b,and N axes to get a [2,2] tensor that is the gradient of the loss w.r.t. parameters
     dLdJ_exp = (fake_dis_grad_expanded*R_grad[0]).sum(axis = (0,1,2))
@@ -481,6 +472,9 @@ def main(args=None):
         help='''Number of SSNs to be used to generate ground truth
         data (default: %(default)s)''')
     parser.add_argument(
+        '--truth_size_per_batch', default=100, type=int,
+        help='''Number of data samples to use for each mean/variance (default: %(default)s)''')
+    parser.add_argument(
         '--truth_seed', default=42, type=int,
         help='Seed for generating ground truth data (default: %(default)s)')
     parser.add_argument(
@@ -526,7 +520,7 @@ def main(args=None):
 
     add_learning_options(parser)
     parser.set_defaults(
-        datastore_template='logfiles/moments_{IO_type}_{rate_cost}_{lam}',
+        datastore_template='logfiles/moments_{IO_type}_{rate_cost}_{lam}_{truth_size_per_batch}',
     )
 
     ns = parser.parse_args(args)

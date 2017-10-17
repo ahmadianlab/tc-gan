@@ -107,6 +107,13 @@ class GANData(object):
         self.log_J, self.log_D, self.log_S = \
             self.gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
 
+    @property
+    def disc(self):
+        if not hasattr(self, '_disc'):
+            from .disc_learning import DiscriminatorLog
+            self._disc = DiscriminatorLog(self.main_logpath)
+        return self._disc
+
     def gen_param(self, name):
         return np.exp(getattr(self, 'log_' + name))
 
@@ -219,12 +226,45 @@ class GANData(object):
         df = pandas.DataFrame(self.main, columns=self.main_names)
         if 'epoch' in df:
             df['gen_step'] = df['epoch']
+            del df['epoch']  # otherwise pandas changes self.main inplace!
+        df['epoch'] = self.gen_step_to_epoch(df['gen_step'])
+        return df
 
+    @property
+    def epochs(self):
+        return self.gen_step_to_epoch(self.main[:, 0])
+
+    def gen_step_to_epoch(self, gen_step):
         truth_size = self.info['run_config']['truth_size']  # data size
         n_samples = self.info['run_config']['n_samples']  # minibatch size
-        df['epoch'] = df['gen_step'] * n_samples / truth_size
+        disc_updates = self.gen_step_to_disc_updates(gen_step)
+        return disc_updates * n_samples / truth_size
 
-        return df
+    def gen_step_to_disc_updates(self, gen_step):
+        run_config = self.info['run_config']
+        if self.gan_type == 'WGAN':
+            WGAN_n_critic0 = run_config['WGAN_n_critic0']
+            WGAN_n_critic = run_config['WGAN_n_critic']
+            return WGAN_n_critic0 + WGAN_n_critic * gen_step
+        else:
+            return gen_step + 1
+
+    def epoch_to_gen_step(self, epoch):
+        return self.disc_updates_to_gen_step(self.epoch_to_disc_updates(epoch))
+
+    def disc_updates_to_gen_step(self, disc_updates):
+        run_config = self.info['run_config']
+        if self.gan_type == 'WGAN':
+            WGAN_n_critic0 = run_config['WGAN_n_critic0']
+            WGAN_n_critic = run_config['WGAN_n_critic']
+            return (disc_updates - WGAN_n_critic0) / WGAN_n_critic
+        else:
+            return disc_updates - 1
+
+    def epoch_to_disc_updates(self, epoch):
+        truth_size = self.info['run_config']['truth_size']  # data size
+        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        return epoch * truth_size / n_samples
 
     @property
     def gan_type(self):

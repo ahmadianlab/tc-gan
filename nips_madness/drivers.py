@@ -39,6 +39,7 @@ class GANDriver(object):
         self.generator_recorder = GenParamRecorder.from_driver(self)
         self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
         self.disclearning_recorder = DiscLearningRecorder.from_driver(self)
+        self.rejection_limiter = SSNRejectionLimiter.from_driver(self)
 
     def post_disc_update(self, gen_step, disc_step, Dloss, Daccuracy,
                          SSsolve_time, gradient_time, model_info):
@@ -69,6 +70,8 @@ class GANDriver(object):
 
         nnorms = self.discparamstats_recorder.record(gen_step, disc_step)
         check_disc_param(self.datastore, self.gan.discriminator, nnorms)
+
+        self.rejection_limiter(model_info.rejections)
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
@@ -150,3 +153,47 @@ def check_disc_param(datastore, discriminator, nnorms):
         raise execution.KnownError(
             "Discriminator parameter is not finite.",
             exit_code=3)
+
+
+class SSNRejectionLimiter(object):
+    """
+    Watch out SSN rejection rate and terminate the driver if it is too large.
+    """
+
+    def __init__(self, datastore, n_samples,
+                 rejection_limit=0.6,
+                 max_consecutive_exceedings=5):
+        self.datastore = datastore
+
+        self.n_samples = n_samples
+        """ Minibatch size; aka NZ """
+
+        self.rejection_limit = rejection_limit
+        """ Rate #rejections/#total over which model considered "bad". """
+
+        self.max_consecutive_exceedings = max_consecutive_exceedings
+        """ Maximum number of consecutive "bad" models. """
+
+        self._exceedings = 0
+
+    def should_abort(self, rejections):
+        if rejections / (rejections + self.n_samples) > self.rejection_limit:
+            self._exceedings += 1
+        else:
+            self._exceedings = 0
+
+        return self._exceedings > self.max_consecutive_exceedings
+
+    def __call__(self, rejections):
+        if self.should_abort(rejections):
+            self.datastore.dump_json(dict(
+                reason='too_many_rejections',
+                good=False,
+            ), 'exit.json')
+            raise execution.KnownError(
+                "Too many rejections in fixed-point finder.",
+                exit_code=4)
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls(driver.datastore, n_samples=driver.gan.NZ)

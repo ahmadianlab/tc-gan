@@ -3,7 +3,7 @@ from unittest import mock
 import numpy as np
 import pytest
 
-from discriminators.simple_discriminator import make_net
+from ..networks.simple_discriminator import make_net
 from .. import recorders
 from .test_drivers import fake_datastore, setup_fake_gan, \
     GenFakeUpdateResults

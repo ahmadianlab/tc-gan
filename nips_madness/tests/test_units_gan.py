@@ -8,6 +8,7 @@ import pytest
 from ..drivers import GANDriver
 from ..gradient_expressions.utils import subsample_neurons, \
     sample_sites_from_stim_space
+from ..run import gan as run_gan
 from ..run.gan import GenerativeAdversarialNetwork, setup_gan, train_gan
 from .. import ssnode
 from .test_drivers import fake_datastore
@@ -42,6 +43,8 @@ def make_gan(
         n_samples=1,
         layers=[8],
         disc_normalization='none',
+        disc_l1_regularization=0,
+        disc_l2_regularization=0,
         gen_learn_rate=0.01,
         disc_learn_rate=0.01,
         rate_penalty_threshold=150,
@@ -125,3 +128,34 @@ def test_smoke_train_gan():
     driver = make_driver(gan, datastore)
     gan.data = mock_data(gan)
     train_gan(driver, gan, datastore, **vars(gan))
+
+
+def prepped(**kwds):
+    run_config = dict(
+        bandwidths=[0.0625, 0.125, 0.25, 0.5, 0.75],
+        J0=ssnode.DEFAULT_PARAMS['J'],
+        D0=ssnode.DEFAULT_PARAMS['D'],
+        S0=ssnode.DEFAULT_PARAMS['S'],
+    )
+    for key in ('J0', 'D0', 'S0'):
+        run_config[key] = np.asarray(run_config[key]).tolist()
+    run_config.update(kwds)
+    return run_config
+
+
+@pytest.mark.parametrize('run_config, desired', [
+    ({}, prepped()),
+    (dict(S0=[[1, 1], [1, 1]]), prepped(S0=[[1, 1], [1, 1]])),
+    (dict(S0=1), prepped(S0=[[1, 1], [1, 1]])),
+])
+def test_preprocess(run_config, desired):
+    run_config_0 = run_config
+    run_config = dict(
+        n_bandwidths=len(prepped()['bandwidths']),
+        load_gen_param=None,
+    )
+    run_config.update(run_config_0)
+
+    run_gan.preprocess(run_config)
+    actual = {k: run_config[k] for k in desired}
+    assert actual == desired

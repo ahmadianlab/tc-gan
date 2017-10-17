@@ -88,7 +88,8 @@ def _validate_norm(normalization, n_layers):
         return (normalization,) * n_layers
 
 
-def make_net(in_shape, LOSS, layers=[], normalization='none'):
+def make_net(in_shape, LOSS, layers=[], normalization='none',
+             nonlinearity='rectify'):
     """
     Make a discriminator network appropriate for loss `LOSS`.
 
@@ -108,16 +109,23 @@ def make_net(in_shape, LOSS, layers=[], normalization='none'):
         (2) It can be a tuple or list of simple normalization
         specifications to specify normalization for each layer
         explicitly.  Its length has to be equal to ``len(layers)``.
+    nonlinearity : str or callable
+        Nonlinearity to be used for *hidden* layers.  A string for
+        specifying a function in `lasagne.nonlinearities` or any
+        callable.
 
     """
 
     net = L.InputLayer(in_shape)
 
+    if isinstance(nonlinearity, str):
+        nonlinearity = getattr(NL, nonlinearity)
     normalization = _validate_norm(normalization, len(layers))
 
     for width, layer_type in zip(layers, normalization):
         make_layer = normalization_types[layer_type]
-        net = make_layer(net, width, b=lasagne.init.Normal(.01, 0))
+        net = make_layer(net, width, b=lasagne.init.Normal(.01, 0),
+                         nonlinearity=nonlinearity)
 
     if LOSS == "LS":
         net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))

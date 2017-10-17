@@ -97,9 +97,10 @@ def make_net(in_shape, LOSS, layers=[], normalization='none',
     ----------
     in_shape : tuple of int
         `shape` argument passed to `lasagne.layers.InputLayer`.
-    LOSS : {'LS', 'CE', 'WGAN'}
+    LOSS : {'LS', 'CE', 'WGAN', 'WD'}
         Discriminator loss type which is used to determine the output
         layer and nonlinearity type.
+        For backward compatibility, 'WGAN' means 'WD'.
     layers : tuple/list of int
         Numbers of units in hidden layers. Empty tuple means perceptron.
     normalization : {'none', 'layer'} or list of them
@@ -131,7 +132,7 @@ def make_net(in_shape, LOSS, layers=[], normalization='none',
         net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
     elif LOSS == "CE":
         net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid,b=lasagne.init.Normal(.01,0))
-    elif LOSS == "WGAN":
+    elif LOSS in ("WD", "WGAN"):
         net = L.DenseLayer(net, 1, nonlinearity=NL.linear, b=None)
     else:
         raise ValueError("Invaid LOSS specified: {}".format(LOSS))

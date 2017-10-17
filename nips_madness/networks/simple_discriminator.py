@@ -124,7 +124,7 @@ def make_net(in_shape, LOSS, layers=[], normalization='none'):
     elif LOSS == "CE":
         net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid,b=lasagne.init.Normal(.01,0))
     elif LOSS == "WGAN":
-        net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
+        net = L.DenseLayer(net, 1, nonlinearity=NL.linear, b=None)
     else:
         raise ValueError("Invaid LOSS specified: {}".format(LOSS))
 

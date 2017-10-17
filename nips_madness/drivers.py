@@ -1,3 +1,5 @@
+import collections
+
 import lasagne
 import numpy as np
 
@@ -40,6 +42,7 @@ class GANDriver(object):
         self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
         self.disclearning_recorder = DiscLearningRecorder.from_driver(self)
         self.rejection_limiter = SSNRejectionLimiter.from_driver(self)
+        self.disc_loss_limiter = disc_loss_limiter(self)
 
     def post_disc_update(self, gen_step, disc_step, Dloss, Daccuracy,
                          SSsolve_time, gradient_time, model_info):
@@ -72,6 +75,7 @@ class GANDriver(object):
         check_disc_param(self.datastore, self.gan.discriminator, nnorms)
 
         self.rejection_limiter(model_info.rejections)
+        self.disc_loss_limiter(Dloss)
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
@@ -197,3 +201,43 @@ class SSNRejectionLimiter(object):
     @classmethod
     def from_driver(cls, driver):
         return cls(driver.datastore, n_samples=driver.gan.NZ)
+
+
+def disc_loss_limiter(driver):
+    if driver.gan.loss_type == 'WD':
+        return WGANDiscLossLimiter.from_driver(driver)
+    else:
+        return lambda *_, **__: None
+
+
+class WGANDiscLossLimiter(object):
+
+    def __init__(self, datastore, prob_limit=0.6,
+                 wild_disc_loss=10000, hist_length=50):
+        self.datastore = datastore
+        self.prob_limit = prob_limit
+        self.wild_disc_loss = wild_disc_loss
+        self.hist_length = hist_length
+        self.dloss_hist = collections.deque(maxlen=hist_length)
+
+    def prob_exceed(self):
+        return np.mean(abs(np.asarray(self.dloss_hist) > self.wild_disc_loss))
+
+    def should_abort(self, dloss):
+        self.dloss_hist.append(dloss)
+        return (len(self.dloss_hist) == self.hist_length and
+                self.prob_exceed() > self.prob_limit)
+
+    def __call__(self, dloss):
+        if self.should_abort(dloss):
+            self.datastore.dump_json(dict(
+                reason='wild_disc_loss',
+                good=False,
+            ), 'exit.json')
+            raise execution.KnownError(
+                "Too many wild discriminator losses.",
+                exit_code=4)
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls(driver.datastore)

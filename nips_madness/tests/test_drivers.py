@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from types import SimpleNamespace
 from unittest import mock
 import collections
@@ -53,6 +55,7 @@ def fake_datastore():
 
 
 def setup_fake_gan(gan):
+    gan.loss_type = 'WD'
     gan.discriminator = make_discriminator()
     gan.NZ = 3  # (n_samples)
 
@@ -329,5 +332,38 @@ def test_rejection_limiter_exception():
 
     datastore.dump_json.assert_called_once_with(dict(
         reason='too_many_rejections',
+        good=False,
+    ), 'exit.json')
+
+
+@pytest.mark.parametrize('repeats, shifts, last_shift', [
+    ([9], [+1], +1),
+    ([9], [+1], -1),
+    ([0, 5, 4], [-1, +1, -1], +1),
+    ([1, 5, 3], [-1, +1, -1], +1),
+    ([2, 5, 2], [-1, +1, -1], +1),
+    ([3, 5, 1], [-1, +1, -1], +1),
+    ([4, 5, 0], [-1, +1, -1], +1),
+])
+def test_wgan_dloss_limiter_exception(repeats, shifts, last_shift):
+    datastore = mock.Mock()
+    limiter = drivers.WGANDiscLossLimiter(datastore,
+                                          prob_limit=0.6 - 1e-5,
+                                          hist_length=10)
+
+    print()
+    for i, (num, shift) in enumerate(zip(repeats, shifts)):
+        print('i={} shift={:+}: '.format(i, shift), end='')
+        for j in range(num):
+            print('+' if shift > 0 else '-', end='')
+
+            limiter(limiter.wild_disc_loss + shift)
+        print()
+
+    with pytest.raises(execution.KnownError):
+        limiter(limiter.wild_disc_loss + last_shift)
+
+    datastore.dump_json.assert_called_once_with(dict(
+        reason='wild_disc_loss',
         good=False,
     ), 'exit.json')

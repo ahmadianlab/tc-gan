@@ -252,7 +252,10 @@ def learn(
         GZmean = get_reduced(rtest).mean(axis = 0)
         Dmean = true.mean(axis = 0)
 
-        datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean))
+        GZvar = get_reduced(rtest).var(axis = 0)
+        Dvar = true.var(axis = 0)
+
+        datastore.tables.saverow('TC_mean.csv', list(GZmean) + list(Dmean) + list(GZvar) + list(Dvar))
 
         jj = J.get_value()
         dd = D.get_value()
@@ -260,6 +263,9 @@ def learn(
         
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
         datastore.tables.saverow('generator.csv', [k] + allpar)
+
+        if k == 1000:
+            break
 
 ###I need theano functions that compute each of the things we want to moment match.
 
@@ -395,7 +401,11 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,LOSS,g_lr,rate_cost,rat
     b1 = .5
     b2 = .9
 
-    G_updates = lasagne.updates.sgd([dLdJ_exp,dLdD_exp,dLdS_exp],[J,D,S], g_lr)#,beta1 = b1,beta2 = b2)
+    cut_value = 10.
+    def cut(tensor):
+        return lasagne.updates.norm_constraint(tensor,cut_value)
+    
+    G_updates = lasagne.updates.sgd([cut(dLdJ_exp),cut(dLdD_exp),cut(dLdS_exp)],[J,D,S], g_lr)#,beta1 = b1,beta2 = b2)
 
     G_train_func = theano.function([rate_vector,dat_mean,dat_vari,ivec,Z],loss_exp,updates = G_updates,allow_input_downcast = True)
     
@@ -438,7 +448,7 @@ def main(args=None):
         help='''Number of time steps used for SSN fixed point finder.
         (default: %(default)s)''')
     parser.add_argument(
-        '--sample-sites', default=[0], type=utils.csv_line(float),
+        '--sample-sites', default=[0,.25,.5], type=utils.csv_line(float),
         help='''Locations (offsets) of neurons to be sampled from SSN in the
         "bandwidth" space [-1, 1].  0 means the center of the
         network. (default: %(default)s)''')
@@ -451,7 +461,7 @@ def main(args=None):
         same SSN.''')
     parser.add_argument(
         '--contrast',
-        default=[20],
+        default=[5,20],
         type=utils.csv_line(float),
         help='Comma separated value of floats')
     parser.add_argument(

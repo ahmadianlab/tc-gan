@@ -2,8 +2,8 @@ import theano
 import theano.tensor as T
 import numpy as np
 
-sign = theano.shared(np.array([[1,-1],[1,-1]]),name = "sign")
-dsign = T.reshape(sign,[2,2,1,1])
+sign = np.array([[1, -1], [1, -1]])
+dsign = sign.reshape([2, 2, 1, 1])
 
 def make_W_with_x(Z,J,D,S,N,X):
 

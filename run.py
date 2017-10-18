@@ -30,7 +30,8 @@ conda list --prefix "{project_root}/env" --export > conda-list.txt
 '''
 
 
-def run_module(module, arguments, use_pdb, assert_repo_is_clean,
+def run_module(module, arguments, use_pdb, use_pudb,
+               assert_repo_is_clean,
                record_env, mpl_style):
     here = os.path.realpath(os.path.dirname(__file__))
     if os.path.isfile(module) and module.endswith('.py'):
@@ -62,6 +63,9 @@ def run_module(module, arguments, use_pdb, assert_repo_is_clean,
             traceback.print_exc()
             print()
             pdb.post_mortem()
+        elif use_pudb:
+            import pudb
+            pudb.post_mortem()
         elif isinstance(err, KnownError):
             print(err)
             return err.exit_code
@@ -90,6 +94,9 @@ def main(args=None):
     parser.add_argument(
         '--pdb', action='store_true', dest='use_pdb',
         help='drop into pdb when there is an exception')
+    parser.add_argument(
+        '--pudb', action='store_true', dest='use_pudb',
+        help='drop into pupdb when there is an exception')
     parser.add_argument(
         '--assert-repo-is-clean', action='store_true',
         help='abort (with code 3) if this repository is not clean')

@@ -52,15 +52,22 @@ def layer_normalized_dense_layer(incoming, num_units,
                                  nonlinearity=NL.rectify,
                                  W=lasagne.init.Normal(std=1),
                                  b=lasagne.init.Constant(0.),
+                                 use_scale='auto',
                                  **kwargs):
     assert num_units > 1
+
+    assert use_scale in (True, False, 'auto')
+    if use_scale == 'auto':
+        use_scale = nonlinearity is not NL.rectify
+
     layer = L.DenseLayer(incoming, num_units,
                          W=W,
                          b=None,
                          nonlinearity=NL.linear,
                          **kwargs)
     layer = LayerNormLayer(layer)
-    layer = L.ScaleLayer(layer)
+    if use_scale:
+        layer = L.ScaleLayer(layer)
     layer = L.BiasLayer(layer, b=b)
     return L.NonlinearityLayer(layer, nonlinearity=nonlinearity)
 
@@ -81,7 +88,8 @@ def _validate_norm(normalization, n_layers):
         return (normalization,) * n_layers
 
 
-def make_net(in_shape, LOSS, layers=[], normalization='none'):
+def make_net(in_shape, LOSS, layers=[], normalization='none',
+             nonlinearity='rectify'):
     """
     Make a discriminator network appropriate for loss `LOSS`.
 
@@ -89,9 +97,10 @@ def make_net(in_shape, LOSS, layers=[], normalization='none'):
     ----------
     in_shape : tuple of int
         `shape` argument passed to `lasagne.layers.InputLayer`.
-    LOSS : {'LS', 'CE', 'WGAN'}
+    LOSS : {'LS', 'CE', 'WGAN', 'WD'}
         Discriminator loss type which is used to determine the output
         layer and nonlinearity type.
+        For backward compatibility, 'WGAN' means 'WD'.
     layers : tuple/list of int
         Numbers of units in hidden layers. Empty tuple means perceptron.
     normalization : {'none', 'layer'} or list of them
@@ -101,23 +110,30 @@ def make_net(in_shape, LOSS, layers=[], normalization='none'):
         (2) It can be a tuple or list of simple normalization
         specifications to specify normalization for each layer
         explicitly.  Its length has to be equal to ``len(layers)``.
+    nonlinearity : str or callable
+        Nonlinearity to be used for *hidden* layers.  A string for
+        specifying a function in `lasagne.nonlinearities` or any
+        callable.
 
     """
 
     net = L.InputLayer(in_shape)
 
+    if isinstance(nonlinearity, str):
+        nonlinearity = getattr(NL, nonlinearity)
     normalization = _validate_norm(normalization, len(layers))
 
     for width, layer_type in zip(layers, normalization):
         make_layer = normalization_types[layer_type]
-        net = make_layer(net, width, b=lasagne.init.Normal(.01, 0))
+        net = make_layer(net, width, b=lasagne.init.Normal(.01, 0),
+                         nonlinearity=nonlinearity)
 
     if LOSS == "LS":
         net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
     elif LOSS == "CE":
         net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid,b=lasagne.init.Normal(.01,0))
-    elif LOSS == "WGAN":
-        net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
+    elif LOSS in ("WD", "WGAN"):
+        net = L.DenseLayer(net, 1, nonlinearity=NL.linear, b=None)
     else:
         raise ValueError("Invaid LOSS specified: {}".format(LOSS))
 

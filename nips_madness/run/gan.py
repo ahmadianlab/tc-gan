@@ -155,20 +155,32 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
 
     @property
     def disc_input_shape(self):
+        """
+        Input shape for discriminator network (aka INSHAPE).
+        """
         if self.track_offset_identity:
             return (self.NZ, self.NB * self.n_sample_sites)
         else:
             return (self.NZ * self.n_sample_sites, self.NB)
 
-    def disc_penalty(self, discriminator):
+    def prepare_discriminator(self):
+        self.discriminator = SD.make_net(
+            self.disc_input_shape,
+            self.loss_type,
+            self.layers,
+            normalization=self.disc_normalization,
+            nonlinearity=self.disc_nonlinearity,
+        )
+
+    def disc_penalty(self):
         penalty = 0
         if self.disc_l1_regularization > 0:
             penalty += lasagne.regularization.regularize_layer_params(
-                discriminator, lasagne.regularization.l1,
+                self.discriminator, lasagne.regularization.l1,
             ) * self.disc_l1_regularization
         if self.disc_l2_regularization > 0:
             penalty += lasagne.regularization.regularize_layer_params(
-                discriminator, lasagne.regularization.l2,
+                self.discriminator, lasagne.regularization.l2,
             ) * self.disc_l2_regularization
         return penalty
 
@@ -263,8 +275,9 @@ def learn(
 
 
 def setup_gan(
-        gan, ssn_params, J0, D0, S0, init_disturbance,
+        gan, ssn_params, J0, D0, S0, init_disturbance, layers,
         bandwidths, smoothness, contrast, n_sites, n_samples, n_stim,
+        disc_normalization, disc_nonlinearity,
         disc_l1_regularization, disc_l2_regularization,
         # "Test" flags:  # TODO: remove
         timetest=False, convtest=False, testDW=False, DRtest=False,
@@ -275,6 +288,9 @@ def setup_gan(
     rate_soft_bound = ssn_params['rate_soft_bound']
     rate_hard_bound = ssn_params['rate_hard_bound']
 
+    gan.layers = layers
+    gan.disc_normalization = disc_normalization
+    gan.disc_nonlinearity = disc_nonlinearity
     gan.disc_l1_regularization = disc_l1_regularization
     gan.disc_l2_regularization = disc_l2_regularization
 
@@ -503,6 +519,7 @@ def setup_gan(
  
         exit()
 
+    gan.prepare_discriminator()
     assert not set(vars(gan)) & set(make_func_kwargs)  # no common keys
     make_functions(
         gan,
@@ -657,17 +674,18 @@ def RGAN_update(driver,D_train_func,G_train_func,N,NZ,data,W,inp,ssn_params,D_ac
 def make_RGAN_functions(
         gan,
         # Parameters:
-        rate_vector,sample_sites,NZ,NB,loss_type,layers,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,disc_normalization,gen_update,disc_update,subsample_kwargs,
+        rate_vector,sample_sites,NZ,NB,loss_type,disc_learn_rate,gen_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,gen_update,disc_update,subsample_kwargs,discriminator,
         # Ignored parameters:
         WGAN_lambda,
+        layers,
         track_offset_identity, include_inhibitory_neurons,
+        disc_normalization, disc_nonlinearity,
         disc_l1_regularization, disc_l2_regularization,
         # Optional parameters:
         gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
-    INSHAPE = gan.disc_input_shape
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -684,11 +702,6 @@ def make_RGAN_functions(
 
     in_fake = T.log(1. + red_R_fake)
     in_true = T.log(1. + red_R_true)
-
-    #I want to make a network that takes red_R and gives a scalar output
-
-    discriminator = SD.make_net(INSHAPE, loss_type, layers,
-                                normalization=disc_normalization)
 
     #get the outputs
     true_dis_out = lasagne.layers.get_output(discriminator, in_true)
@@ -709,7 +722,7 @@ def make_RGAN_functions(
         exit()
 
     # Apply l1 and/or l2 regularization if disc_l{1,2}_regularization > 0:
-    true_loss_exp += gan.disc_penalty(discriminator)
+    true_loss_exp += gan.disc_penalty()
 
     if rate_penalty_no_I:
         penalized_rate = rate_vector[:, :, :N]
@@ -766,24 +779,23 @@ def make_RGAN_functions(
     gan.D_loss_func = D_loss_func
     gan.D_acc = D_acc
     gan.get_reduced = get_reduced
-    gan.discriminator = discriminator
     gan.rate_penalty_func = rate_penalty_func
 
 
 def make_WGAN_functions(
         gan,
         # Parameters:
-        rate_vector,sample_sites,NZ,NB,layers,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,WGAN_lambda,disc_normalization,gen_update,disc_update,subsample_kwargs,
+        rate_vector,sample_sites,NZ,NB,gen_learn_rate, disc_learn_rate,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,WGAN_lambda,gen_update,disc_update,subsample_kwargs,discriminator,
         # Ignored parameters:
-        loss_type,
+        loss_type, layers,
         track_offset_identity, include_inhibitory_neurons,
+        disc_normalization, disc_nonlinearity,
         disc_l1_regularization, disc_l2_regularization,
         # Optional parameters:
         gen_update_config={}, disc_update_config={},
         ):
     d_lr = disc_learn_rate
     g_lr = gen_learn_rate
-    INSHAPE = gan.disc_input_shape
 
     ###I want to make a network that takes a tensor of shape [2N] and generates dl/dr
 
@@ -800,11 +812,6 @@ def make_WGAN_functions(
 
     in_fake = T.log(1. + red_R_fake)
     in_true = T.log(1. + red_R_true)
-
-    #I want to make a network that takes red_R and gives a scalar output
-
-    discriminator = SD.make_net(INSHAPE, "WGAN", layers,
-                                normalization=disc_normalization)
 
     #get the outputs
     true_dis_out = lasagne.layers.get_output(discriminator, in_true)
@@ -827,7 +834,7 @@ def make_WGAN_functions(
     fake_loss_exp = -fake_dis_out.mean()#generative loss
 
     # Apply l1 and/or l2 regularization if disc_l{1,2}_regularization > 0:
-    true_loss_exp += gan.disc_penalty(discriminator)
+    true_loss_exp += gan.disc_penalty()
 
     if rate_penalty_no_I:
         penalized_rate = rate_vector[:, :, :N]
@@ -886,7 +893,6 @@ def make_WGAN_functions(
     gan.D_loss_func = D_loss_func
     gan.D_acc = D_acc
     gan.get_reduced = get_reduced
-    gan.discriminator = discriminator
     gan.rate_penalty_func = rate_penalty_func
 
 
@@ -1012,6 +1018,10 @@ def main(args=None):
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
+    parser.add_argument(
+        '--disc-nonlinearity', default='rectify',
+        help='''Nonlinearity to be used for hidden layers.
+        (default: %(default)s)''')
     parser.add_argument(
         '--disc-l1-regularization', default=0, type=float,
         help='Coefficient for l1 regularization applied to discriminator.')

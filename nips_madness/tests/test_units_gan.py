@@ -43,6 +43,7 @@ def make_gan(
         n_samples=1,
         layers=[8],
         disc_normalization='none',
+        disc_nonlinearity='rectify',
         disc_l1_regularization=0,
         disc_l2_regularization=0,
         gen_learn_rate=0.01,

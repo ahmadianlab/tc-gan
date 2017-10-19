@@ -299,6 +299,8 @@ class TuningCurveGenerator(BaseComponent):
     inputs = property(lambda self: (self.stimulator.inputs +
                                     self.model.inputs +
                                     self.prober.inputs))
+    output_shape = property(lambda self: (self.batchsize,
+                                          self.num_tcdom * len(self.probes)))
     num_tcdom = property(lambda self: self.stimulator.num_tcdom)
     num_sites = property(lambda self: self.stimulator.num_sites)
     num_neurons = property(lambda self: self.stimulator.num_neurons)
@@ -344,11 +346,11 @@ class TuningCurveGenerator(BaseComponent):
 
 class UnConditionalDiscriminator(BaseComponent):
 
-    def __init__(self, batchsize, num_tcdom, loss_type,
+    def __init__(self, shape, loss_type,
                  layers, normalization, nonlinearity):
         from .simple_discriminator import make_net
         self.l_out = make_net(
-            (batchsize, num_tcdom), loss_type,
+            shape, loss_type,
             layers, normalization, nonlinearity,
         )
 
@@ -448,8 +450,7 @@ class BPTTWassersteinGAN(BaseComponent):
             probes=sample_sites_from_stim_space(sample_sites, num_sites),
             **rest)
         disc, rest = UnConditionalDiscriminator.consume_kwargs(
-            batchsize=gen.batchsize,
-            num_tcdom=gen.num_tcdom,
+            shape=gen.output_shape,
             layers=disc_layers,
             normalization=disc_normalization,
             nonlinearity=disc_nonlinearity,
@@ -531,6 +532,7 @@ class BPTTWassersteinGAN(BaseComponent):
         info.accuracy = self.disc.accuracy(xg, xd)
         info.gen_out = gen_out
         info.dynamics_penalty = gen_out.model_dynamics_penalty
+        info.xd = xd
         info.xg = xg
         info.xp = xp
         info.gen_time = self.gen_forward_watch.times[-1]

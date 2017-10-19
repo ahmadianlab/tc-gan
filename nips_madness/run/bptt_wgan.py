@@ -6,6 +6,7 @@ import numpy as np
 
 from . import gan as plain_gan
 from .. import ssnode
+from .. import utils
 from ..drivers import GANDriver
 from ..networks.bptt_gan import BPTTWassersteinGAN
 from ..recorders import UpdateResult
@@ -59,6 +60,12 @@ def learn(
                 last_info = info
             else:
                 assert info.gen_step == k
+                # Save fake and tuning curves averaged over Zs:
+                data_mean = last_info.xd.mean(axis=0).tolist()
+                gen_mean = last_info.xg.mean(axis=0).tolist()
+                driver.datastore.tables.saverow('TC_mean.csv',
+                                                data_mean + gen_mean)
+
                 # Then the generator step was just taken.  Let's
                 # return a result that GANDriver understands.
                 return UpdateResult(
@@ -87,6 +94,22 @@ def make_parser():
     parser.add_argument(
         '--truth_seed', default=42, type=int,
         help='Seed for generating ground truth data (default: %(default)s)')
+
+    # Generator
+    parser.add_argument(
+        '--batchsize', '--n_samples', default=15, type=eval,
+        help='''Number of samples to draw from G each step
+        (aka NZ, minibatch size). (default: %(default)s)''')
+    parser.add_argument(
+        '--sample-sites', default=[0], type=utils.csv_line(float),
+        help='''Locations (offsets) of neurons to be sampled from SSN in the
+        "bandwidth" space [-1, 1].  0 means the center of the
+        network. (default: %(default)s)''')
+    parser.add_argument(
+        '--contrasts', '--contrast',
+        default=[20],
+        type=utils.csv_line(float),
+        help='Comma separated value of floats')
 
     # Generator trainer
     # TODO: add

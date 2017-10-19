@@ -240,6 +240,9 @@ def cartesian_product(*arrays, **kwargs):
 
 def random_minibatches(batchsize, data, strict=False, seed=0):
     num_batches = len(data) // batchsize
+    if batchsize > len(data):
+        raise ValueError('batchsize = {} > len(data) = {}'
+                         .format(batchsize, len(data)))
     if len(data) % batchsize != 0:
         msg = 'len(data) = {} not divisible by batchsize = {}'.format(
             len(data), batchsize)

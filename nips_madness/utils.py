@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import time
+import warnings
 
 import numpy as np
 import theano
@@ -235,3 +236,25 @@ def cartesian_product(*arrays, **kwargs):
         prod[i] = a.reshape(shape)
 
     return prod.reshape((len(arrays), -1))
+
+
+def random_minibatches(batchsize, data, strict=False, seed=0):
+    num_batches = len(data) // batchsize
+    if len(data) % batchsize != 0:
+        msg = 'len(data) = {} not divisible by batchsize = {}'.format(
+            len(data), batchsize)
+        if strict:
+            raise ValueError(msg)
+        else:
+            warnings.warn(msg)
+
+    rng = np.random.RandomState(seed)
+
+    while True:
+        idx = np.arange(len(data))
+        rng.shuffle(idx)
+
+        for i in range(num_batches):
+            s = i * num_batches
+            e = (i + 1) * num_batches
+            yield data[idx[s:e]]

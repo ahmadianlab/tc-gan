@@ -3,7 +3,7 @@ import numpy as np
 from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import cartesian_product
-from .bptt_gan import TuningCurveGenerator
+from .bptt_gan import TuningCurveGenerator, DEFAULT_PARAMS
 
 
 class FiniteTimeTuningCurveSampler(object):
@@ -11,25 +11,11 @@ class FiniteTimeTuningCurveSampler(object):
     @classmethod
     def from_dict(cls, dct):
         default = dict(
-            bandwidths=ssnode.DEFAULT_PARAMS['bandwidths'],
-            contrasts=ssnode.DEFAULT_PARAMS['contrast'],
-            smoothness=ssnode.DEFAULT_PARAMS['smoothness'],
-            sample_sites=[0],
-            seed=0,
-            # Stimulator:
-            num_sites=ssnode.DEFAULT_PARAMS['N'],
-            # Model / SSN:
+            DEFAULT_PARAMS,
             J=ssnode.DEFAULT_PARAMS['J'],
             D=ssnode.DEFAULT_PARAMS['D'],
             S=ssnode.DEFAULT_PARAMS['S'],
-            k=ssnode.DEFAULT_PARAMS['k'],
-            n=ssnode.DEFAULT_PARAMS['n'],
-            tau_E=10,
-            tau_I=1,
-            dt=0.1,
-            num_steps=1200,
-            batchsize=1,
-            skip_steps=1000,
+            seed=0,
         )
 
         self, rest = cls.consume_kwargs(**dict(default, **dct))

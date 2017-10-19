@@ -150,7 +150,9 @@ def init_driver(
         iterations, quit_JDS_threshold, quiet,
         disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
+        layers,
         **run_config):
+    del layers  # see [[ns\.layers]] below in main() for why
 
     gan, rest = BPTTWassersteinGAN.consume_kwargs(**run_config)
     driver = GANDriver(
@@ -168,6 +170,11 @@ def init_driver(
 def main(args=None):
     parser = make_parser()
     ns = parser.parse_args(args)
+
+    # To make "layers_str" work, set layers and "remove" it in
+    # init_driver.  See also: [[../execution.py::layers_str]]
+    ns.layers = ns.disc_layers
+
     plain_gan.do_learning(learn, vars(ns), init_driver=init_driver)
 
 

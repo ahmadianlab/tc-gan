@@ -27,9 +27,9 @@ class FiniteTimeTuningCurveSampler(object):
             tau_E=10,
             tau_I=1,
             dt=0.1,
-            num_steps=150,
+            num_steps=1200,
             batchsize=1,
-            skip_steps=50,
+            skip_steps=1000,
         )
 
         self, rest = cls.consume_kwargs(**dict(default, **dct))
@@ -92,3 +92,9 @@ class FiniteTimeTuningCurveSampler(object):
         num_steps = self.gen.model.num_steps
         ts = np.linspace(dt, dt * num_steps, num_steps)
         return ts
+
+    @property
+    def dom_points(self):
+        for contrast in self.contrasts:
+            for bandwidth in self.bandwidths:
+                yield dict(contrast=contrast, bandwidth=bandwidth)

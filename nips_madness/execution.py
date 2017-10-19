@@ -7,6 +7,22 @@ import theano
 
 from . import utils
 
+
+class KnownError(Exception):
+    """Exception with exit code."""
+
+    def __init__(self, message, exit_code=1):
+        self.exit_code = exit_code
+        super(KnownError, self).__init__(message)
+
+
+class SuccessExit(KnownError):
+    """Exception for successful exit (code=0)."""
+
+    def __init__(self, message):
+        super(SuccessExit, self).__init__(message, exit_code=0)
+
+
 default_tracking_packages = [
     theano, lasagne, numpy,
 ]
@@ -40,7 +56,7 @@ class DataTables(object):
         return self._files[name]
 
     def saverow(self, name, row, echo=False):
-        if isinstance(row, list):
+        if isinstance(row, (list, tuple)):
             row = ','.join(map(str, row))
 
         file = self._get_file(name)
@@ -74,6 +90,10 @@ class DataStore(object):
         newpath = os.path.join(self.directory, *subpaths)
         makedirs_exist_ok(os.path.dirname(newpath))
         return newpath
+
+    def dump_json(self, obj, filename):
+        with open(self.path(filename), 'w') as fp:
+            json.dump(obj, fp)
 
     def __repr__(self):
         return '<DataStore: {}>'.format(self.directory)

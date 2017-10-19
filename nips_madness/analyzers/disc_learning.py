@@ -2,6 +2,7 @@ import json
 import os
 
 from matplotlib import pyplot
+import numpy as np
 
 from ..utils import csv_line
 
@@ -9,6 +10,31 @@ defaults = dict(
     title_params=['layers', 'disc_normalization'],
     figsize=(9, 3),
 )
+
+
+def param_stats_to_pretty_label(name):
+    """
+    Convert param_stats names to latex label for plotting.
+
+    >>> param_stats_to_pretty_label('W.nnorm')
+    '$|W_0|$'
+    >>> param_stats_to_pretty_label('W.nnorm.1')
+    '$|W_1|$'
+    >>> param_stats_to_pretty_label('b.nnorm.2')
+    '$|b_2|$'
+    >>> param_stats_to_pretty_label('scales.nnorm.3')
+    '$|g_3|$'
+    >>> param_stats_to_pretty_label('spam')
+
+    """
+    parts = name.split('.')
+    if 2 <= len(parts) <= 3 and parts[1] == 'nnorm':
+        var = parts[0]
+        suffix = parts[2] if len(parts) == 3 else '0'
+        if var == 'scales':
+            var = 'g'
+            # "g" for gain; see: Ba et al (2016) Layer Normalization
+        return '$|{}_{}|$'.format(var, suffix)
 
 
 class DiscriminatorLog(object):
@@ -30,21 +56,59 @@ class DiscriminatorLog(object):
 
         self.learning['disc_updates'] = range(len(self.learning))
         self.param_stats['disc_updates'] = range(len(self.param_stats))
+        self.learning['epoch'] = self.param_stats['epoch'] = self.epochs
 
-    def plot_learning(self, **kwargs):
+    @property
+    def disc_updates(self):
+        return np.asarray(self.learning['disc_updates'])
+
+    @property
+    def epochs(self):
+        return self.disc_updates_to_epoch(self.disc_updates)
+
+    def disc_updates_to_epoch(self, disc_updates):
+        run_config = self.get_info()['run_config']
+        truth_size = run_config['truth_size']  # data size
+        n_samples = run_config['n_samples']  # minibatch size
+        return disc_updates * n_samples / truth_size
+
+    def plot_learning(self, yscale='symlog', **kwargs):
         losses = ['Dloss', 'Daccuracy']
-        self.learning.plot('disc_updates', losses, **kwargs)
+        ax = self.learning.plot('epoch', losses, **kwargs)
+        ax.set_yscale(yscale)
+        return ax
 
-    def plot_param_stats(self, logy=True, **kwargs):
-        self.param_stats.plot('disc_updates', self.param_stats_names,
-                              logy=logy,
-                              **kwargs)
+    def plot_param_stats(
+            self, logy=True,
+            legend=dict(loc='center left', ncol='auto', fontsize='small',
+                        handlelength=0.5, columnspacing=0.4),
+            legend_max_rows=7,
+            **kwargs):
+        ax = self.param_stats.plot('epoch', self.param_stats_names,
+                                   logy=logy,
+                                   legend=False,
+                                   **kwargs)
+        for line in ax.get_lines():
+            label = param_stats_to_pretty_label(line.get_label())
+            if label:
+                line.set_label(label)
+        if legend:
+            if not isinstance(legend, dict):
+                legend = {}
+            legend = dict(legend)
+            if legend.get('ncol') == 'auto':
+                n_stats = len(self.param_stats_names)
+                legend['ncol'] = int(np.ceil(n_stats / legend_max_rows))
+            leg = ax.legend(**legend)
+            leg.set_frame_on(True)
+        return ax
 
     def plot_all(self, title_params=defaults['title_params'],
                  figsize=defaults['figsize']):
         fig, axes = pyplot.subplots(ncols=2, sharex=True, squeeze=False,
                                     figsize=figsize)
         self.plot_learning(ax=axes[0, 0])
+        axes[0, 0].axhline(0, color='0.5')
         self.plot_param_stats(ax=axes[0, 1])
         fig.suptitle(self.pretty_title(title_params))
         return fig
@@ -56,6 +120,7 @@ class DiscriminatorLog(object):
     def pretty_title(self, title_params):
         info = self.get_info()
         run_config = dict(info['extra_info'], **info['run_config'])
+        run_config['n_bandwidths'] = len(run_config['bandwidths'])
         return ' '.join('{}={}'.format(k, run_config[k]) for k in title_params)
 
 

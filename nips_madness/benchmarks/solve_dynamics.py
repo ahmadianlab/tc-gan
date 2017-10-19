@@ -1,3 +1,7 @@
+"""
+Compare fixed point solvers implemented C and Python.
+"""
+
 import timeit
 
 import numpy as np

@@ -5,16 +5,16 @@ prepare: env ext
 ext: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=nips_madness/ext
 
-test:
-	misc/with-env pytest
+test: prepare
+	misc/pytest
 
-test-quick:
-	misc/with-env pytest -k 'not slowtest'
+test-quick: prepare
+	misc/pytest -k 'not slowtest'
 
-test-flakes:
-	misc/with-env pytest -m flakes
+test-flakes: prepare
+	misc/pytest -m flakes
 
-doc:
+doc: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=doc html
 
 include misc/conda.mk

@@ -69,6 +69,7 @@ def sample_sites_from_stim_space(stim_locs, N):
 
 def subsample_neurons(rate_vector, sample_sites,
                       track_offset_identity=False,
+                      include_inhibitory_neurons=False,
                       N=None, NZ=None, NB=None):
     """
     Reduce `rate_vector` into a form that can be fed to the discriminator.
@@ -132,6 +133,10 @@ def subsample_neurons(rate_vector, sample_sites,
         assert (NZ_, NB_, TN_) == (NZ, NB, 2 * N)
         assert 0 <= min(sample_sites)
         assert max(sample_sites) < N
+
+    if include_inhibitory_neurons:
+        sample_sites = list(sample_sites)  # copy
+        sample_sites.extend(np.array(sample_sites) + N)
 
     subsample = rate_vector[:, :, sample_sites]
     if track_offset_identity:

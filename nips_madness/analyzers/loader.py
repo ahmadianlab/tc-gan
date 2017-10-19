@@ -5,10 +5,15 @@ import warnings
 
 import numpy as np
 
+from .. import ssnode
+
 try:
     string_types = (str, unicode)
 except NameError:
     string_types = (str,)
+
+
+LogFile = collections.namedtuple('LogFile', ['names', 'data'])
 
 
 def load_logfile(path):
@@ -22,7 +27,10 @@ def load_logfile(path):
         else:
             skiprows = 0
             names = []
-    return names, np.loadtxt(path, delimiter=',', skiprows=skiprows)
+    data = np.loadtxt(path, delimiter=',', skiprows=skiprows)
+    if data.ndim == 1:
+        data = data.reshape((1, -1))
+    return LogFile(names, data)
 
 
 def parse_tag(tag):
@@ -73,6 +81,13 @@ class GANData(object):
             idx = np.arange(len(gen)).reshape((-1, 1))
             gen = np.concatenate([idx, gen], axis=1)
 
+        if not main_names:
+            warnings.warn('learning.csv has no header line; '
+                          'assuming the default.')
+            from ..run.gan import LearningRecorder
+            assert main.shape[1] == len(LearningRecorder.column_names)
+            main_names = LearningRecorder.column_names
+
         with open(os.path.join(dirname, 'info.json')) as file:
             info = json.load(file)
 
@@ -100,6 +115,13 @@ class GANData(object):
     def _gen_as_matrices(self):
         return self.gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
 
+    @property
+    def disc(self):
+        if not hasattr(self, '_disc'):
+            from .disc_learning import DiscriminatorLog
+            self._disc = DiscriminatorLog(self.main_logpath)
+        return self._disc
+
     def gen_param(self, name):
         return getattr(self, name)
 
@@ -115,6 +137,13 @@ class GANData(object):
         except (AttributeError, KeyError):
             return 0
 
+    def fake_JDS(self):
+        return np.exp(self.gen[:, 1:])
+
+    def true_JDS(self):
+        JDS = list(map(ssnode.DEFAULT_PARAMS.get, 'JDS'))
+        return np.concatenate(JDS).flatten()
+
     @property
     def track_offset_identity(self):
         try:
@@ -123,11 +152,22 @@ class GANData(object):
             return False
 
     @property
+    def include_inhibitory_neurons(self):
+        try:
+            return self.info['run_config']['include_inhibitory_neurons']
+        except (AttributeError, KeyError):
+            return False
+
+    @property
     def n_sample_sites(self):
         try:
-            return len(self.info['run_config']['sample_sites'])
+            sample_sites = self.info['run_config']['sample_sites']
         except (AttributeError, KeyError):
             return 1
+        if self.include_inhibitory_neurons:
+            return len(sample_sites) * 2
+        else:
+            return len(sample_sites)
 
     @property
     def n_bandwidths(self):
@@ -143,9 +183,20 @@ class GANData(object):
     @property
     def n_bandwidths_viz(self):
         if self.track_offset_identity:
-            return self.n_bandwidths * self.n_sample_sites
+            return self.n_stim * self.n_sample_sites
         else:
-            return self.n_bandwidths
+            return self.n_stim
+
+    @property
+    def n_contrasts(self):
+        try:
+            return len(self.info['run_config']['contrast'])
+        except (AttributeError, KeyError):
+            return 1
+
+    @property
+    def n_stim(self):
+        return self.n_bandwidths * self.n_contrasts
 
     @property
     def model_tuning(self):
@@ -184,7 +235,48 @@ class GANData(object):
 
     def to_dataframe(self):
         import pandas
-        return pandas.DataFrame(self.main, columns=self.main_names)
+        df = pandas.DataFrame(self.main, columns=self.main_names)
+        if 'epoch' in df:
+            df['gen_step'] = df['epoch']
+            del df['epoch']  # otherwise pandas changes self.main inplace!
+        df['epoch'] = self.gen_step_to_epoch(df['gen_step'])
+        return df
+
+    @property
+    def epochs(self):
+        return self.gen_step_to_epoch(self.main[:, 0])
+
+    def gen_step_to_epoch(self, gen_step):
+        truth_size = self.info['run_config']['truth_size']  # data size
+        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        disc_updates = self.gen_step_to_disc_updates(gen_step)
+        return disc_updates * n_samples / truth_size
+
+    def gen_step_to_disc_updates(self, gen_step):
+        run_config = self.info['run_config']
+        if self.gan_type == 'WGAN':
+            WGAN_n_critic0 = run_config['WGAN_n_critic0']
+            WGAN_n_critic = run_config['WGAN_n_critic']
+            return WGAN_n_critic0 + WGAN_n_critic * gen_step
+        else:
+            return gen_step + 1
+
+    def epoch_to_gen_step(self, epoch):
+        return self.disc_updates_to_gen_step(self.epoch_to_disc_updates(epoch))
+
+    def disc_updates_to_gen_step(self, disc_updates):
+        run_config = self.info['run_config']
+        if self.gan_type == 'WGAN':
+            WGAN_n_critic0 = run_config['WGAN_n_critic0']
+            WGAN_n_critic = run_config['WGAN_n_critic']
+            return (disc_updates - WGAN_n_critic0) / WGAN_n_critic
+        else:
+            return disc_updates - 1
+
+    def epoch_to_disc_updates(self, epoch):
+        truth_size = self.info['run_config']['truth_size']  # data size
+        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        return epoch * truth_size / n_samples
 
     @property
     def gan_type(self):

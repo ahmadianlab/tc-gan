@@ -107,6 +107,24 @@ def csv_line(value_parser):
     return convert
 
 
+def tolist_if_not(arr):
+    """
+    Convert `arr` to list if it is not already.
+
+    >>> import numpy as np
+    >>> tolist_if_not([0])
+    [0]
+    >>> tolist_if_not(np.arange(1))
+    [0]
+
+    """
+    try:
+        tolist = arr.tolist
+    except AttributeError:
+        return arr
+    return tolist()
+
+
 def cpu_count(_environ=os.environ):
     """ Return available number of CPUs; Slurm/PBS-aware version. """
     try:

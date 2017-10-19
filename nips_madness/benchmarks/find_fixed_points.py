@@ -1,3 +1,7 @@
+"""
+Print wall-time comparing serial/parallel; asym_power/tanh/...; Nz=30,150.
+"""
+
 import itertools
 import timeit
 

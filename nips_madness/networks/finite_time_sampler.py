@@ -63,6 +63,7 @@ class FiniteTimeTuningCurveSampler(object):
         self.stimulator_contrasts, self.stimulator_bandwidths \
             = cartesian_product(contrasts, bandwidths)
 
+    num_neurons = property(lambda self: self.num_sites * 2)
     num_sites = property(lambda self: self.gen.num_sites)
     batchsize = property(lambda self: self.gen.batchsize)
 
@@ -71,15 +72,15 @@ class FiniteTimeTuningCurveSampler(object):
             stimulator_bandwidths=self.stimulator_bandwidths,
             stimulator_contrasts=self.stimulator_contrasts,
             model_zs=self.rng.rand(self.batchsize,
-                                   self.num_sites,
-                                   self.num_sites),
+                                   self.num_neurons,
+                                   self.num_neurons),
         )
         if full_output:
             return out
         return out.prober_tuning_curve
 
     def compute_trajectories(self):
-        zmat = self.rng.rand(2 * self.num_sites, 2 * self.num_sites)
+        zmat = self.rng.rand(self.num_neurons, self.num_neurons)
         trajectories = self.gen.model.compute_trajectories(
             zmat,
             self.stimulator_bandwidths,

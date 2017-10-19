@@ -187,7 +187,7 @@ class EulerSSNModel(BaseComponent):
 
         self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
         rs = rates[:, self.skip_steps:]
-        time_avg = rs.mean(axis=1)
+        time_avg = rs.mean(axis=1)  # shape: (num_tcdom, num_sites)
         dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
 
         self.zs = theano.tensor.tensor3('zs')
@@ -234,11 +234,11 @@ class FixedProber(BaseComponent):
         self.outputs = (self.tuning_curve,)
 
 
-def collect_names(template_list, var_lists):
+def collect_names(prefixes, var_lists):
     names = []
-    for template, var_list in zip(template_list, var_lists):
+    for prefix, var_list in zip(prefixes, var_lists):
         for var in var_list:
-            names.append(template.format(var.name))
+            names.append(prefix + var.name)
     return names
 
 

@@ -246,6 +246,7 @@ def learn(
     gan.W = W
     gan.temp_con = temp_con
     gan.rate_penalty_func = lambda _: np.nan  # TODO: implement
+    gan.get_gen_param = theano.function([], [Jp, Dp, Sp])
 
     if track_offset_identity:
         gan.truth_size_per_batch = n_samples

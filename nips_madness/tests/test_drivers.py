@@ -65,6 +65,10 @@ def setup_fake_gan(gan):
             = np.arange(4).reshape((2, 2)) + 10 ** i
         setattr(gan, name, fake_shared)
 
+    gan.get_gen_param = lambda: (gan.J.get_value(),
+                                 gan.D.get_value(),
+                                 gan.S.get_value())
+
 
 def make_driver(
         iterations,

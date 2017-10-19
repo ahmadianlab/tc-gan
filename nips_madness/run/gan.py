@@ -344,8 +344,6 @@ def setup_gan(
     gan.D = D
     gan.S = S
 
-    gan.get_gen_param = theano.function([], [Jp, Dp, Sp])
-
     #compute jacobian of the primed variables w.r.t. J,D,S.
     dJpJ = T.reshape(T.jacobian(T.reshape(Jp,[-1]),J),[2,2,2,2])
     dDpD = T.reshape(T.jacobian(T.reshape(Dp,[-1]),D),[2,2,2,2])
@@ -544,6 +542,7 @@ def setup_gan(
     gan.ssn_params = ssn_params
     gan.W = W
     gan.gen_param_type = gen_param_type
+    gan.get_gen_param = theano.function([], [Jp, Dp, Sp])
 
     if gan.track_offset_identity:
         gan.truth_size_per_batch = NZ

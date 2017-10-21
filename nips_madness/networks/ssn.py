@@ -211,6 +211,13 @@ class EulerSSNModel(BaseComponent):
             self.trajectories,
         )
 
+    @cached_property
+    def compute_time_avg(self):
+        return theano_function(
+            (self.zs,) + self.stimulator.inputs,
+            self.time_avg,
+        )
+
 
 class FixedProber(BaseComponent):
 
@@ -220,6 +227,7 @@ class FixedProber(BaseComponent):
         self.model = model
         self.probes = probes
 
+        # time_avg.shape: (batchsize, num_tcdom, num_neurons)
         tc = self.model.time_avg[:, :, self.probes]
         self.tuning_curve = tc.reshape((self.model.batchsize, -1))
         self.tuning_curve.name = 'tuning_curve'

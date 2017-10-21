@@ -253,14 +253,17 @@ def random_minibatches(batchsize, data, strict=False, seed=0):
 
     rng = np.random.RandomState(seed)
 
-    while True:
-        idx = np.arange(len(data))
-        rng.shuffle(idx)
+    def iterator():
+        while True:
+            idx = np.arange(len(data))
+            rng.shuffle(idx)
 
-        for i in range(num_batches):
-            s = i * num_batches
-            e = (i + 1) * num_batches
-            yield data[idx[s:e]]
+            for i in range(num_batches):
+                s = i * num_batches
+                e = (i + 1) * num_batches
+                yield data[idx[s:e]]
+
+    return iterator()
 
 
 def theano_function(*args, **kwds):

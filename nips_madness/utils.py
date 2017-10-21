@@ -259,8 +259,8 @@ def random_minibatches(batchsize, data, strict=False, seed=0):
             rng.shuffle(idx)
 
             for i in range(num_batches):
-                s = i * num_batches
-                e = (i + 1) * num_batches
+                s = i * batchsize
+                e = (i + 1) * batchsize
                 yield data[idx[s:e]]
 
     return iterator()

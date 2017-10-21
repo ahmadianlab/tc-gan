@@ -222,6 +222,14 @@ class cached_property(object):
 
 
 def cartesian_product(*arrays, **kwargs):
+    """
+    Return Cartesian product of `arrays` (`itertools.product` for Numpy).
+
+    >>> cartesian_product([0, 1], [10, 20], dtype=int)
+    array([[ 0,  0,  1,  1],
+           [10, 20, 10, 20]])
+
+    """
     dtype = kwargs.pop('dtype', theano.config.floatX)
     assert not kwargs
     arrays = list(map(np.asarray, arrays))

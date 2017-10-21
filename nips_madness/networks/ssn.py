@@ -61,7 +61,7 @@ class BandwidthContrastStimulator(BaseComponent):
     num_neurons = property(lambda self: self.num_sites * 2)
 
 
-class SSN(BaseComponent):
+class EulerSSNCore(BaseComponent):
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type='asym_power'):
@@ -123,7 +123,7 @@ class EulerSSNLayer(lasagne.layers.Layer):
         # It's a bit scary to share namespace with lasagne; so let's
         # introduce only one namespace and keep SSN-specific stuff
         # there:
-        self.ssn, rest = SSN.consume_kwargs(**kwargs)
+        self.ssn, rest = EulerSSNCore.consume_kwargs(**kwargs)
 
         super(EulerSSNLayer, self).__init__(incoming, **rest)
 

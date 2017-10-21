@@ -82,7 +82,6 @@ class EulerSSNCore(BaseComponent):
         self.dt = dt
         self.io_type = io_type
 
-        # num_tcdom = "batch dimension" when using Lasagne:
         num_sites = stimulator.num_sites
         num_neurons = stimulator.num_neurons
 
@@ -97,7 +96,7 @@ class EulerSSNCore(BaseComponent):
         self.Wt = make_W_with_x(theano.tensor.shape_padleft(self.zmat),
                                 self.J, self.D, self.S,
                                 num_sites,
-                                np.linspace(-0.5, 0.5, num_sites))[0].T
+                                stimulator.site_to_band)[0].T
         self.Wt.name = 'Wt'
 
         self.f = ssnode.make_io_fun(self.k, self.n, io_type=self.io_type)

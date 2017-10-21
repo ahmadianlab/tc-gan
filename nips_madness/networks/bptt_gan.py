@@ -27,7 +27,7 @@ DEFAULT_PARAMS = dict(
     tau_E=10,
     tau_I=1,
     dt=0.1,
-    num_steps=1200,
+    seqlen=1200,
     batchsize=1,
     skip_steps=1000,
 )

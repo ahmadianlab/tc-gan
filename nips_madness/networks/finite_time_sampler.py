@@ -76,8 +76,8 @@ class FiniteTimeTuningCurveSampler(object):
 
     def timepoints(self):
         dt = self.gen.model.dt
-        num_steps = self.gen.model.num_steps
-        ts = np.linspace(dt, dt * num_steps, num_steps)
+        seqlen = self.gen.model.seqlen
+        ts = np.linspace(dt, dt * seqlen, seqlen)
         return ts
 
     @property

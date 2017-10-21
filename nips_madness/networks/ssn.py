@@ -138,15 +138,15 @@ class EulerSSNLayer(lasagne.layers.Layer):
 class EulerSSNModel(BaseComponent):
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
-                 skip_steps=None, num_steps=None, batchsize=None):
+                 skip_steps=None, seqlen=None, batchsize=None):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.batchsize = int_or_lscalr(batchsize, 'batchsize')
-        self.num_steps = int_or_lscalr(num_steps, 'num_steps')
+        self.seqlen = int_or_lscalr(seqlen, 'seqlen')
 
         # num_tcdom = "batch dimension" when using Lasagne:
         num_neurons = self.stimulator.num_neurons
-        shape = (self.stimulator.num_tcdom, self.num_steps, num_neurons)
+        shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
 
         shape_rec = (shape[0],) + shape[2:]
         self.l_ssn = EulerSSNLayer(

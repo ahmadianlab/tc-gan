@@ -54,6 +54,9 @@ def make_gan(
         gen_update='adam-wgan',
         disc_update='adam-wgan',
         gen_param_type='log',
+        J_min=1e-3, J_max=10,
+        D_min=1e-3, D_max=10,
+        S_min=1e-3, S_max=10,
     )
     kwargs = dict(default_kwargs, **kwargs)
 

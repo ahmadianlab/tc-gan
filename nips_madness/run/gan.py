@@ -185,6 +185,16 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
             ) * self.disc_l2_regularization
         return penalty
 
+    def clip_gen_param(self):
+        assert self.gen_param_type == 'clip'
+
+        for name in 'JDS':
+            param = getattr(self, name)
+            p_min = getattr(self, name + '_min')
+            p_max = getattr(self, name + '_max')
+            param.set_value(np.clip(param.get_value(),
+                                    p_min, p_max))
+
 
 def get_updater(update_name, *args, **kwds):
     if update_name == 'adam-wgan':
@@ -280,7 +290,7 @@ def setup_gan(
         bandwidths, smoothness, contrast, n_sites, n_samples, n_stim,
         disc_normalization, disc_nonlinearity,
         disc_l1_regularization, disc_l2_regularization,
-        gen_param_type,
+        gen_param_type, J_min, J_max, D_min, D_max, S_min, S_max,
         # "Test" flags:  # TODO: remove
         timetest=False, convtest=False, testDW=False, DRtest=False,
         **make_func_kwargs):
@@ -543,6 +553,12 @@ def setup_gan(
     gan.W = W
     gan.gen_param_type = gen_param_type
     gan.get_gen_param = theano.function([], [Jp, Dp, Sp])
+    gan.J_min = J_min
+    gan.J_max = J_max
+    gan.D_min = D_min
+    gan.D_max = D_max
+    gan.S_min = S_min
+    gan.S_max = S_max
 
     if gan.track_offset_identity:
         gan.truth_size_per_batch = NZ
@@ -578,9 +594,7 @@ def train_gan(driver, gan, datastore,
                                  list(GZmean) + list(Dmean))
 
         if gan.gen_param_type == 'clip':
-            for gen_param in [gan.J, gan.D, gan.S]:
-                gen_param.set_value(np.clip(gen_param.get_value(),
-                                            1e-3, 10))
+            gan.clip_gen_param()
 
         return update_result
 
@@ -929,6 +943,17 @@ def main(args=None):
         elements are used for the disturbance for J, D (delta),
         S (sigma), respectively.  It accepts any Python expression.
         (default: %(default)s)''')
+    for name in 'JDS':
+        parser.add_argument(
+            '--{}-min'.format(name), default=1e-3, type=eval,
+            help='''Lower limit of the parameter {}.
+            Used only if --gen-param-type=clip.
+            (default: %(default)s)'''.format(name))
+        parser.add_argument(
+            '--{}-max'.format(name), default=10, type=eval,
+            help='''Upper limit of the parameter {}.
+            Used only if --gen-param-type=clip.
+            (default: %(default)s)'''.format(name))
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')

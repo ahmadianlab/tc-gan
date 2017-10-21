@@ -261,3 +261,13 @@ def random_minibatches(batchsize, data, strict=False, seed=0):
             s = i * num_batches
             e = (i + 1) * num_batches
             yield data[idx[s:e]]
+
+
+def theano_function(*args, **kwds):
+    # from theano.compile.nanguardmode import NanGuardMode
+    # kwds.setdefault('mode', NanGuardMode(
+    #     nan_is_error=True, inf_is_error=True, big_is_error=True))
+    kwds.setdefault('allow_input_downcast', True)
+    # MAYBE: make sure to use theano.config.floatX everywhere and
+    # remove allow_input_downcast.
+    return theano.function(*args, **kwds)

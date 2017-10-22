@@ -24,7 +24,8 @@ class BaseComponent(object):
         if common:
             raise ValueError(
                 '{cls}.consume_config() got multiple values for'
-                ' configurations: {}'.format(sorted(common), cls=cls))
+                ' configurations: {}'.format(sorted(common),
+                                             cls=cls.__name__))
 
         kwargs = dict(config, **init_kwargs)
         self, rest = cls.consume_kwargs(*init_args, **kwargs)
@@ -36,7 +37,8 @@ class BaseComponent(object):
                 ' which were NOT consumed by {cls}.consume_kwargs().'
                 ' Make sure to use keyword arguments defined in'
                 ' {cls}.consume_kwargs() and/or {cls}.__init__():'
-                ' {}'.format(sorted(unused), cls=cls)
+                ' {}'.format(sorted(unused),
+                             cls=cls.__name__)
             )
 
         return self, rest

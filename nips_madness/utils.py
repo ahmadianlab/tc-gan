@@ -285,10 +285,41 @@ def theano_function(*args, **kwds):
 
 
 def subdict_by_prefix(flat, prefix, key=None):
+    """
+    Put key-value pairs in `flat` dict prefixed by `prefix` in a sub-dict.
+
+    >>> flat = dict(
+    ...     prefix_alpha=1,
+    ...     prefix_beta=2,
+    ...     gamma=3,
+    ... )
+    >>> assert subdict_by_prefix(flat, 'prefix_') == dict(
+    ...     prefix=dict(alpha=1, beta=2),
+    ...     gamma=3,
+    ... )
+
+    Key of the sub-dictionary can be explicitly specified:
+
+    >>> assert subdict_by_prefix(flat, 'prefix_', 'delta') == dict(
+    ...     delta=dict(alpha=1, beta=2),
+    ...     gamma=3,
+    ... )
+
+    If the sub-dictionary already exists, it is copied and then
+    extended:
+
+    >>> flat['prefix'] = dict(theta=4)
+    >>> assert subdict_by_prefix(flat, 'prefix_') == dict(
+    ...     prefix=dict(alpha=1, beta=2, theta=4),
+    ...     gamma=3,
+    ... )
+    >>> assert flat['prefix'] == dict(theta=4)  # i.e., not modified
+
+    """
     if key is None:
         key = prefix.rstrip('_')
     nested = {}
-    nested[key] = subdict = flat.get(key, {})
+    nested[key] = subdict = flat.get(key, {}).copy()
     assert isinstance(subdict, dict)
 
     for k, v in flat.items():

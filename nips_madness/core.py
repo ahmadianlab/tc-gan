@@ -22,7 +22,7 @@ class BaseComponent(object):
     def consume_config(cls, config, *init_args, **init_kwargs):
         common = set(config) & set(init_kwargs)
         if common:
-            raise TypeError(
+            raise ValueError(
                 '{cls}.consume_config() got multiple values for'
                 ' configurations: {}'.format(sorted(common), cls=cls))
 
@@ -31,7 +31,7 @@ class BaseComponent(object):
 
         unused = set(init_kwargs) - (set(init_kwargs) - set(rest))
         if unused:
-            raise TypeError(
+            raise ValueError(
                 '{cls}.consume_config() got following keyword arguments'
                 ' which were NOT consumed by {cls}.consume_kwargs().'
                 ' Make sure to use keyword arguments defined in'

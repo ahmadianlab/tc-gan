@@ -372,3 +372,7 @@ class TuningCurveGenerator(BaseComponent):
         replace = {v: kwargs.pop(k) for k, v in kv if k in kwargs}
         assert not kwargs
         return theano.clone(self.prober.outputs[0], replace)
+
+    def prepare(self):
+        """ Force compile Theno functions. """
+        self._forward

@@ -60,6 +60,10 @@ class UnConditionalDiscriminator(BaseComponent):
     def get_output(self, inputs=None):
         return lasagne.layers.get_output(self.l_out, inputs=inputs)
 
+    def prepare(self):
+        """ Force compile Theno functions. """
+        self.accuracy
+
 
 class Updater(BaseComponent):
 
@@ -105,6 +109,10 @@ class BaseTrainer(BaseComponent):
     @cached_property
     def train(self):
         return theano_function(self.inputs, self.loss, updates=self.updates)
+
+    def prepare(self):
+        """ Force compile Theno functions. """
+        self.train
 
 
 class CriticTrainer(BaseTrainer):
@@ -183,11 +191,11 @@ class BPTTWassersteinGAN(BaseComponent):
         return next(self.dataset)
 
     def prepare(self):
-        # Force compile:
-        self.gen._forward
-        self.gen_trainer.train
-        self.disc.accuracy
-        self.disc_trainer.train
+        """ Force compile Theno functions. """
+        self.gen.prepare()
+        self.gen_trainer.prepare()
+        self.disc.prepare()
+        self.disc_trainer.prepare()
 
     def gen_forward(self, zs):
         return self.gen.forward(

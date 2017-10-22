@@ -155,16 +155,16 @@ class BPTTWassersteinGAN(BaseComponent):
 
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
                  bandwidths, contrasts,
-                 n_critic_init, n_critic, lmd,
+                 critic_iters_init, critic_iters, lipschitz_cost,
                  seed=0):
         self.gen = gen
         self.disc = disc
         self.gen_trainer = gen_trainer
         self.disc_trainer = disc_trainer
 
-        self.n_critic_init = n_critic_init
-        self.n_critic = n_critic
-        self.lmd = lmd
+        self.critic_iters_init = critic_iters_init
+        self.critic_iters = critic_iters
+        self.lipschitz_cost = lipschitz_cost
         self.rng = np.random.RandomState(seed)
 
         self.bandwidths = bandwidths
@@ -213,7 +213,7 @@ class BPTTWassersteinGAN(BaseComponent):
         xp = eps * xd + (1 - eps) * xg
         with self.disc_train_watch:
             info.disc_loss = self.disc_trainer.train(
-                xg, xd, xp, self.lmd,
+                xg, xd, xp, self.lipschitz_cost,
             )
 
         info.accuracy = self.disc.accuracy(xg, xd)
@@ -240,12 +240,12 @@ class BPTTWassersteinGAN(BaseComponent):
         info.disc_time = self.disc_train_watch.sum()
         return info
 
-    def _single_gen_step(self, gen_step, n_critic):
+    def _single_gen_step(self, gen_step, critic_iters):
         self.gen_forward_watch = StopWatch()
         self.gen_train_watch = StopWatch()
         self.disc_train_watch = StopWatch()
 
-        for disc_step in range(self.n_critic_init):
+        for disc_step in range(self.critic_iters_init):
             info = SimpleNamespace(is_discriminator=True, gen_step=gen_step,
                                    disc_step=disc_step)
             yield self.train_discriminator(info)
@@ -254,8 +254,8 @@ class BPTTWassersteinGAN(BaseComponent):
         yield self.train_generator(info)
 
     def learning(self):
-        for info in self._single_gen_step(0, self.n_critic_init):
+        for info in self._single_gen_step(0, self.critic_iters_init):
             yield info
         for gen_step in itertools.count(1):
-            for info in self._single_gen_step(gen_step, self.n_critic):
+            for info in self._single_gen_step(gen_step, self.critic_iters):
                 yield info

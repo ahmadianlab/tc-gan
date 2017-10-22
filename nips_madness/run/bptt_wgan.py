@@ -129,13 +129,19 @@ def make_parser():
 
     # Discriminator trainer
     parser.add_argument(
-        '--lmd', '--WGAN_lambda', default=10.0, type=float,
+        '--lipschitz-cost',
+        '--WGAN_lambda',  # to be compatible with gan.py
+        default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')
     parser.add_argument(
-        '--n-critic-init', '--WGAN_n_critic0', default=50, type=int,
+        '--critic-iters-init',
+        '--WGAN_n_critic0',  # to be compatible with gan.py
+        default=50, type=int,
         help='First critic iterations (default: %(default)s)')
     parser.add_argument(
-        '--n-critic', '--WGAN_n_critic', default=5, type=int,
+        '--critic-iters',
+        '--WGAN_n_critic',  # to be compatible with gan.py
+        default=5, type=int,
         help='Critic iterations (default: %(default)s)')
 
     plain_gan.add_learning_options(parser)

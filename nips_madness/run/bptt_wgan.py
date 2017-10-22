@@ -82,8 +82,13 @@ def learn(
 
 def make_parser():
     import argparse
+
+    class CustomFormatter(argparse.RawDescriptionHelpFormatter,
+                          argparse.ArgumentDefaultsHelpFormatter):
+        pass
+
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=CustomFormatter,
         description=__doc__)
 
     # Dataset

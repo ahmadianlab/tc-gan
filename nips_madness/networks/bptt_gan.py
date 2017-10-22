@@ -102,13 +102,13 @@ class BaseTrainer(BaseComponent):
         return super(BaseTrainer, self).consume_kwargs(
             *args, updater=updater, **rest)
 
-    @cached_property
-    def updates(self):
+    def get_updates(self):
         return self.updater(self.loss, self.target.get_all_params())
 
     @cached_property
     def train(self):
-        return theano_function(self.inputs, self.loss, updates=self.updates)
+        return theano_function(self.inputs, self.loss,
+                               updates=self.get_updates())
 
     def prepare(self):
         """ Force compile Theno functions. """
@@ -141,15 +141,33 @@ class CriticTrainer(BaseTrainer):
 
 class GeneratorTrainer(BaseTrainer):
 
-    def __init__(self, gen, disc, dynamics_cost, updater):
+    def __init__(self, gen, disc, dynamics_cost,
+                 J_min, J_max, D_min, D_max, S_min, S_max,
+                 updater):
         self.target = self.gen = gen
         self.disc = disc
         self.dynamics_cost = dynamics_cost
+        self.J_min = J_min
+        self.J_max = J_max
+        self.D_min = D_min
+        self.D_max = D_max
+        self.S_min = S_min
+        self.S_max = S_max
         self.updater = updater
 
         self.loss = - disc.get_output(gen.get_output()).mean()
         self.loss += self.dynamics_cost * gen.model.dynamics_penalty
         self.inputs = gen.inputs
+
+    def clip_JDS(self, updates):
+        for var in self.gen.get_all_params():
+            p_min = getattr(self, var.name + '_min')
+            p_max = getattr(self, var.name + '_max')
+            updates[var] = updates[var].clip(p_min, p_max)
+        return updates
+
+    def get_updates(self):
+        return self.clip_JDS(super(GeneratorTrainer, self).get_updates())
 
 
 class BPTTWassersteinGAN(BaseComponent):

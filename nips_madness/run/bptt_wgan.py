@@ -130,6 +130,20 @@ def make_parser():
         '--include-inhibitory-neurons', action='store_true',
         help='Sample TCs from inhibitory neurons if given.')
 
+    for name in 'JDS':
+        parser.add_argument(
+            '--gen-{}-min'.format(name),
+            default=1e-3, type=eval,
+            help='''Lower limit of the parameter {}.
+            Used only if --gen-param-type=clip.
+            '''.format(name))
+        parser.add_argument(
+            '--gen-{}-max'.format(name),
+            default=10, type=eval,
+            help='''Upper limit of the parameter {}.
+            Used only if --gen-param-type=clip.
+            '''.format(name))
+
     # Generator trainer
     parser.add_argument(
         '--gen-dynamics-cost', type=float, default=1,

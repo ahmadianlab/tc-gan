@@ -1210,7 +1210,8 @@ def init_driver(
     return dict(run_config, datastore=datastore, gan=gan, driver=driver)
 
 
-def do_learning(learn, run_config, init_driver=init_driver):
+def do_learning(learn, run_config, init_driver=init_driver,
+                script_file=__file__, extra_info={}):
     """
     Wrap `.execution.do_learning` with some pre-processing.
     """
@@ -1222,7 +1223,8 @@ def do_learning(learn, run_config, init_driver=init_driver):
             n_bandwidths=run_config['n_bandwidths'],
             load_gen_param=run_config['load_gen_param'],
             data_version=1,
-        ))
+            script_file=script_file,
+            **extra_info))
 
 
 if __name__ == "__main__":

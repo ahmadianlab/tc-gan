@@ -2,7 +2,7 @@ import pytest
 
 from .. import bptt_wgan
 from ... import recorders
-from .test_gan import load_gandata
+from .test_gan import load_json, load_gandata
 
 
 def single_g_step(args):
@@ -21,6 +21,9 @@ def single_g_step(args):
 def test_single_g_step_slowtest(args, cleancwd):
     single_g_step(args)
     assert cleancwd.join('logfiles').check()
+
+    info = load_json(cleancwd, 'info.json')
+    assert info['extra_info']['script_file'] == bptt_wgan.__file__
 
     with pytest.warns(None) as record:
         data = load_gandata(cleancwd)

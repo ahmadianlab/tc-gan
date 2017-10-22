@@ -60,6 +60,8 @@ def test_single_g_step_slowtest(args, cleancwd):
     assert cleancwd.join('logfiles').check()
 
     info = load_json(cleancwd, 'info.json')
+    assert info['extra_info']['script_file'] == gan.__file__
+
     ganet = make_gan(**info['run_config'])
     _, n_tc_points = ganet.disc_input_shape
 

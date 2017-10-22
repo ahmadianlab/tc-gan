@@ -221,7 +221,8 @@ def main(args=None):
     # init_driver.  See also: [[../execution.py::layers_str]]
     ns.layers = ns.disc_layers
 
-    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver)
+    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver,
+                          script_file=__file__)
 
 
 if __name__ == '__main__':

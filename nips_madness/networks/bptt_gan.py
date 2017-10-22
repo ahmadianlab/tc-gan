@@ -238,7 +238,7 @@ class BPTTWassersteinGAN(BaseComponent):
         self.gen_train_watch = StopWatch()
         self.disc_train_watch = StopWatch()
 
-        for disc_step in range(self.critic_iters_init):
+        for disc_step in range(critic_iters):
             info = SimpleNamespace(is_discriminator=True, gen_step=gen_step,
                                    disc_step=disc_step)
             yield self.train_discriminator(info)

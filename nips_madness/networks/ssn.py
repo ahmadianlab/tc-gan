@@ -180,7 +180,9 @@ class EulerSSNModel(BaseComponent):
         time_avg = rs.mean(axis=1)  # shape: (num_tcdom, num_neurons)
         dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
 
+        # self.zs.shape: (batchsize, num_neurons, num_neurons)
         self.zs = theano.tensor.tensor3('zs')
+        # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
         self.time_avg, _ = theano.map(
             lambda z: theano.clone(time_avg, {self.zmat: z}),
             [self.zs],
@@ -221,6 +223,60 @@ class EulerSSNModel(BaseComponent):
 
 class FixedProber(BaseComponent):
 
+    """
+    Probe `model` output with constant `probe`.
+
+    Here, fixed/constant means that `probe` does not co-vary with
+    batches and the points in :term:`tuning curve domain`.
+
+    For a demonstration purpose, let's setup a fake model.  All
+    `FixedProber` cares are `.time_avg` and `.batchsize` attributes:
+
+    >>> from types import SimpleNamespace
+    >>> batchsize = 3
+    >>> num_tcdom = 5
+    >>> num_neurons = 7
+    >>> time_avg = np.arange(batchsize * num_tcdom * num_neurons)
+    >>> time_avg = time_avg.reshape((batchsize, num_tcdom, num_neurons))
+    >>> model = SimpleNamespace(
+    ...     time_avg=theano.shared(time_avg),
+    ...     batchsize=batchsize)
+
+    To probe `model.time_avg`, give the indices of neurons to be
+    probed as `probes` argument:
+
+    >>> probes = np.array([0, 5])
+    >>> prober = FixedProber(model, probes)
+
+    Then, `FixedProber` mixes the probe axis into :term:`tuning curve
+    domain` axis.  So from the point of view of the discriminator, the
+    probe offset is yet another axis in the :term:`tuning curve
+    domain`.
+
+    >>> tuning_curve = prober.tuning_curve.eval()
+    >>> assert tuning_curve.shape == (batchsize, num_tcdom * len(probes))
+    >>> tuning_curve
+    array([[  0,   5,   7,  12,  14,  19,  21,  26,  28,  33],
+           [ 35,  40,  42,  47,  49,  54,  56,  61,  63,  68],
+           [ 70,  75,  77,  82,  84,  89,  91,  96,  98, 103]])
+
+    For each batches, the first ``len(probes)``-slice of
+    `.tuning_curve` along the second axis corresponds to the first
+    point in :term:`tuning curve domain` (i.e., index 0 of the second
+    axis of `time_avg`):
+
+    >>> np.testing.assert_equal(time_avg[:, 0, probes],
+    ...                         tuning_curve[:, :len(probes)])
+
+    Similarly, the second ``len(probes)``-slice corresponds to the
+    second point in :term:`tuning curve domain` (i.e., index 1 of the
+    second axis of `time_avg`):
+
+    >>> np.testing.assert_equal(time_avg[:, 1, probes],
+    ...                         tuning_curve[:, len(probes):2 * len(probes)])
+
+    """
+
     inputs = ()
 
     def __init__(self, model, probes):
@@ -229,6 +285,7 @@ class FixedProber(BaseComponent):
 
         # time_avg.shape: (batchsize, num_tcdom, num_neurons)
         tc = self.model.time_avg[:, :, self.probes]
+        # tuning_curve.shape: (batchsize, num_tcdom * len(probes))
         self.tuning_curve = tc.reshape((self.model.batchsize, -1))
         self.tuning_curve.name = 'tuning_curve'
 

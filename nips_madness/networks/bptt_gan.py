@@ -61,21 +61,46 @@ class UnConditionalDiscriminator(BaseComponent):
         return lasagne.layers.get_output(self.l_out, inputs=inputs)
 
 
+class Updater(BaseComponent):
+
+    _named_update_configs = {
+        # Values recommended by Gulrajani et al. (2017)
+        # -- http://arxiv.org/abs/1704.00028:
+        'adam-wgan': ('adam', dict(beta1=0.5, beta2=0.9)),
+    }
+
+    def __init__(self, learning_rate=0.001, update_name='adam-wgan',
+                 update_config={}):
+        self.learning_rate = learning_rate
+        self.update_name = update_name
+        self.update_config = update_config
+
+    def _get_updater(self):
+        name, default = self._named_update_configs.get(
+            self.update_name,
+            dict(name=self.update_name))
+        updater = getattr(lasagne.updates, name)
+        config = dict(default, **self.update_config)
+        return updater, config
+
+    def __call__(self, loss, params):
+        updater, config = self._get_updater()
+        return updater(
+            loss, params, learning_rate=self.learning_rate,
+            **config)
+
+
 class BaseTrainer(BaseComponent):
 
-    # These are the values recommended by Gulrajani et al. (2017)
-    # -- http://arxiv.org/abs/1704.00028
-    learning_rate = 0.0001
-    beta1 = 0.5
-    beta2 = 0.9
+    @classmethod
+    def consume_kwargs(self, *args, **kwargs):
+        updater, rest = Updater.consume_kwargs(**kwargs)
+        return super(BaseTrainer, self).consume_kwargs(
+            *args, updater=updater, **rest)
 
     @cached_property
     def updates(self):
-        params = self.target.get_all_params()
-        return lasagne.updates.adam(
-            self.loss, params, learning_rate=self.learning_rate,
-            beta1=self.beta1, beta2=self.beta2,
-        )
+        return self.updater(self.loss, self.target.get_all_params())
 
     @cached_property
     def train(self):
@@ -87,8 +112,9 @@ class CriticTrainer(BaseTrainer):
     Discriminator/Critic trainer for WGAN.
     """
 
-    def __init__(self, disc):
+    def __init__(self, disc, updater):
         self.target = disc
+        self.updater = updater
 
         from theano import tensor as T
         self.lmd = lmd = T.scalar()
@@ -107,10 +133,11 @@ class CriticTrainer(BaseTrainer):
 
 class GeneratorTrainer(BaseTrainer):
 
-    def __init__(self, gen, disc, dynamics_cost):
+    def __init__(self, gen, disc, dynamics_cost, updater):
         self.target = self.gen = gen
         self.disc = disc
         self.dynamics_cost = dynamics_cost
+        self.updater = updater
 
         self.loss = - disc.get_output(gen.get_output()).mean()
         self.loss += self.dynamics_cost * gen.model.dynamics_penalty

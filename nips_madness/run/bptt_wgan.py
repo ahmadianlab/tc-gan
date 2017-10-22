@@ -95,6 +95,17 @@ def make_parser():
         '--truth_seed', default=42, type=int,
         help='Seed for generating ground truth data (default: %(default)s)')
 
+    # Generator & Discriminator trainers
+    for prefix in ['gen', 'disc']:
+        parser.add_argument(
+            '--{}-learning-rate'.format(prefix),
+            default=0.01, type=float,
+            help='{} learning rate (default: %(default)s)'.format(prefix))
+        parser.add_argument(
+            '--{}-update-name'.format(prefix),
+            default='adam-wgan',
+            help='{} update method (default: %(default)s)'.format(prefix))
+
     # Generator
     parser.add_argument(
         '--batchsize', '--n_samples', default=15, type=eval,

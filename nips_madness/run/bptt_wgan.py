@@ -104,6 +104,7 @@ def make_parser():
     for prefix in ['gen', 'disc']:
         parser.add_argument(
             '--{}-learning-rate'.format(prefix),
+            '--{}-learn-rate'.format(prefix),
             default=0.01, type=float,
             help='{} learning rate (default: %(default)s)'.format(prefix))
         parser.add_argument(

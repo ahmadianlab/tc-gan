@@ -8,7 +8,7 @@ from . import gan as plain_gan
 from .. import ssnode
 from .. import utils
 from ..drivers import GANDriver
-from ..networks.bptt_gan import BPTTWassersteinGAN
+from ..networks.bptt_gan import make_gan
 from ..recorders import UpdateResult
 
 
@@ -163,7 +163,7 @@ def init_driver(
     run_config = utils.subdict_by_prefix(run_config, 'disc_')
     run_config = utils.subdict_by_prefix(run_config, 'gen_')
 
-    gan, rest = BPTTWassersteinGAN.consume_kwargs(**run_config)
+    gan, rest = make_gan(run_config)
     driver = GANDriver(
         gan, datastore,
         iterations=iterations, quiet=quiet,

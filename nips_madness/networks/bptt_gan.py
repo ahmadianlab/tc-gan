@@ -117,42 +117,6 @@ class GeneratorTrainer(BaseTrainer):
 
 class BPTTWassersteinGAN(BaseComponent):
 
-    @classmethod
-    def consume_kwargs(cls, J0, S0, D0,
-                       **kwargs):
-        rest = dict(DEFAULT_PARAMS, **kwargs)
-        num_sites = rest.pop('num_sites')
-        bandwidths = rest.pop('bandwidths')
-        contrasts = rest.pop('contrasts')
-        sample_sites = rest.pop('sample_sites')
-        gen, rest = TuningCurveGenerator.consume_config(
-            rest,
-            # Stimulator:
-            num_tcdom=len(bandwidths) * len(contrasts),
-            num_sites=num_sites,
-            # Model / SSN:
-            J=J0,
-            D=D0,
-            S=S0,
-            # Prober:
-            probes=sample_sites_from_stim_space(sample_sites, num_sites),
-        )
-        disc, rest = consume_subdict(
-            UnConditionalDiscriminator, 'disc', rest,
-            shape=gen.output_shape,
-            loss_type='WD')
-        gen_trainer, rest = consume_subdict(
-            GeneratorTrainer, 'gen', rest,
-            gen, disc,
-        )
-        disc_trainer, rest = consume_subdict(
-            CriticTrainer, 'disc', rest,
-            disc,
-        )
-        return super(BPTTWassersteinGAN, cls).consume_kwargs(
-            gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
-            **rest)
-
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
                  bandwidths, contrasts,
                  critic_iters_init, critic_iters, lipschitz_cost,
@@ -259,3 +223,43 @@ class BPTTWassersteinGAN(BaseComponent):
         for gen_step in itertools.count(1):
             for info in self._single_gen_step(gen_step, self.critic_iters):
                 yield info
+
+
+def make_gan(config):
+    """
+    Initialize a GAN given `config` and return unconsumed part of `config`.
+    """
+    return _make_gan_from_kwargs(**dict(DEFAULT_PARAMS, **config))
+
+
+def _make_gan_from_kwargs(
+        J0, S0, D0, num_sites, bandwidths, contrasts, sample_sites,
+        **rest):
+    gen, rest = TuningCurveGenerator.consume_config(
+        rest,
+        # Stimulator:
+        num_tcdom=len(bandwidths) * len(contrasts),
+        num_sites=num_sites,
+        # Model / SSN:
+        J=J0,
+        D=D0,
+        S=S0,
+        # Prober:
+        probes=sample_sites_from_stim_space(sample_sites, num_sites),
+    )
+    disc, rest = consume_subdict(
+        UnConditionalDiscriminator, 'disc', rest,
+        shape=gen.output_shape,
+        loss_type='WD',
+    )
+    gen_trainer, rest = consume_subdict(
+        GeneratorTrainer, 'gen', rest,
+        gen, disc,
+    )
+    disc_trainer, rest = consume_subdict(
+        CriticTrainer, 'disc', rest,
+        disc,
+    )
+    return BPTTWassersteinGAN.consume_kwargs(
+        gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
+        **rest)

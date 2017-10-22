@@ -126,6 +126,9 @@ def make_parser():
         default=[20],
         type=utils.csv_line(float),
         help='Comma separated value of floats')
+    parser.add_argument(
+        '--include-inhibitory-neurons', action='store_true',
+        help='Sample TCs from inhibitory neurons if given.')
 
     # Generator trainer
     parser.add_argument(

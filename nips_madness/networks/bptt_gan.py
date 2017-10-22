@@ -263,7 +263,11 @@ def make_gan(config):
 
 def _make_gan_from_kwargs(
         J0, S0, D0, num_sites, bandwidths, contrasts, sample_sites,
+        include_inhibitory_neurons,
         **rest):
+    probes = sample_sites_from_stim_space(sample_sites, num_sites)
+    if include_inhibitory_neurons:
+        probes.extend(np.array(probes) + num_sites)
     gen, rest = TuningCurveGenerator.consume_config(
         rest,
         # Stimulator:
@@ -274,7 +278,7 @@ def _make_gan_from_kwargs(
         D=D0,
         S=S0,
         # Prober:
-        probes=sample_sites_from_stim_space(sample_sites, num_sites),
+        probes=probes,
     )
     disc, rest = consume_subdict(
         UnConditionalDiscriminator, 'disc', rest,

@@ -198,9 +198,14 @@ class BPTTWassersteinGAN(BaseComponent):
     loss_type = 'WD'
     discriminator = property(lambda self: self.disc.l_out)
     NZ = property(lambda self: self.batchsize)
-    J = property(lambda self: self.gen.model.J)
-    D = property(lambda self: self.gen.model.D)
-    S = property(lambda self: self.gen.model.S)
+
+    def get_gen_param(self):
+        # To be called from GANDriver
+        return [
+            self.gen.model.J.get_value(),
+            self.gen.model.D.get_value(),
+            self.gen.model.S.get_value(),
+        ]
 
     def init_dataset(self, data):
         self.dataset = random_minibatches(self.batchsize, data)

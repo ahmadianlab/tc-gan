@@ -129,7 +129,7 @@ def make_parser():
 
     # Discriminator trainer
     parser.add_argument(
-        '--WGAN_lambda', default=10.0, type=float,
+        '--lmd', '--WGAN_lambda', default=10.0, type=float,
         help='The complexity penalty for the D (default: %(default)s)')
     parser.add_argument(
         '--n-critic-init', '--WGAN_n_critic0', default=50, type=int,
@@ -153,6 +153,9 @@ def init_driver(
         layers,
         **run_config):
     del layers  # see [[ns\.layers]] below in main() for why
+
+    run_config = utils.subdict_by_prefix(run_config, 'disc_')
+    run_config = utils.subdict_by_prefix(run_config, 'gen_')
 
     gan, rest = BPTTWassersteinGAN.consume_kwargs(**run_config)
     driver = GANDriver(

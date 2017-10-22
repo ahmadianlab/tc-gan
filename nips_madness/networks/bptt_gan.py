@@ -10,7 +10,7 @@ from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
     theano_function,
 )
-from .core import BaseComponent
+from .core import BaseComponent, consume_subdict
 from .ssn import TuningCurveGenerator
 
 
@@ -119,15 +119,14 @@ class BPTTWassersteinGAN(BaseComponent):
 
     @classmethod
     def consume_kwargs(cls, J0, S0, D0,
-                       disc_layers, disc_normalization, disc_nonlinearity,
-                       WGAN_lambda,
                        **kwargs):
         rest = dict(DEFAULT_PARAMS, **kwargs)
         num_sites = rest.pop('num_sites')
         bandwidths = rest.pop('bandwidths')
         contrasts = rest.pop('contrasts')
         sample_sites = rest.pop('sample_sites')
-        gen, rest = TuningCurveGenerator.consume_kwargs(
+        gen, rest = TuningCurveGenerator.consume_config(
+            rest,
             # Stimulator:
             num_tcdom=len(bandwidths) * len(contrasts),
             num_sites=num_sites,
@@ -137,22 +136,21 @@ class BPTTWassersteinGAN(BaseComponent):
             S=S0,
             # Prober:
             probes=sample_sites_from_stim_space(sample_sites, num_sites),
-            **rest)
-        disc, rest = UnConditionalDiscriminator.consume_kwargs(
+        )
+        disc, rest = consume_subdict(
+            UnConditionalDiscriminator, 'disc', rest,
             shape=gen.output_shape,
-            layers=disc_layers,
-            normalization=disc_normalization,
-            nonlinearity=disc_nonlinearity,
-            loss_type='WD', **rest)
-        gen_trainer, rest = GeneratorTrainer.consume_kwargs(
+            loss_type='WD')
+        gen_trainer, rest = consume_subdict(
+            GeneratorTrainer, 'gen', rest,
             gen, disc,
-            **rest)
-        disc_trainer, rest = CriticTrainer.consume_kwargs(
+        )
+        disc_trainer, rest = consume_subdict(
+            CriticTrainer, 'disc', rest,
             disc,
-            **rest)
+        )
         return super(BPTTWassersteinGAN, cls).consume_kwargs(
             gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
-            lmd=WGAN_lambda,
             **rest)
 
     def __init__(self, gen, disc, gen_trainer, disc_trainer,

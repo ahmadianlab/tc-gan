@@ -282,3 +282,21 @@ def theano_function(*args, **kwds):
     # MAYBE: make sure to use theano.config.floatX everywhere and
     # remove allow_input_downcast.
     return theano.function(*args, **kwds)
+
+
+def subdict_by_prefix(flat, prefix, key=None):
+    if key is None:
+        key = prefix.rstrip('_')
+    nested = {}
+    nested[key] = subdict = flat.get(key, {})
+    assert isinstance(subdict, dict)
+
+    for k, v in flat.items():
+        if k == key:
+            pass
+        elif k.startswith(prefix):
+            subdict[k[len(prefix):]] = v
+        else:
+            nested[k] = v
+
+    return nested

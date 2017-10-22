@@ -104,8 +104,16 @@ class GANData(object):
         self.__dict__.update(kwds)
 
         self.gen_index = self.gen[:, 0]
-        self.log_J, self.log_D, self.log_S = \
-            self.gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
+        if self.data_version < 1:
+            self.log_J, self.log_D, self.log_S = self._gen_as_matrices()
+            self.J = np.exp(self.log_J)
+            self.D = np.exp(self.log_D)
+            self.S = np.exp(self.log_S)
+        else:
+            self.J, self.D, self.S = self._gen_as_matrices()
+
+    def _gen_as_matrices(self):
+        return self.gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
 
     @property
     def disc(self):
@@ -115,15 +123,19 @@ class GANData(object):
         return self._disc
 
     def gen_param(self, name):
-        return np.exp(getattr(self, 'log_' + name))
+        return getattr(self, name)
 
     def iter_gen_params(self, indices=None):
         if indices is None:
             indices = slice(None)
-        for log_JDS in zip(self.log_J[indices],
-                           self.log_D[indices],
-                           self.log_S[indices]):
-            yield list(map(np.exp, log_JDS))
+        return zip(self.J[indices], self.D[indices], self.S[indices])
+
+    @property
+    def data_version(self):
+        try:
+            return self.info['extra_info']['data_version']
+        except (AttributeError, KeyError):
+            return 0
 
     def fake_JDS(self):
         return np.exp(self.gen[:, 1:])

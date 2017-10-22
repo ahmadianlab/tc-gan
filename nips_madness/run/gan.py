@@ -20,11 +20,10 @@ the datastore:
   of the "true" SSN.
 
 ``generator.csv``
-  Generator parameters.  Logarithm of actual values
-  are stored.  Three 2x2 matrices J, D and S (sigma) are stored in the
-  2nd to 13th columns after they are concatenated and flattened.  The
-  first column stores the generator step.  Each row corresponds to
-  each generator step.
+  Generator parameters.  Three 2x2 matrices J, D and S (sigma) are
+  stored in the 2nd to 13th columns after they are concatenated and
+  flattened.  The first column stores the generator step.  Each row
+  corresponds to each generator step.
 
 ``disc_param_stats.csv``
   Normalized norms (2-norm divided by number
@@ -44,6 +43,8 @@ the datastore:
 from __future__ import print_function
 
 from types import SimpleNamespace
+import json
+import os
 
 import theano
 import theano.tensor as T
@@ -184,6 +185,16 @@ class GenerativeAdversarialNetwork(SimpleNamespace):
             ) * self.disc_l2_regularization
         return penalty
 
+    def clip_gen_param(self):
+        assert self.gen_param_type == 'clip'
+
+        for name in 'JDS':
+            param = getattr(self, name)
+            p_min = getattr(self, name + '_min')
+            p_max = getattr(self, name + '_max')
+            param.set_value(np.clip(param.get_value(),
+                                    p_min, p_max))
+
 
 def get_updater(update_name, *args, **kwds):
     if update_name == 'adam-wgan':
@@ -279,6 +290,7 @@ def setup_gan(
         bandwidths, smoothness, contrast, n_sites, n_samples, n_stim,
         disc_normalization, disc_nonlinearity,
         disc_l1_regularization, disc_l2_regularization,
+        gen_param_type, J_min, J_max, D_min, D_max, S_min, S_max,
         # "Test" flags:  # TODO: remove
         timetest=False, convtest=False, testDW=False, DRtest=False,
         **make_func_kwargs):
@@ -303,13 +315,18 @@ def setup_gan(
     coe = theano.shared(coe_value,name = "coe")
 
     #these are parameters we will use to test the GAN
-    J2 = theano.shared(np.log(np.array(J0)).astype("float64"), name="j")
-    D2 = theano.shared(np.log(np.array(D0)).astype("float64"), name="d")
-    S2 = theano.shared(np.log(np.array(S0)).astype("float64"), name="s")
+    if gen_param_type == 'log':
+        J2 = theano.shared(np.log(np.array(J0)).astype("float64"), name="j")
+        D2 = theano.shared(np.log(np.array(D0)).astype("float64"), name="d")
+        S2 = theano.shared(np.log(np.array(S0)).astype("float64"), name="s")
 
-    Jp2 = T.exp(J2)
-    Dp2 = T.exp(D2)
-    Sp2 = T.exp(S2)
+        Jp2 = T.exp(J2)
+        Dp2 = T.exp(D2)
+        Sp2 = T.exp(S2)
+    else:
+        J2 = Jp2 = theano.shared(np.array(J0, dtype="float64"), name="j")
+        D2 = Dp2 = theano.shared(np.array(D0, dtype="float64"), name="d")
+        S2 = Sp2 = theano.shared(np.array(S0, dtype="float64"), name="s")
 
     #these are the parammeters to be fit
     dp = init_disturbance
@@ -321,17 +338,21 @@ def setup_gan(
     D_dis = np.array(D_dis) * np.ones((2, 2))
     S_dis = np.array(S_dis) * np.ones((2, 2))
 
-    gan.J = J = theano.shared(J2.get_value() + J_dis, name="j")
-    gan.D = D = theano.shared(D2.get_value() + D_dis, name="d")
-    gan.S = S = theano.shared(S2.get_value() + S_dis, name="s")
+    if gen_param_type == 'log':
+        J = theano.shared(J2.get_value() + J_dis, name="j")
+        D = theano.shared(D2.get_value() + D_dis, name="d")
+        S = theano.shared(S2.get_value() + S_dis, name="s")
 
-#    J = theano.shared(np.log(np.array([[.01,.01],[.02,.01]])).astype("float64"),name = "j")
-#    D = theano.shared(np.log(np.array([[.2,.2],[.3,.2]])).astype("float64"),name = "d")
-#    S = theano.shared(np.log(np.array([[.1,.1],[.1,.1]])).astype("float64"),name = "s")
-
-    Jp = T.exp(J)
-    Dp = T.exp(D)
-    Sp = T.exp(S)
+        Jp = T.exp(J)
+        Dp = T.exp(D)
+        Sp = T.exp(S)
+    else:
+        J = Jp = theano.shared(J2.get_value() * np.exp(J_dis), name="j")
+        D = Dp = theano.shared(D2.get_value() * np.exp(D_dis), name="d")
+        S = Sp = theano.shared(S2.get_value() * np.exp(S_dis), name="s")
+    gan.J = J
+    gan.D = D
+    gan.S = S
 
     #compute jacobian of the primed variables w.r.t. J,D,S.
     dJpJ = T.reshape(T.jacobian(T.reshape(Jp,[-1]),J),[2,2,2,2])
@@ -530,6 +551,14 @@ def setup_gan(
     gan.inp = inp = BAND_IN
     gan.ssn_params = ssn_params
     gan.W = W
+    gan.gen_param_type = gen_param_type
+    gan.get_gen_param = theano.function([], [Jp, Dp, Sp])
+    gan.J_min = J_min
+    gan.J_max = J_max
+    gan.D_min = D_min
+    gan.D_max = D_max
+    gan.S_min = S_min
+    gan.S_max = S_max
 
     if gan.track_offset_identity:
         gan.truth_size_per_batch = NZ
@@ -563,6 +592,9 @@ def train_gan(driver, gan, datastore,
         Dmean = update_result.true.mean(axis=0)
         datastore.tables.saverow('TC_mean.csv',
                                  list(GZmean) + list(Dmean))
+
+        if gan.gen_param_type == 'clip':
+            gan.clip_gen_param()
 
         return update_result
 
@@ -911,6 +943,17 @@ def main(args=None):
         elements are used for the disturbance for J, D (delta),
         S (sigma), respectively.  It accepts any Python expression.
         (default: %(default)s)''')
+    for name in 'JDS':
+        parser.add_argument(
+            '--{}-min'.format(name), default=1e-3, type=eval,
+            help='''Lower limit of the parameter {}.
+            Used only if --gen-param-type=clip.
+            (default: %(default)s)'''.format(name))
+        parser.add_argument(
+            '--{}-max'.format(name), default=10, type=eval,
+            help='''Upper limit of the parameter {}.
+            Used only if --gen-param-type=clip.
+            (default: %(default)s)'''.format(name))
     parser.add_argument(
         '--gen-learn-rate', default=0.001, type=float,
         help='Learning rate for generator (default: %(default)s)')
@@ -1015,6 +1058,9 @@ def main(args=None):
     parser.add_argument(
         '--WGAN_n_critic', default=5, type=int,
         help='Critic iterations (default: %(default)s)')
+    parser.add_argument(
+        '--gen-param-type', default='log', choices=('log', 'clip'),
+        help='Parametrization of generator (default: %(default)s)')
     parser.add_argument(
         '--disc-normalization', default='none', choices=('none', 'layer'),
         help='Normalization used for discriminator.')
@@ -1125,7 +1171,16 @@ def preprocess(run_config):
                              ' Last row of {} contains {} columns.'
                              ' It has to contain 13 (or 12) columns.'
                              .format(load_gen_param, len(lastrow)))
-        J0, D0, S0 = np.exp(lastrow).reshape((3, 2, 2))
+
+        # Support old (aka "version 0") generator.csv
+        with open(os.path.join(os.path.dirname(load_gen_param), 'info.json')) \
+                as file:
+            info = json.load(file)
+        data_version = info.get('extra_info', {}).get('data_version', 0)
+        if data_version < 1:
+            lastrow = np.exp(lastrow)
+
+        J0, D0, S0 = lastrow.reshape((3, 2, 2))
         run_config.update(J0=J0, D0=D0, S0=S0)
     else:
         run_config.setdefault('J0', SSsolve.DEFAULT_PARAMS['J'])
@@ -1166,6 +1221,7 @@ def do_learning(learn, run_config):
         extra_info=dict(
             n_bandwidths=run_config['n_bandwidths'],
             load_gen_param=run_config['load_gen_param'],
+            data_version=1,
         ))
 
 

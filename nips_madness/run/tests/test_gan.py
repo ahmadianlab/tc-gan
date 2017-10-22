@@ -53,6 +53,7 @@ def make_gan(n_samples, bandwidths, contrast, **run_config):
     ['--sample-sites', '0, 0.5'],
     ['--disc-param-save-on-error'],
     ['--gen-update', 'rmsprop'],
+    ['--gen-param-type', 'clip'],
 ])
 def test_single_g_step_slowtest(args, cleancwd):
     single_g_step(args)

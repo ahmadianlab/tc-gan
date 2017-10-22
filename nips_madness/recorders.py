@@ -138,9 +138,7 @@ class GenParamRecorder(BaseRecorder):
         super(GenParamRecorder, self).__init__(datastore)
 
     def record(self, gen_step):
-        jj = self.gan.J.get_value()
-        dd = self.gan.D.get_value()
-        ss = self.gan.S.get_value()
+        jj, dd, ss = self.gan.get_gen_param()
 
         self._saverow([gen_step] + list(np.concatenate([jj, dd, ss]).flat))
         return [jj, dd, ss]

@@ -112,7 +112,11 @@ def make_parser():
         help='Comma separated value of floats')
 
     # Generator trainer
-    # TODO: add
+    parser.add_argument(
+        '--gen-dynamics-cost', type=float, default=1,
+        help='''Cost for non-fixed point behavior of the SSN during
+        the period in which the tuning curves are measured.
+        (default: %(default)s)''')
 
     # Discriminator
     parser.add_argument(

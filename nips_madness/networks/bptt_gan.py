@@ -107,11 +107,13 @@ class CriticTrainer(BaseTrainer):
 
 class GeneratorTrainer(BaseTrainer):
 
-    def __init__(self, gen, disc):
+    def __init__(self, gen, disc, dynamics_cost):
         self.target = self.gen = gen
         self.disc = disc
+        self.dynamics_cost = dynamics_cost
 
         self.loss = - disc.get_output(gen.get_output()).mean()
+        self.loss += self.dynamics_cost * gen.model.dynamics_penalty
         self.inputs = gen.inputs
 
 

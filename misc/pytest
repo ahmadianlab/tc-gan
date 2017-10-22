@@ -18,4 +18,6 @@ fi
 # See:
 # http://deeplearning.net/software/theano/library/config.html#envvar-THEANORC
 
+export MPLBACKEND=Agg
+
 exec "$thisdir/with-env" pytest "$@"

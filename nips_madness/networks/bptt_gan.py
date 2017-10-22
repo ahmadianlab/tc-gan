@@ -5,12 +5,12 @@ import lasagne
 import numpy as np
 
 from .. import ssnode
+from ..core import BaseComponent, consume_subdict
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
     theano_function, log_timing,
 )
-from .core import BaseComponent, consume_subdict
 from .ssn import TuningCurveGenerator
 from .utils import largerrecursionlimit
 

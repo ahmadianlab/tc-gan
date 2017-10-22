@@ -5,9 +5,9 @@ import numpy as np
 import theano
 
 from .. import ssnode
+from ..core import BaseComponent
 from ..gradient_expressions.make_w_batch import make_W_with_x
 from ..utils import cached_property, theano_function, log_timing
-from .core import BaseComponent
 
 
 def int_or_lscalr(value, name):

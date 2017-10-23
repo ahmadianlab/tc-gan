@@ -248,15 +248,14 @@ class GANData(object):
 
     def gen_step_to_epoch(self, gen_step):
         truth_size = self.info['run_config']['truth_size']  # data size
-        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        n_samples = self.batchsize
         disc_updates = self.gen_step_to_disc_updates(gen_step)
         return disc_updates * n_samples / truth_size
 
     def gen_step_to_disc_updates(self, gen_step):
-        run_config = self.info['run_config']
         if self.gan_type == 'WGAN':
-            WGAN_n_critic0 = run_config['WGAN_n_critic0']
-            WGAN_n_critic = run_config['WGAN_n_critic']
+            WGAN_n_critic0 = self.critic_iters_init
+            WGAN_n_critic = self.critic_iters
             return WGAN_n_critic0 + WGAN_n_critic * gen_step
         else:
             return gen_step + 1
@@ -265,22 +264,51 @@ class GANData(object):
         return self.disc_updates_to_gen_step(self.epoch_to_disc_updates(epoch))
 
     def disc_updates_to_gen_step(self, disc_updates):
-        run_config = self.info['run_config']
         if self.gan_type == 'WGAN':
-            WGAN_n_critic0 = run_config['WGAN_n_critic0']
-            WGAN_n_critic = run_config['WGAN_n_critic']
+            WGAN_n_critic0 = self.critic_iters_init
+            WGAN_n_critic = self.critic_iters
             return (disc_updates - WGAN_n_critic0) / WGAN_n_critic
         else:
             return disc_updates - 1
 
     def epoch_to_disc_updates(self, epoch):
         truth_size = self.info['run_config']['truth_size']  # data size
-        n_samples = self.info['run_config']['n_samples']  # minibatch size
+        n_samples = self.batchsize
         return epoch * truth_size / n_samples
 
     @property
+    def batchsize(self):
+        run_config = self.info['run_config']
+        try:
+            return run_config['batchsize']
+        except KeyError:
+            return run_config['n_samples']
+
+    @property
+    def critic_iters(self):
+        run_config = self.info['run_config']
+        try:
+            return run_config['critic_iters']
+        except KeyError:
+            return run_config['WGAN_n_critic']
+
+    @property
+    def critic_iters_init(self):
+        run_config = self.info['run_config']
+        try:
+            return run_config['critic_iters_init']
+        except KeyError:
+            return run_config['WGAN_n_critic0']
+
+    @property
     def gan_type(self):
-        loss = self.info['run_config']['loss']
+        try:
+            loss = self.info['run_config']['loss']
+        except KeyError:
+            if self.info['extra_info']['script_file'].endswith('bptt_wgan.py'):
+                loss = 'WD'
+            else:
+                raise
         try:
             return {
                 'CE': 'RGAN',

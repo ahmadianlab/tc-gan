@@ -69,8 +69,16 @@ class DiscriminatorLog(object):
     def disc_updates_to_epoch(self, disc_updates):
         run_config = self.get_info()['run_config']
         truth_size = run_config['truth_size']  # data size
-        n_samples = run_config['n_samples']  # minibatch size
+        n_samples = self.batchsize
         return disc_updates * n_samples / truth_size
+
+    @property
+    def batchsize(self):
+        run_config = self.get_info()['run_config']
+        try:
+            return run_config['batchsize']
+        except KeyError:
+            return run_config['n_samples']
 
     def plot_learning(self, yscale='symlog', **kwargs):
         losses = ['Dloss', 'Daccuracy']

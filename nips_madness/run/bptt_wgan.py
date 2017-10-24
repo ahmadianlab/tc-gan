@@ -8,28 +8,32 @@ from . import gan as plain_gan
 from .. import ssnode
 from .. import utils
 from ..drivers import GANDriver
+from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..networks.bptt_gan import make_gan
 from ..recorders import UpdateResult
 
 
 def learn(
         driver, truth_size, truth_seed,
+        sample_sites, include_inhibitory_neurons,
         ):
 
     np.random.seed(0)
     gan = driver.gan
     gan.prepare()
     ssn = gan.gen
+    sample_sites = sample_sites_from_stim_space(sample_sites, ssn.num_sites)
 
     print("Generating the truth...")
     data, _ = ssnode.sample_tuning_curves(
-        sample_sites=ssn.probes,
+        sample_sites=sample_sites,
         NZ=truth_size,
         seed=truth_seed,
         bandwidths=gan.bandwidths,
         contrast=gan.contrasts,
         N=ssn.num_sites,
         track_offset_identity=True,
+        include_inhibitory_neurons=include_inhibitory_neurons,
         # dt=ssn.dt,
         dt=5e-4,  # as in ./gan.py
         max_iter=100000,
@@ -195,12 +199,17 @@ def init_driver(
         disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         layers,
+        sample_sites, include_inhibitory_neurons,
         **run_config):
     del layers  # see [[ns\.layers]] below in main() for why
 
     run_config = utils.subdict_by_prefix(run_config, 'disc_')
     run_config = utils.subdict_by_prefix(run_config, 'gen_')
 
+    run_config.update(
+        sample_sites=sample_sites,
+        include_inhibitory_neurons=include_inhibitory_neurons,
+    )
     gan, rest = make_gan(run_config)
     driver = GANDriver(
         gan, datastore,
@@ -211,7 +220,10 @@ def init_driver(
         quit_JDS_threshold=quit_JDS_threshold,
     )
 
-    return dict(driver=driver, **rest)
+    return dict(driver=driver,
+                sample_sites=sample_sites,
+                include_inhibitory_neurons=include_inhibitory_neurons,
+                **rest)
 
 
 def main(args=None):

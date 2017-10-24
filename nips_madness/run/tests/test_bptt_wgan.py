@@ -17,6 +17,7 @@ def single_g_step(args):
 @pytest.mark.parametrize('args', [
     [],
     ['--sample-sites', '0, 0.5'],
+    ['--include-inhibitory-neurons'],
 ])
 def test_single_g_step_slowtest(args, cleancwd):
     single_g_step(args)

@@ -74,7 +74,7 @@ def learn(
                 data_mean = last_info.xd.mean(axis=0).tolist()
                 gen_mean = last_info.xg.mean(axis=0).tolist()
                 driver.datastore.tables.saverow('TC_mean.csv',
-                                                data_mean + gen_mean)
+                                                gen_mean + data_mean)
 
                 # Then the generator step was just taken.  Let's
                 # return a result that GANDriver understands.

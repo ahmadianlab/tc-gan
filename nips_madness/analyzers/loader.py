@@ -138,7 +138,10 @@ class GANData(object):
             return 0
 
     def fake_JDS(self):
-        return np.exp(self.gen[:, 1:])
+        if self.data_version < 1:
+            return np.exp(self.gen[:, 1:])
+        else:
+            return self.gen[:, 1:]
 
     def true_JDS(self):
         JDS = list(map(ssnode.DEFAULT_PARAMS.get, 'JDS'))

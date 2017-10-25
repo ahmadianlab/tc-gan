@@ -46,6 +46,18 @@ def learn(
                 max_iter=100000,
                 r0=np.zeros(2 * ssn.num_sites),
                 io_type='asym_power',
+                rate_stop_at=200,
+                # For io_type='asym_power' (and 'asym_linear'),
+                # `rate_stop_at` determines the rate at which the
+                # solver terminates and reject the sample.  Let's use
+                # this feature to exclude extremely large rate in the
+                # tuning curve data.  But let's not make it too large,
+                # since transiently having large rate is OK.
+                #
+                # TODO: Add another rate limiting which acts only on
+                #       the tuning curve data (i.e., sub-sampled fixed
+                #       point) to allow large transient rate and large
+                #       rates in non-sampled locations.
             ), **true_ssn_options))
     data = np.array(data.T)      # shape: (N_data, nb)
 

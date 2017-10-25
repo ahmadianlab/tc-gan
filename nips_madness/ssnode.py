@@ -21,7 +21,7 @@ import scipy.optimize
 
 from .clib import libssnode, double_ptr
 from .gradient_expressions.utils import subsample_neurons
-from .utils import cpu_count
+from .utils import cpu_count, get_array_module
 
 
 DEFAULT_PARAMS = dict(
@@ -127,10 +127,11 @@ def rate_to_volt(rate, k, n):
 
 
 def io_alin(v, volt_max, k, n):
-    vc = np.clip(v, 0, volt_max)
+    xp = get_array_module(v)
+    vc = xp.clip(v, 0, volt_max)
     rate = k * (vc**n)
     linear = k * (volt_max**(n-1)) * n * (v - volt_max)
-    return np.where(v <= volt_max, rate, rate + linear)
+    return xp.where(v <= volt_max, rate, rate + linear)
 
 
 def io_power(v, k, n):
@@ -139,12 +140,13 @@ def io_power(v, k, n):
 
 
 def io_atanh(v, r0, r1, v0, k, n):
-    v_pow = np.clip(v, 0, v0)
+    xp = get_array_module(v)
+    v_pow = xp.clip(v, 0, v0)
     r_pow = k * (v_pow**n)
-    r_tanh = r0 + (r1 - r0) * np.tanh(
+    r_tanh = r0 + (r1 - r0) * xp.tanh(
         n * r0 / (r1 - r0) * (v - v0) / v0
     )
-    return np.where(v <= v0, r_pow, r_tanh)
+    return xp.where(v <= v0, r_pow, r_tanh)
 
 
 def solve_dynamics(*args, **kwds):

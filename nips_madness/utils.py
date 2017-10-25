@@ -361,3 +361,17 @@ def load_any_file(path):
     module, mode = param_module(path)
     with open(path, 'r' + mode) as f:
         return module.load(f)
+
+
+def get_array_module(array):
+    """
+    Return `numpy` or `theano.tensor` depending on `array` type.
+
+    Inspired by cupy.get_array_module:
+    https://docs-cupy.chainer.org/en/latest/reference/generated/cupy.get_array_module.html
+
+    """
+    if isinstance(array, np.ndarray) or np.isscalar(array):
+        return np
+    else:
+        return theano.tensor

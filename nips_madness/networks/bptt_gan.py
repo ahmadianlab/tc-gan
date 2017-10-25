@@ -24,6 +24,7 @@ DEFAULT_PARAMS = dict(
     # Model / SSN:
     k=ssnode.DEFAULT_PARAMS['k'],
     n=ssnode.DEFAULT_PARAMS['n'],
+    io_type='asym_tanh',
     tau_E=10,
     tau_I=1,
     dt=0.1,

@@ -64,7 +64,7 @@ class BandwidthContrastStimulator(BaseComponent):
 class EulerSSNCore(BaseComponent):
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
-                 io_type='asym_power'):
+                 io_type):
 
         J = np.asarray(J)
         D = np.asarray(D)
@@ -137,6 +137,7 @@ class EulerSSNLayer(lasagne.layers.Layer):
 class EulerSSNModel(BaseComponent):
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
+                 io_type,
                  skip_steps=None, seqlen=None, batchsize=None):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
@@ -152,6 +153,7 @@ class EulerSSNModel(BaseComponent):
             lasagne.layers.InputLayer(shape_rec),
             stimulator=stimulator,
             J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
+            io_type=io_type,
         )
 
         # Since SSN is autonomous, we don't need to do anything for

@@ -216,6 +216,7 @@ def learn(
         true_IO_type, truth_size, truth_seed, bandwidths,
         sample_sites, track_offset_identity,
         contrast, include_inhibitory_neurons,
+        true_ssn_options={},
         **setup_gan_kwargs):
 
     gan.track_offset_identity = track_offset_identity
@@ -250,9 +251,19 @@ def learn(
         track_offset_identity=track_offset_identity,
         include_inhibitory_neurons=include_inhibitory_neurons,
     )
+    assert not set(subsample_kwargs) & set(true_ssn_options)
 
     if not true_IO_type:
         true_IO_type = IO_type
+        assert 'io_type' not in true_ssn_options  # to not ignore true_IO_type
+
+    true_ssn_kwargs = dict(
+        ssn_params,
+        io_type=true_IO_type,
+        **subsample_kwargs)
+    true_ssn_kwargs.update(true_ssn_options)
+    logger.debug('true_ssn_kwargs = %r', true_ssn_kwargs)
+
     logger.info('Generating the truth...')
     with utils.log_timing('sample_tuning_curves()'):
         data, _ = SSsolve.sample_tuning_curves(
@@ -263,8 +274,7 @@ def learn(
             smoothness=smoothness,
             contrast=contrast,
             N=n_sites,
-            **dict(ssn_params, io_type=true_IO_type,
-                   **subsample_kwargs))
+            **true_ssn_kwargs)
     data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:

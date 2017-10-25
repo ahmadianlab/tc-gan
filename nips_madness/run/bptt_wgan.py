@@ -48,6 +48,11 @@ def learn(
         )
     data = np.array(data.T)      # shape: (N_data, nb)
 
+    with utils.log_timing('numpy.save("truth.npy", data)'):
+        np.save(driver.datastore.path('truth.npy'), data)
+    # Note: saving in .npy rather than .npz so that it can be
+    # deduplicated (by, e.g., git-annex).
+
     gan.init_dataset(data)
 
     learning_it = gan.learning()

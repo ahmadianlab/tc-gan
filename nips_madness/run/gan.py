@@ -42,6 +42,7 @@ the datastore:
 
 from __future__ import print_function
 
+from logging import getLogger
 from types import SimpleNamespace
 import json
 import os
@@ -65,6 +66,8 @@ from .. import ssnode as SSsolve
 import time
 
 from .. import stimuli
+
+logger = getLogger(__name__)
 
 
 class GenerativeAdversarialNetwork(SimpleNamespace):
@@ -220,7 +223,7 @@ def learn(
     gan.rate_cost = float(rate_cost)
     gan.loss_type = loss
 
-    print(datastore)
+    logger.debug(datastore)
 
     bandwidths = np.array(bandwidths)
     gan.sample_sites = \
@@ -250,18 +253,18 @@ def learn(
 
     if not true_IO_type:
         true_IO_type = IO_type
-    print("Generating the truth...")
-    data, _ = SSsolve.sample_tuning_curves(
-        sample_sites=sample_sites,
-        NZ=truth_size,
-        seed=truth_seed,
-        bandwidths=bandwidths,
-        smoothness=smoothness,
-        contrast=contrast,
-        N=n_sites,
-        **dict(ssn_params, io_type=true_IO_type,
-               **subsample_kwargs))
-    print("DONE")
+    logger.info('Generating the truth...')
+    with utils.log_timing('sample_tuning_curves()'):
+        data, _ = SSsolve.sample_tuning_curves(
+            sample_sites=sample_sites,
+            NZ=truth_size,
+            seed=truth_seed,
+            bandwidths=bandwidths,
+            smoothness=smoothness,
+            contrast=contrast,
+            N=n_sites,
+            **dict(ssn_params, io_type=true_IO_type,
+                   **subsample_kwargs))
     data = np.array(data.T)      # shape: (N_data, nb)
 
     # Check for sanity:
@@ -271,7 +274,7 @@ def learn(
     else:
         assert n_stim == data.shape[-1]
 
-    print(n_sites)
+    logger.debug('n_sites = %s', n_sites)
 
     setup_gan(
         gan, ssn_params=ssn_params,
@@ -374,8 +377,8 @@ def setup_gan(
     ###
 
     BAND_IN = stimuli.input(bandwidths, X.get_value(), smoothness, contrast)
-    
-    print(BAND_IN.shape)
+
+    logger.debug('BAND_IN.shape = %s', BAND_IN.shape)
 
     #theano variable for the random samples
     gan.Z = Z = T.tensor3("z", "float32")

@@ -259,6 +259,7 @@ def learn(
     true_ssn_kwargs = dict(
         ssn_params,
         io_type=true_IO_type,
+        rate_stop_at=200,  # See: [[./bptt_wgan.py::rate_stop_at]]
         **subsample_kwargs)
     true_ssn_kwargs.update(true_ssn_options)
     logger.debug('true_ssn_kwargs = %r', true_ssn_kwargs)

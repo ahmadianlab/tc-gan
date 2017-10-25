@@ -157,7 +157,7 @@ def solve_dynamics(*args, **kwds):
 
 
 def fixed_point(
-        W, ext, k, n, r0, tau=DEFAULT_PARAMS['tau'],
+        W, ext, k, n, r0=None, tau=DEFAULT_PARAMS['tau'],
         max_iter=10000, atol=1e-5, dt=.0008, solver='euler',
         rate_soft_bound=DEFAULT_PARAMS['rate_soft_bound'],
         rate_hard_bound=DEFAULT_PARAMS['rate_hard_bound'],
@@ -179,8 +179,9 @@ def fixed_point(
         Scaling factor of the I/O function.
     n : float
         Power of the SSN nonlinearity.
-    r0 : array of shape (2*N,)
+    r0 : array of shape (2*N,) or None
         The initial condition in terms of rate.
+        Set to zero if None.
     tau : array of shape (2,)
         The time constants of the neurons.
     max_iter : int
@@ -224,12 +225,15 @@ def fixed_point(
         raise ValueError("Unknown solver: {}".format(solver))
 
     W = np.asarray(W, dtype='double')
+    N = W.shape[0] // 2
     ext = np.asarray(ext, dtype='double')
-    r0 = np.array(r0, dtype='double')  # copied, as it will be modified
+    if r0 is None:
+        r0 = np.zeros(2 * N, dtype='double')
+    else:
+        r0 = np.array(r0, dtype='double')  # copied, as it will be modified
     r1 = np.empty_like(r0)
     tau_E, tau_I = tau
 
-    N = W.shape[0] // 2
     assert 2 * N == W.shape[0] == W.shape[1]
     assert W.ndim == 2
     assert (2 * N,) == r0.shape == ext.shape

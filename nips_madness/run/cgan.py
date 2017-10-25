@@ -67,7 +67,6 @@ def learn(
         io_type=IO_type,
         k=coe_value,
         n=exp_value,
-        r0=np.zeros(2 * n_sites),
     )
 
     COS = contrast

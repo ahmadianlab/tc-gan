@@ -1,0 +1,28 @@
+# Start generator at the true parameter just to generate
+# records/log-files which then can be fed to analysis pipelines to
+# check if they work.
+
+# Dataset
+truth_size: 80  # = batchsize * iterations
+
+# Driver
+iterations: 5
+
+# Generator
+J0: [[ 0.0957,  0.0638], [ 0.1197,  0.0479]]
+D0: [[ 0.766 ,  0.5106], [ 0.9575,  0.383 ]]
+S0: [[0.0833375, 0.025], [0.166625, 0.025]]
+batchsize: 16
+contrasts: [5, 20]
+gen_dynamics_cost: 1
+gen_learning_rate: 0.0001
+include_inhibitory_neurons: True
+n_bandwidths: 5
+sample_sites: [0, 0.125, 0.25, 0.5, 0.75, 1]
+
+# Discriminator
+critic_iters: 1
+critic_iters_init: 1
+disc_layers: [512, 512, 512, 512]
+disc_learning_rate: 0.02
+disc_param_save_on_error: True

@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+from contextlib import contextmanager
+from logging import getLogger
 import multiprocessing
 import os
 import subprocess
@@ -10,6 +12,7 @@ import warnings
 import numpy as np
 import theano
 
+logger = getLogger(__name__)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
@@ -84,6 +87,14 @@ class StopWatch(object):
 
     def sum(self):
         return sum(self.times)
+
+
+@contextmanager
+def log_timing(opname='Operation', logger=logger):
+    pre = time.time()
+    yield
+    t = time.time() - pre
+    logger.info('%s took %s seconds', opname, t)
 
 
 def csv_line(value_parser):

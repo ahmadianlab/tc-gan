@@ -2,6 +2,8 @@
 Run SSN-BTTP GAN learning.
 """
 
+from logging import getLogger
+
 import numpy as np
 
 from . import gan as plain_gan
@@ -12,6 +14,8 @@ from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..networks.bptt_gan import make_gan
 from ..recorders import UpdateResult
 
+logger = getLogger(__name__)
+
 
 def learn(
         driver, truth_size, truth_seed,
@@ -20,26 +24,28 @@ def learn(
 
     np.random.seed(0)
     gan = driver.gan
-    gan.prepare()
+    logger.info('Compiling Theano functions...')
+    with utils.log_timing('gan.prepare()'):
+        gan.prepare()
     ssn = gan.gen
     sample_sites = sample_sites_from_stim_space(sample_sites, ssn.num_sites)
 
-    print("Generating the truth...")
-    data, _ = ssnode.sample_tuning_curves(
-        sample_sites=sample_sites,
-        NZ=truth_size,
-        seed=truth_seed,
-        bandwidths=gan.bandwidths,
-        contrast=gan.contrasts,
-        N=ssn.num_sites,
-        track_offset_identity=True,
-        include_inhibitory_neurons=include_inhibitory_neurons,
-        # dt=ssn.dt,
-        dt=5e-4,  # as in ./gan.py
-        max_iter=100000,
-        r0=np.zeros(2 * ssn.num_sites),
-    )
-    print("DONE")
+    logger.info('Generating the truth...')
+    with utils.log_timing('sample_tuning_curves()'):
+        data, _ = ssnode.sample_tuning_curves(
+            sample_sites=sample_sites,
+            NZ=truth_size,
+            seed=truth_seed,
+            bandwidths=gan.bandwidths,
+            contrast=gan.contrasts,
+            N=ssn.num_sites,
+            track_offset_identity=True,
+            include_inhibitory_neurons=include_inhibitory_neurons,
+            # dt=ssn.dt,
+            dt=5e-4,  # as in ./gan.py
+            max_iter=100000,
+            r0=np.zeros(2 * ssn.num_sites),
+        )
     data = np.array(data.T)      # shape: (N_data, nb)
 
     gan.init_dataset(data)

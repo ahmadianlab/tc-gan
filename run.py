@@ -13,6 +13,7 @@ Examples::
 from __future__ import print_function
 
 import importlib
+import logging
 import os
 import pdb
 import subprocess
@@ -32,7 +33,10 @@ conda list --prefix "{project_root}/env" --export > conda-list.txt
 
 def run_module(module, arguments, use_pdb, use_pudb,
                assert_repo_is_clean,
-               record_env, mpl_style):
+               record_env, mpl_style,
+               log_level, log_format, log_datefmt):
+    logging.basicConfig(level=getattr(logging, log_level),
+                        format=log_format, datefmt=log_datefmt)
     here = os.path.realpath(os.path.dirname(__file__))
     if os.path.isfile(module) and module.endswith('.py'):
         relpath = os.path.relpath(os.path.realpath(module), here)
@@ -91,6 +95,23 @@ def main(args=None):
     parser.add_argument(
         'arguments', nargs='*',
         help="arguments passed to module's main function")
+    parser.add_argument(
+        '--log-level', default='INFO',
+        choices='CRITICAL ERROR WARNING INFO DEBUG NOTSET'.split(),
+        help='''Logging level.
+        See: https://docs.python.org/3/library/logging.html#levels''')
+    parser.add_argument(
+        '--log-format',
+        default='%(asctime)s %(levelname)s %(message)s',
+        help='''Logging format. For example, to include logger name,
+        use '%(asctime)s %(levelname)s %(name)s %(message)s'.
+        See:
+        https://docs.python.org/3/library/logging.html#logrecord-attributes''')
+    parser.add_argument(
+        '--log-datefmt',
+        default='%Y-%m-%d %H:%M:%S',
+        help='''Logging datetime format.
+        See: https://docs.python.org/3/library/time.html#time.strftime''')
     parser.add_argument(
         '--pdb', action='store_true', dest='use_pdb',
         help='drop into pdb when there is an exception')

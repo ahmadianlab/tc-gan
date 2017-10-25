@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 def learn(
         driver, truth_size, truth_seed,
         sample_sites, include_inhibitory_neurons,
-        ):
+        true_ssn_options={}):
 
     np.random.seed(0)
     gan = driver.gan
@@ -41,12 +41,12 @@ def learn(
             N=ssn.num_sites,
             track_offset_identity=True,
             include_inhibitory_neurons=include_inhibitory_neurons,
-            # dt=ssn.dt,
-            dt=5e-4,  # as in ./gan.py
-            max_iter=100000,
-            r0=np.zeros(2 * ssn.num_sites),
-            io_type='asym_power',
-        )
+            **dict(dict(
+                dt=5e-4,  # as in ./gan.py
+                max_iter=100000,
+                r0=np.zeros(2 * ssn.num_sites),
+                io_type='asym_power',
+            ), **true_ssn_options))
     data = np.array(data.T)      # shape: (N_data, nb)
 
     with utils.log_timing('numpy.save("truth.npy", data)'):

@@ -45,6 +45,7 @@ def learn(
             dt=5e-4,  # as in ./gan.py
             max_iter=100000,
             r0=np.zeros(2 * ssn.num_sites),
+            io_type='asym_power',
         )
     data = np.array(data.T)      # shape: (N_data, nb)
 

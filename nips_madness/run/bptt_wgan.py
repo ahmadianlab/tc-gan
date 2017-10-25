@@ -32,7 +32,7 @@ def learn(
 
     logger.info('Generating the truth...')
     with utils.log_timing('sample_tuning_curves()'):
-        data, _ = ssnode.sample_tuning_curves(
+        data, (_, _, fpinfo) = ssnode.sample_tuning_curves(
             sample_sites=sample_sites,
             NZ=truth_size,
             seed=truth_seed,
@@ -59,6 +59,14 @@ def learn(
                 #       rates in non-sampled locations.
             ), **true_ssn_options))
     data = np.array(data.T)      # shape: (N_data, nb)
+
+    logger.info('Information of sampled tuning curves:')
+    logger.info('  len(data): %s', len(data))
+    logger.info('  rejections: %s', fpinfo.rejections)
+    logger.info('  rejection rate'
+                ' = rejections / (rejections + len(data)) : %s',
+                fpinfo.rejections / (fpinfo.rejections + len(data)))
+    logger.info('  error codes: %r', fpinfo.counter)
 
     with utils.log_timing('numpy.save("truth.npy", data)'):
         np.save(driver.datastore.path('truth.npy'), data)

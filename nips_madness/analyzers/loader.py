@@ -293,7 +293,7 @@ class GANData(object):
         try:
             return run_config['critic_iters']
         except KeyError:
-            return run_config['WGAN_n_critic']
+            return run_config.get('WGAN_n_critic', 5)
 
     @property
     def critic_iters_init(self):
@@ -301,7 +301,7 @@ class GANData(object):
         try:
             return run_config['critic_iters_init']
         except KeyError:
-            return run_config['WGAN_n_critic0']
+            return run_config.get('WGAN_n_critic0', 50)
 
     @property
     def gan_type(self):

@@ -1,5 +1,6 @@
 import json
 import os
+import warnings
 
 from matplotlib import pyplot
 import numpy as np
@@ -50,6 +51,19 @@ class DiscriminatorLog(object):
             os.path.join(logpath, 'disc_learning.csv'))
         self.param_stats = pandas.read_csv(
             os.path.join(logpath, 'disc_param_stats.csv'))
+
+        rows_learning = len(self.learning)
+        rows_param_stats = len(self.param_stats)
+        if rows_learning != rows_param_stats:
+            min_rows = min(rows_learning, rows_param_stats)
+            self.learning = self.learning.iloc[:, :min_rows]
+            self.param_stats = self.param_stats.iloc[:, :min_rows]
+
+            warnings.warn(
+                'Rows in disc_learning.csv ({}) and rows in'
+                ' disc_param_stats.csv ({}) differ.'
+                ' Resetting the shortest ({}).'
+                .format(rows_learning, rows_param_stats, min_rows))
 
         assert list(self.param_stats.columns[:2]) == ['gen_step', 'disc_step']
         self.param_stats_names = list(self.param_stats.columns[2:])

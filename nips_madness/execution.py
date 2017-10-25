@@ -143,10 +143,10 @@ def add_base_learning_options(parser):
 
     parser.add_argument(
         '--load-config',
-        help='''Load configuration (hyper parameters) from a JSON file
-        if given.  Note that configurations are overwritten by the
-        ones in JSON file if they are given by both in command line
-        and JSON.''')
+        help='''Load configuration (hyper parameters) from a
+        JSON/YAML/TOML/Pickle file if given.  Note that configurations
+        are overwritten by the ones in the given file if they are
+        given by both in command line and the file.''')
 
 
 def pre_learn(
@@ -156,8 +156,7 @@ def pre_learn(
         extra_info={}, preprocess=None,
         **run_config):
     if load_config:
-        with open(load_config) as file:
-            run_config.update(json.load(file))
+        run_config.update(utils.load_any_file(load_config))
 
     if preprocess:
         preprocess(run_config)

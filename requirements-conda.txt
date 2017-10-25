@@ -7,6 +7,7 @@ pandas
 pytest
 pyflakes
 sphinx
+pyyaml
 
 # "Optional" dependencies:
 ipython

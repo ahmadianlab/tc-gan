@@ -8,7 +8,7 @@ from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
-    theano_function,
+    theano_function, log_timing,
 )
 from .core import BaseComponent, consume_subdict
 from .ssn import TuningCurveGenerator
@@ -105,12 +105,14 @@ class BaseTrainer(BaseComponent):
             *args, updater=updater, **rest)
 
     def get_updates(self):
-        return self.updater(self.loss, self.target.get_all_params())
+        with log_timing("{}.update()".format(self.__class__.__name__)):
+            return self.updater(self.loss, self.target.get_all_params())
 
     @cached_property
     def train(self):
-        return theano_function(self.inputs, self.loss,
-                               updates=self.get_updates())
+        with log_timing("compiling {}.train".format(self.__class__.__name__)):
+            return theano_function(self.inputs, self.loss,
+                                   updates=self.get_updates())
 
     def prepare(self):
         """ Force compile Theno functions. """

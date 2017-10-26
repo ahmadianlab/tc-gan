@@ -6,7 +6,7 @@ import theano
 
 from .. import ssnode
 from ..gradient_expressions.make_w_batch import make_W_with_x
-from ..utils import cached_property, theano_function
+from ..utils import cached_property, theano_function, log_timing
 from .core import BaseComponent
 
 
@@ -380,4 +380,6 @@ class TuningCurveGenerator(BaseComponent):
 
     def prepare(self):
         """ Force compile Theno functions. """
-        self._forward
+        with log_timing("compiling {}._forward"
+                        .format(self.__class__.__name__)):
+            self._forward

@@ -1,5 +1,8 @@
 import numpy as np
+import pandas
+import pytest
 
+from ..disc_learning import DiscriminatorLog
 from ..loader import GANData, parse_tag
 
 
@@ -34,3 +37,32 @@ def test_parse_tag():
         use_data=True, io_type='asym_tanh', loss='CE',
         layers=[128], rate_cost=1.28,
     )
+
+
+def test_disc_log_init_different_rows():
+    learning = pandas.DataFrame(
+        np.array([[0] * 3,
+                  range(3),
+                  range(3),
+                  range(3)]).T,
+        columns=['gen_step', 'disc_step',
+                 'another_column', 'yet_another_column'],
+    )
+    param_stats = pandas.DataFrame(
+        np.array([[0] * 5,
+                  range(5),
+                  range(5)]).T,
+        columns=['gen_step', 'disc_step', 'another_column'],
+    )
+
+    class PatchedDiscriminatorLog(DiscriminatorLog):
+        def get_info(self):
+            return dict(run_config=dict(
+                batchsize=1,
+                truth_size=100,
+            ))
+
+    with pytest.warns(None) as record:
+        disc = PatchedDiscriminatorLog(learning, param_stats)
+    assert len(record) == 1
+    assert len(disc.learning) == len(disc.param_stats) == 3

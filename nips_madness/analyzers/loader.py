@@ -119,8 +119,8 @@ class GANData(object):
     @property
     def disc(self):
         if not hasattr(self, '_disc'):
-            from .disc_learning import DiscriminatorLog
-            self._disc = DiscriminatorLog(self.main_logpath)
+            from .disc_learning import load_disc_log
+            self._disc = load_disc_log(self.main_logpath)
         return self._disc
 
     def gen_param(self, name):

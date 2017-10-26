@@ -5,7 +5,6 @@ from matplotlib import pyplot
 import matplotlib
 import numpy as np
 
-from ..ssnode import DEFAULT_PARAMS
 from ..utils import csv_line
 from .loader import load_gandata
 
@@ -108,7 +107,7 @@ def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
     if axes is None:
         _, axes = pyplot.subplots(ncols=3, sharex=True, figsize=(9, 3))
     for column, name in enumerate('JDS'):
-        true_param = DEFAULT_PARAMS[name]
+        true_param = data.true_param(name)
         fake_param = data.gen_param(name)
         for c, ((i, p), (j, q)) in enumerate(itertools.product(
                 enumerate('EI'), enumerate('EI'))):

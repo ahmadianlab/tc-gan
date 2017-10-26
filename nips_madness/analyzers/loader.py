@@ -125,6 +125,11 @@ class GANData(object):
     def gen_param(self, name):
         return getattr(self, name)
 
+    def true_param(self, name):
+        return np.asarray(self.info['run_config']
+                          .get('true_ssn_options', {})
+                          .get(name, ssnode.DEFAULT_PARAMS[name]))
+
     def iter_gen_params(self, indices=None):
         if indices is None:
             indices = slice(None)
@@ -144,7 +149,7 @@ class GANData(object):
             return self.gen[:, 1:]
 
     def true_JDS(self):
-        JDS = list(map(ssnode.DEFAULT_PARAMS.get, 'JDS'))
+        JDS = list(map(self.true_param, 'JDS'))
         return np.concatenate(JDS).flatten()
 
     @property

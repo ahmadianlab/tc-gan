@@ -2,3 +2,5 @@
 [global]
 mode = FAST_COMPILE
 # http://deeplearning.net/software/theano/library/config.html#config.mode
+
+floatX = float32

@@ -1,6 +1,7 @@
 import lasagne
 import numpy as np
 import pytest
+import theano
 
 from ..simple_discriminator import LayerNormLayer, layer_normalized_dense_layer
 
@@ -25,6 +26,7 @@ def test_layer_norm_layer(def_shape, real_shape):
 
     rs = np.random.RandomState(0)
     x = rs.randn(*(real_shape or def_shape))
+    x = np.asarray(x, dtype=theano.config.floatX)
     actual = out.eval({l0.input_var: x})
 
     desired = np_norm_layer(x, l1.epsilon)
@@ -53,6 +55,7 @@ def test_layer_normalized_dense_layer(batchsize, in_dim, out_dim):
     else:
         raise ValueError('LayerNormLayer not found')
     out = lasagne.layers.get_output(l1)
+    x = np.asarray(x, dtype=theano.config.floatX)
     actual = out.eval({l0.input_var: x})
 
     a = np.tensordot(x, W, axes=1)

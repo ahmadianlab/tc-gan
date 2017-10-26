@@ -67,7 +67,8 @@ class BandwidthContrastStimulator(BaseComponent):
         self.bandwidths = theano.tensor.vector('bandwidths')
         self.contrasts = theano.tensor.vector('contrasts')
         self.smoothness = smoothness
-        self.site_to_band = np.linspace(-0.5, 0.5, self.num_sites)
+        self.site_to_band = np.linspace(-0.5, 0.5, self.num_sites,
+                                        dtype=theano.config.floatX)
 
         def sigm(x):
             from theano.tensor import exp
@@ -93,9 +94,9 @@ class EulerSSNCore(BaseComponent):
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type):
 
-        J = np.asarray(J)
-        D = np.asarray(D)
-        S = np.asarray(S)
+        J = np.asarray(J, dtype=theano.config.floatX)
+        D = np.asarray(D, dtype=theano.config.floatX)
+        S = np.asarray(S, dtype=theano.config.floatX)
         assert J.shape == D.shape == S.shape == (2, 2)
 
         self.stimulator = stimulator

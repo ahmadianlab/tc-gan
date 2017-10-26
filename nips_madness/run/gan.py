@@ -1237,6 +1237,8 @@ def do_learning(learn, run_config, script_file,
             load_gen_param=run_config['load_gen_param'],
             data_version=1,
             script_file=script_file,
+            learn=utils.objectpath(learn),
+            init_driver=utils.objectpath(init_driver),
             **extra_info))
 
 

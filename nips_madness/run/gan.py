@@ -1103,7 +1103,7 @@ def main(args=None):
 
     add_learning_options(parser)
     ns = parser.parse_args(args)
-    do_learning(learn, vars(ns))
+    do_learning(learn, vars(ns), script_file=__file__)
 
 
 def add_learning_options(parser):
@@ -1223,8 +1223,8 @@ def init_driver(
     return dict(run_config, datastore=datastore, gan=gan, driver=driver)
 
 
-def do_learning(learn, run_config, init_driver=init_driver,
-                script_file=__file__, extra_info={}):
+def do_learning(learn, run_config, script_file,
+                init_driver=init_driver, extra_info={}):
     """
     Wrap `.execution.do_learning` with some pre-processing.
     """

@@ -12,6 +12,7 @@ from ..utils import (
 )
 from .core import BaseComponent, consume_subdict
 from .ssn import TuningCurveGenerator
+from .utils import largerrecursionlimit
 
 
 DEFAULT_PARAMS = dict(
@@ -216,8 +217,10 @@ class BPTTWassersteinGAN(BaseComponent):
 
     def prepare(self):
         """ Force compile Theno functions. """
-        self.gen.prepare()
-        self.gen_trainer.prepare()
+        with largerrecursionlimit(self.gen.model.unroll_scan,
+                                  self.gen.model.seqlen):
+            self.gen.prepare()
+            self.gen_trainer.prepare()
         self.disc.prepare()
         self.disc_trainer.prepare()
 

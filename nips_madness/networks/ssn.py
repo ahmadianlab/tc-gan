@@ -178,6 +178,7 @@ class EulerSSNModel(BaseComponent):
             precompute_input=False,  # True (default) is maybe better?
             unroll_scan=unroll_scan,
         )
+        self.unroll_scan = unroll_scan
 
         self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
         rs = rates[:, self.skip_steps:]

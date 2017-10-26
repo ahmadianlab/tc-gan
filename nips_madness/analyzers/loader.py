@@ -200,11 +200,13 @@ class GANData(object):
             return self.n_stim
 
     @property
+    def contrasts(self):
+        run_config = self.info['run_config']
+        return run_config.get('contrasts') or run_config.get('contrast', [20])
+
+    @property
     def n_contrasts(self):
-        try:
-            return len(self.info['run_config']['contrast'])
-        except (AttributeError, KeyError):
-            return 1
+        return len(self.contrasts)
 
     @property
     def n_stim(self):

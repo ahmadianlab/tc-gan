@@ -1,3 +1,4 @@
+from pathlib import Path
 import collections
 import json
 import os
@@ -157,7 +158,10 @@ class GANData(object):
         try:
             return self.info['run_config']['track_offset_identity']
         except (AttributeError, KeyError):
-            return False
+            if self.run_module == 'bptt_wgan':
+                return True
+            else:
+                return False
 
     @property
     def include_inhibitory_neurons(self):
@@ -313,7 +317,7 @@ class GANData(object):
         try:
             loss = self.info['run_config']['loss']
         except KeyError:
-            if self.info['extra_info']['script_file'].endswith('bptt_wgan.py'):
+            if self.run_module == 'bptt_wgan':
                 loss = 'WD'
             else:
                 raise
@@ -326,6 +330,14 @@ class GANData(object):
         except KeyError:
             pass
         return '{}-GAN'.format(loss)
+
+    @property
+    def run_module(self):
+        try:
+            script_file = self.info['extra_info']['script_file']
+        except KeyError:
+            return 'gan'
+        return Path(script_file).stem
 
     def params(self):
         params = self.info['run_config']

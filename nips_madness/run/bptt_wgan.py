@@ -165,6 +165,12 @@ def make_parser():
     parser.add_argument(
         '--include-inhibitory-neurons', action='store_true',
         help='Sample TCs from inhibitory neurons if given.')
+    parser.add_argument(
+        '--unroll-scan', action='store_true',
+        help='''Unroll recurrent steps for SSN.  It may make SSN
+        forward/backward computations time-efficient at the cost of
+        increased memory consumption.
+        See: lasagne.layers.CustomRecurrentLayer''')
 
     for name in 'JDS':
         parser.add_argument(

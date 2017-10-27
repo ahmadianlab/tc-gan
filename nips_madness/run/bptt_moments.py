@@ -106,6 +106,9 @@ def make_parser():
         '--lam', default=.1, type=float,
         help='Weight for the variance (default: %(default)s)')
     parser.add_argument(
+        '--moment-weights-regularization', default=1e-3, type=float,
+        help='Regularizer to avoid division by zero (default: %(default)s)')
+    parser.add_argument(
         '--learning-rate',
         default=0.01, type=float,
         help='learning rate (default: %(default)s)')

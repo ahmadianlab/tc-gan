@@ -89,10 +89,11 @@ class MMGeneratorTrainer(BaseTrainer):
 class BPTTMomentMatcher(BaseComponent):
 
     def __init__(self, gen, gen_trainer, bandwidths, contrasts,
-                 lam, seed=0):
+                 lam, moment_weights_regularization, seed=0):
         self.gen = gen
         self.gen_trainer = gen_trainer
         self.lam = lam
+        self.moment_weights_regularization = moment_weights_regularization
 
         self.rng = np.random.RandomState(seed)
 
@@ -115,7 +116,8 @@ class BPTTMomentMatcher(BaseComponent):
     def init_dataset(self, data):
         self.data_moments = sample_moments(data)
         r0 = self.data_moments[0]  # sample mean
-        self.moment_weights = np.array([1 / r0**2, self.lam / r0**4])
+        den = r0 + self.moment_weights_regularization
+        self.moment_weights = np.array([1 / den**2, self.lam / den**4])
 
     def prepare(self):
         """ Force compile Theno functions. """

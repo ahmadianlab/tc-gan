@@ -191,13 +191,11 @@ def make_parser():
             '--gen-{}-min'.format(name),
             default=1e-3, type=eval,
             help='''Lower limit of the parameter {}.
-            Used only if --gen-param-type=clip.
             '''.format(name))
         parser.add_argument(
             '--gen-{}-max'.format(name),
             default=10, type=eval,
             help='''Upper limit of the parameter {}.
-            Used only if --gen-param-type=clip.
             '''.format(name))
 
     # Generator trainer

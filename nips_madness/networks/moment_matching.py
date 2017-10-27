@@ -115,7 +115,7 @@ class BPTTMomentMatcher(BaseComponent):
     def init_dataset(self, data):
         self.data_moments = sample_moments(data)
         r0 = self.data_moments[0]  # sample mean
-        self.moment_weights = np.array([1 / r0**2, self.lam / r0**2])
+        self.moment_weights = np.array([1 / r0**2, self.lam / r0**4])
 
     def prepare(self):
         """ Force compile Theno functions. """

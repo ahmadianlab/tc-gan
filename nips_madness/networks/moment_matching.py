@@ -87,8 +87,11 @@ class BPTTMomentMatcher(BaseComponent):
         self.stimulator_contrasts, self.stimulator_bandwidths \
             = cartesian_product(contrasts, bandwidths)
 
+    batchsize = property(lambda self: self.gen.model.batchsize)
+    num_neurons = property(lambda self: self.gen.num_neurons)
+
     def get_gen_param(self):
-        # To be called from GANDriver
+        # To be called from MomentMatchingDriver
         return [
             self.gen.model.J.get_value(),
             self.gen.model.D.get_value(),

@@ -17,18 +17,13 @@ from ..recorders import UpdateResult
 logger = getLogger(__name__)
 
 
-def learn(
-        driver, truth_size, truth_seed,
+def generate_dataset(
+        driver,
+        num_sites, bandwidths, contrasts,
+        truth_size, truth_seed,
         sample_sites, include_inhibitory_neurons,
         true_ssn_options={}):
-
-    np.random.seed(0)
-    gan = driver.gan
-    logger.info('Compiling Theano functions...')
-    with utils.log_timing('gan.prepare()'):
-        gan.prepare()
-    ssn = gan.gen
-    sample_sites = sample_sites_from_stim_space(sample_sites, ssn.num_sites)
+    sample_sites = sample_sites_from_stim_space(sample_sites, num_sites)
 
     logger.info('Generating the truth...')
     with utils.log_timing('sample_tuning_curves()'):
@@ -36,9 +31,9 @@ def learn(
             sample_sites=sample_sites,
             NZ=truth_size,
             seed=truth_seed,
-            bandwidths=gan.bandwidths,
-            contrast=gan.contrasts,
-            N=ssn.num_sites,
+            bandwidths=bandwidths,
+            contrast=contrasts,
+            N=num_sites,
             track_offset_identity=True,
             include_inhibitory_neurons=include_inhibitory_neurons,
             **dict(dict(
@@ -72,6 +67,25 @@ def learn(
         np.save(driver.datastore.path('truth.npy'), data)
     # Note: saving in .npy rather than .npz so that it can be
     # deduplicated (by, e.g., git-annex).
+
+    return data
+
+
+def learn(driver, **generate_dataset_kwargs):
+
+    np.random.seed(0)
+    gan = driver.gan
+    logger.info('Compiling Theano functions...')
+    with utils.log_timing('gan.prepare()'):
+        gan.prepare()
+
+    ssn = gan.gen
+    data = generate_dataset(
+        driver,
+        num_sites=ssn.num_sites,
+        bandwidths=gan.bandwidths,
+        contrasts=gan.contrasts,
+        **generate_dataset_kwargs)
 
     gan.init_dataset(data)
 

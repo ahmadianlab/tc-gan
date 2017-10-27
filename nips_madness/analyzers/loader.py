@@ -59,6 +59,25 @@ def parse_tag(tag):
     return locals()
 
 
+class LazyLogFileLoader(object):
+
+    def __init__(self, datastore, filenames):
+        self.__datastore = Path(datastore)
+        self.__filenames = filenames
+        self.__namemap = {Path(name).stem: name for name in filenames}
+
+    def __getattr__(self, name):
+        if name not in self.__namemap:
+            raise AttributeError('{} not in {}'.format(name, self.__namemap))
+        try:
+            return self.__dict__[name]
+        except KeyError:
+            pass
+        path = self.__datastore.joinpath(self.__namemap[name])
+        self.__dict__[name] = logfile = load_logfile(str(path))
+        return logfile
+
+
 class GANData(object):
 
     @classmethod

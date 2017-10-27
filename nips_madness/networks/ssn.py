@@ -6,7 +6,7 @@ import theano
 
 from .. import ssnode
 from ..gradient_expressions.make_w_batch import make_W_with_x
-from ..utils import cached_property, theano_function
+from ..utils import cached_property, theano_function, log_timing
 from .core import BaseComponent
 
 
@@ -138,6 +138,7 @@ class EulerSSNModel(BaseComponent):
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type,
+                 unroll_scan=False,
                  skip_steps=None, seqlen=None, batchsize=None):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
@@ -175,7 +176,9 @@ class EulerSSNModel(BaseComponent):
             hidden_to_hidden=self.l_ssn,
             nonlinearity=None,  # let EulerSSNLayer handle the nonlinearity
             precompute_input=False,  # True (default) is maybe better?
+            unroll_scan=unroll_scan,
         )
+        self.unroll_scan = unroll_scan
 
         self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
         rs = rates[:, self.skip_steps:]
@@ -377,4 +380,6 @@ class TuningCurveGenerator(BaseComponent):
 
     def prepare(self):
         """ Force compile Theno functions. """
-        self._forward
+        with log_timing("compiling {}._forward"
+                        .format(self.__class__.__name__)):
+            self._forward

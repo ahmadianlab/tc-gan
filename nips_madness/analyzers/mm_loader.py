@@ -29,6 +29,11 @@ class MomentMatchingData(object):
         batchsize = self.info['run_config']['batchsize']
         return step * batchsize / truth_size
 
+    def epoch_to_step(self, epoch):
+        truth_size = self.info['run_config']['truth_size']  # data size
+        batchsize = self.info['run_config']['batchsize']
+        return epoch / batchsize * truth_size
+
     def true_param(self, name):
         return np.asarray(self.info['run_config']
                           .get('true_ssn_options', {})
@@ -42,6 +47,11 @@ class MomentMatchingData(object):
         gen = self.log.generator.data
         J, D, S = gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
         return SimpleNamespace(J=J, D=D, S=S)
+
+    @cached_property
+    def gen_moments(self):
+        data = self.log.gen_moments.data
+        return data.reshape((len(data), 2, -1))
 
     default_spec_keys = ('lam', 'learning_rate')
 

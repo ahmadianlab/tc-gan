@@ -264,6 +264,11 @@ class MomentMatchingDriver(object):
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
+
+        self.datastore.tables.saverow(
+            'gen_moments.csv',
+            list(update_result.gen_moments.flat))
+
         jj, dd, ss = self.generator_recorder.record(gen_step)
 
         maybe_quit(

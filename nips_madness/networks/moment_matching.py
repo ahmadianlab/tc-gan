@@ -6,7 +6,10 @@ import theano
 
 from ..core import BaseComponent
 from ..gradient_expressions.utils import sample_sites_from_stim_space
-from ..utils import cartesian_product, StopWatch
+from ..utils import (
+    cached_property, cartesian_product, StopWatch,
+    theano_function, log_timing,
+)
 from .bptt_gan import DEFAULT_PARAMS, BaseTrainer
 from .ssn import TuningCurveGenerator
 from .utils import largerrecursionlimit
@@ -71,6 +74,17 @@ class MMGeneratorTrainer(BaseTrainer):
     def get_updates(self):
         return self.clip_JDS(super(MMGeneratorTrainer, self).get_updates())
 
+    @cached_property
+    def train(self):
+        outputs = [
+            self.loss,
+            self.gen.model.dynamics_penalty,
+            self.gen_moments,
+        ]
+        with log_timing("compiling {}.train".format(self.__class__.__name__)):
+            return theano_function(self.inputs, outputs,
+                                   updates=self.get_updates())
+
 
 class BPTTMomentMatcher(BaseComponent):
 
@@ -113,7 +127,9 @@ class BPTTMomentMatcher(BaseComponent):
     def train_generator(self, info):
         zg = self.rng.rand(self.batchsize, self.num_neurons, self.num_neurons)
         with self.train_watch:
-            info.loss = self.gen_trainer.train(
+            (info.loss,
+             info.dynamics_penalty,
+             info.gen_moments) = self.gen_trainer.train(
                 self.stimulator_bandwidths,
                 self.stimulator_contrasts,
                 zg,

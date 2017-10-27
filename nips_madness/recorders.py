@@ -108,13 +108,14 @@ class MMLearningRecorder(BaseRecorder):
 
     filename = "learning.csv"
     column_names = (
-        "step", "loss", "train_time",
+        "step", "loss", "dynamics_penalty", "train_time",
     )
 
     def record(self, gen_step, update_result):
         self._saverow([
             gen_step,
             update_result.loss,
+            update_result.dynamics_penalty,
             update_result.train_time,
         ])
 

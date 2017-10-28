@@ -4,6 +4,8 @@
 
 .. note:: Work in progress!
 
+.. _general-construction:
+
 General construction
 ====================
 

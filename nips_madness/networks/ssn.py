@@ -379,7 +379,7 @@ class TuningCurveGenerator(BaseComponent):
         return theano.clone(self.prober.outputs[0], replace)
 
     def prepare(self):
-        """ Force compile Theno functions. """
+        """ Force compile Theano functions. """
         with log_timing("compiling {}._forward"
                         .format(self.__class__.__name__)):
             self._forward

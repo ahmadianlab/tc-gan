@@ -120,7 +120,7 @@ class BPTTMomentMatcher(BaseComponent):
         self.moment_weights = np.array([1 / den**2, self.lam / den**4])
 
     def prepare(self):
-        """ Force compile Theno functions. """
+        """ Force compile Theano functions. """
         with largerrecursionlimit(self.gen.model.unroll_scan,
                                   self.gen.model.seqlen):
             self.gen.prepare()

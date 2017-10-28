@@ -63,7 +63,7 @@ class UnConditionalDiscriminator(BaseComponent):
         return lasagne.layers.get_output(self.l_out, inputs=inputs)
 
     def prepare(self):
-        """ Force compile Theno functions. """
+        """ Force compile Theano functions. """
         self.accuracy
 
 
@@ -115,7 +115,7 @@ class BaseTrainer(BaseComponent):
                                    updates=self.get_updates())
 
     def prepare(self):
-        """ Force compile Theno functions. """
+        """ Force compile Theano functions. """
         self.train
 
 
@@ -218,7 +218,7 @@ class BPTTWassersteinGAN(BaseComponent):
         return next(self.dataset)
 
     def prepare(self):
-        """ Force compile Theno functions. """
+        """ Force compile Theano functions. """
         with largerrecursionlimit(self.gen.model.unroll_scan,
                                   self.gen.model.seqlen):
             self.gen.prepare()

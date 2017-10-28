@@ -11,8 +11,12 @@ from .loader import LazyLogFileLoader
 
 class MomentMatchingData(object):
 
+    run_module = 'bptt_moments'
+
     def __init__(self, datastore):
         self.datastore = Path(datastore)
+        if not self.datastore.is_dir():
+            self.datastore = self.datastore.parent
         self.log = LazyLogFileLoader(
             self.datastore,
             ['learning.csv', 'generator.csv', 'gen_moments.csv'])

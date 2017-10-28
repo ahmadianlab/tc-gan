@@ -354,11 +354,7 @@ class GANData(object):
 
     @property
     def run_module(self):
-        try:
-            script_file = self.info['extra_info']['script_file']
-        except KeyError:
-            return 'gan'
-        return Path(script_file).stem
+        return guess_run_module(self.info)
 
     def params(self):
         params = self.info['run_config']
@@ -449,3 +445,40 @@ def load_gandata(paths, **kwds):
     if isinstance(paths, string_types):
         return GANData.load(paths)
     return GANGrid(map(GANData.load, paths), **kwds)
+
+
+def guess_run_module(info):
+    try:
+        script_file = info['extra_info']['script_file']
+    except KeyError:
+        return 'gan'
+    return Path(script_file).stem
+
+
+def get_run_module(path):
+    datastore = Path(path)
+    if not datastore.is_dir():
+        datastore = datastore.parent
+    with open(str(datastore.joinpath('info.json'))) as file:
+        info = json.load(file)
+    return guess_run_module(info)
+
+
+def get_loader(paths):
+    if isinstance(paths, string_types):
+        first_path = paths
+    else:
+        first_path = paths[0]
+    run_module = get_run_module(first_path)
+    if run_module == 'bptt_moments':
+        from .mm_loader import MomentMatchingData
+        if isinstance(paths, string_types):
+            return MomentMatchingData
+        else:
+            return lambda paths: map(MomentMatchingData, paths)
+    else:
+        return load_gandata
+
+
+def load_learning(paths, **kwds):
+    return get_loader(paths)(paths, **kwds)

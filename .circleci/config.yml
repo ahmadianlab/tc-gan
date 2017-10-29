@@ -48,9 +48,14 @@ jobs:
       - run:
           name: run tests
           command: |
-            make test-quick PYTEST_OPTS='-n auto'
+            make test-quick PYTEST_OPTS='-n 2'
             export THEANO_FLAGS=mode=Mode
-            make test-slow-only PYTEST_OPTS=--junitxml=test-results/pytest-slow.xml
+            make test-slow-only PYTEST_OPTS='-n 2 --junitxml=test-results/pytest-slow.xml'
+# Pass '-n 2' to pytest-xdist to limit number of CPUs to 2 which is
+# the number of CPUs for default "resource_class: medium" [*].  Note
+# that '-n auto' somehow detects much more CPUs.
+#
+# [*] https://circleci.com/docs/2.0/configuration-reference/#resource_class
 
       - run:
           name: save theano cache

@@ -97,7 +97,7 @@ class MMGeneratorTrainer(BaseTrainer):
       minbatch :math:`B`.
     * :math:`w` = `moment_weights` is a generic weights/coefficients
       for the all moments.  See :eq:`BPTTMomentMatcher-loss` and
-      `.BPTTMomentMatcher.init_dataset` for a concrete example.
+      `.BPTTMomentMatcher.set_dataset` for a concrete example.
 
     Attributes
     ----------
@@ -268,7 +268,7 @@ class BPTTMomentMatcher(BaseComponent):
             self.gen.model.S.get_value(),
         ]
 
-    def init_dataset(self, data):
+    def set_dataset(self, data):
         """ Calculate `data_moments` (means & variances) from `data`. """
         self.data_moments = sample_moments(data)
         r0 = self.data_moments[0]  # sample mean

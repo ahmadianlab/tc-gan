@@ -211,7 +211,7 @@ class BPTTWassersteinGAN(BaseComponent):
             self.gen.model.S.get_value(),
         ]
 
-    def init_dataset(self, data):
+    def set_dataset(self, data):
         self.dataset = random_minibatches(self.batchsize, data)
 
     def next_minibatch(self):

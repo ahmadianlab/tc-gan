@@ -87,7 +87,7 @@ def learn(driver, **generate_dataset_kwargs):
         contrasts=gan.contrasts,
         **generate_dataset_kwargs)
 
-    gan.init_dataset(data)
+    gan.set_dataset(data)
 
     learning_it = gan.learning()
 

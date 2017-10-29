@@ -32,7 +32,7 @@ def learn(driver, **generate_dataset_kwargs):
         contrasts=mmatcher.contrasts,
         **generate_dataset_kwargs)
 
-    mmatcher.init_dataset(data)
+    mmatcher.set_dataset(data)
     driver.run(mmatcher)
 
 

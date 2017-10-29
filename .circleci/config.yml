@@ -35,6 +35,7 @@ jobs:
           name: run tests
           command: |
             make test-quick PYTEST_OPTS='-n auto'
+            make test-slow-only PYTEST_OPTS=--junitxml=test-results/pytest-slow.xml
 
       - store_test_results:
           path: test-results

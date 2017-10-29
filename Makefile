@@ -11,6 +11,9 @@ ext: misc/rc/rc.sh env
 test: prepare
 	$(PYTEST)
 
+test-slow-only: prepare
+	$(PYTEST) -k 'slowtest'
+
 test-quick: prepare
 	$(PYTEST) -k 'not slowtest'
 

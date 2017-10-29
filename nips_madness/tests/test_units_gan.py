@@ -110,7 +110,7 @@ def mock_data(gan, truth_size=200):
 @pytest.mark.parametrize('sample_sites', [[0], [0, 1], [0, 0.5, 1]])
 @pytest.mark.parametrize('track_offset_identity', [False, True])
 @pytest.mark.parametrize('include_inhibitory_neurons', [False, True])
-def test_get_reduced_equal_subsample_neurons_slowtest(
+def test_get_reduced_equal_subsample_neurons(
         sample_sites,
         track_offset_identity, include_inhibitory_neurons,
         ):

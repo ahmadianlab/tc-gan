@@ -6,6 +6,7 @@
 *.sh.*
 *~
 /.cache
+/prof
 python
 taka
 disc_params/

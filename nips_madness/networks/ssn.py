@@ -137,7 +137,11 @@ class EulerSSNCore(BaseComponent):
         I = self.stimulator.stimulus
         eps = self.eps.reshape((1, -1))
         co_eps = (1 - self.eps).reshape((1, -1))
-        return co_eps * r + eps * f(r.dot(Wt) + I)
+        r_next = co_eps * r + eps * f(r.dot(Wt) + I)
+        r_next = theano.tensor.patternbroadcast(r_next, r.broadcastable)
+        # patternbroadcast is required for the case num_tcdom=1.
+        r_next.name = 'r_next'
+        return r_next
 
 
 class EulerSSNLayer(lasagne.layers.Layer):

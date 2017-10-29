@@ -1142,7 +1142,7 @@ def add_learning_options(parser):
 
     # Arguments handled in `preprocess`:
     parser.add_argument(
-        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
+        '--n_bandwidths', default=4, type=int, choices=(1, 4, 5, 8),
         help='Number of bandwidths (default: %(default)s)')
     parser.add_argument(
         '--load-gen-param',
@@ -1159,7 +1159,9 @@ def preprocess(run_config):
     # Set `bandwidths` outside the `learn` function, so that
     # `bandwidths` is stored in info.json:
     n_bandwidths = run_config.pop('n_bandwidths')
-    if n_bandwidths == 4:
+    if n_bandwidths == 1:
+        bandwidths = [0.0625]   # useful only for testing
+    elif n_bandwidths == 4:
         bandwidths = [0.0625, 0.125, 0.25, 0.75]
     elif n_bandwidths == 5:
         bandwidths = [0.0625, 0.125, 0.25, 0.5, 0.75]

@@ -124,7 +124,7 @@ def make_parser():
 
     # Arguments handled in `.gan.preprocess`:
     parser.add_argument(
-        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
+        '--n_bandwidths', default=4, type=int, choices=(1, 4, 5, 8),
         help='Number of bandwidths (default: %(default)s)')
     parser.add_argument(
         '--load-gen-param',

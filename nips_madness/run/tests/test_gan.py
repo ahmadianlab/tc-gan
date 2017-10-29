@@ -14,6 +14,7 @@ def single_g_step(args):
         '--truth_size', '1',
         '--n_samples', '1',
         '--contrast', '20',
+        '--n_bandwidths', '1',
         '--WGAN_n_critic0', '1',
     ] + args)
 

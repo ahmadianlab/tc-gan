@@ -349,11 +349,15 @@ def collect_names(prefixes, var_lists):
 
 class TuningCurveGenerator(BaseComponent):
 
+    stimulator_class = BandwidthContrastStimulator
+    model_class = EulerSSNModel
+    prober_class = FixedProber
+
     @classmethod
     def consume_kwargs(cls, **kwargs):
-        stimulator, rest = BandwidthContrastStimulator.consume_kwargs(**kwargs)
-        model, rest = EulerSSNModel.consume_kwargs(stimulator, **rest)
-        prober, rest = FixedProber.consume_kwargs(model, **rest)
+        stimulator, rest = cls.stimulator_class.consume_kwargs(**kwargs)
+        model, rest = cls.model_class.consume_kwargs(stimulator, **rest)
+        prober, rest = cls.prober_class.consume_kwargs(model, **rest)
         return cls(stimulator, model, prober), rest
 
     def __init__(self, stimulator, model, prober):

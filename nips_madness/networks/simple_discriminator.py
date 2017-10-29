@@ -88,7 +88,7 @@ def _validate_norm(normalization, n_layers):
         return (normalization,) * n_layers
 
 
-def make_net(in_shape, LOSS, layers=[], normalization='none',
+def make_net(in_shape, loss_type, layers=[], normalization='none',
              nonlinearity='rectify'):
     """
     Make a discriminator network appropriate for loss `LOSS`.
@@ -97,7 +97,7 @@ def make_net(in_shape, LOSS, layers=[], normalization='none',
     ----------
     in_shape : tuple of int
         `shape` argument passed to `lasagne.layers.InputLayer`.
-    LOSS : {'LS', 'CE', 'WGAN', 'WD'}
+    loss_type : {'LS', 'CE', 'WGAN', 'WD'}
         Discriminator loss type which is used to determine the output
         layer and nonlinearity type.
         For backward compatibility, 'WGAN' means 'WD'.
@@ -118,6 +118,11 @@ def make_net(in_shape, LOSS, layers=[], normalization='none',
     """
 
     net = L.InputLayer(in_shape)
+    net = stack_hidden_layers(net, layers, normalization, nonlinearity)
+    return make_output_layer(net, loss_type)
+
+
+def stack_hidden_layers(net, layers, normalization, nonlinearity):
 
     if isinstance(nonlinearity, str):
         nonlinearity = getattr(NL, nonlinearity)
@@ -128,13 +133,17 @@ def make_net(in_shape, LOSS, layers=[], normalization='none',
         net = make_layer(net, width, b=lasagne.init.Normal(.01, 0),
                          nonlinearity=nonlinearity)
 
-    if LOSS == "LS":
+    return net
+
+
+def make_output_layer(net, loss_type):
+    if loss_type == "LS":
         net = L.DenseLayer(net,1,nonlinearity = NL.linear,b=lasagne.init.Normal(.01,0))
-    elif LOSS == "CE":
+    elif loss_type == "CE":
         net = L.DenseLayer(net,1,nonlinearity = NL.sigmoid,b=lasagne.init.Normal(.01,0))
-    elif LOSS in ("WD", "WGAN"):
+    elif loss_type in ("WD", "WGAN"):
         net = L.DenseLayer(net, 1, nonlinearity=NL.linear, b=None)
     else:
-        raise ValueError("Invaid LOSS specified: {}".format(LOSS))
+        raise ValueError("Invaid loss_type specified: {}".format(loss_type))
 
     return net

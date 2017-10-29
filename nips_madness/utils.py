@@ -257,6 +257,13 @@ def cartesian_product(*arrays, **kwargs):
     return prod.reshape((len(arrays), -1))
 
 
+def as_randomstate(seed):
+    if hasattr(seed, 'seed'):
+        return seed  # suppose it's a RandomState instance
+    else:
+        return np.random.RandomState(seed)
+
+
 def random_minibatches(batchsize, data, strict=False, seed=0):
     num_batches = len(data) // batchsize
     if batchsize > len(data):
@@ -270,7 +277,7 @@ def random_minibatches(batchsize, data, strict=False, seed=0):
         else:
             warnings.warn(msg)
 
-    rng = np.random.RandomState(seed)
+    rng = as_randomstate(seed)
 
     def iterator():
         while True:

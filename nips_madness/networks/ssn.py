@@ -249,6 +249,8 @@ class EulerSSNModel(BaseComponent):
     S = property(lambda self: self.l_ssn.ssn.S)
 
     num_tcdom = property(lambda self: self.stimulator.num_tcdom)
+    num_sites = property(lambda self: self.stimulator.num_sites)
+    num_neurons = property(lambda self: self.stimulator.num_neurons)
 
     def _map_clone(self, expr):
         return theano.map(

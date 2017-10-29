@@ -20,6 +20,10 @@ def sample_slice(N, center_sites):
     return np.s_[i_beg:i_end]
 
 
+def sample_sites_from_stim_space_impl(stim_locs, N, type=int):
+    return ((stim_locs + 1) * (N - 1) / 2).astype(type)
+
+
 def sample_sites_from_stim_space(stim_locs, N):
     """
     Make `sample_sites` from specification on stimulation space (bandwidth).
@@ -54,7 +58,7 @@ def sample_sites_from_stim_space(stim_locs, N):
     assert all(stim_locs >= -1)
     assert all(stim_locs <= 1)
 
-    sample_sites = ((stim_locs + 1) * (N - 1) / 2).astype(int)
+    sample_sites = sample_sites_from_stim_space_impl(stim_locs, N)
 
     if len(sample_sites) != len(set(sample_sites)):
         raise ValueError(

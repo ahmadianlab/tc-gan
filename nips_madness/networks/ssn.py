@@ -22,12 +22,39 @@ def int_or_lscalr(value, name):
 
 
 class BandwidthContrastStimulator(BaseComponent):
-    """
+    r"""
     Stimulator for varying bandwidths and contrasts.
 
-    .. attribute:: num_tcdom
+    We set the stimulus input to excitatory and inhibitory neurons at
+    site :math:`i` to
 
-       Number of points in tuning curve (TC) domain.
+    .. math::
+       :label: BandwidthContrastStimulator-input
+
+       I_i(s) = A\,
+       \sigma\!\left( \frac{{s}/{2} + x_i}{l} \right)\,
+       \sigma\!\left( \frac{{s}/{2} - x_i}{l} \right)
+
+    where :math:`\sigma(u) = (1+\exp(-u))^{-1}` is the logistic
+    function, :math:`A` denotes the stimulus intensity (`contrast`),
+    and :math:`s \in S` (= `bandwidths`) are the stimulus size.
+
+    Attributes
+    ----------
+    num_sites : int
+        Size of the SSN to be stimulated.
+
+    num_tcdom : int
+        Number of points in :term:`tuning curve domain` (TC dom).
+
+    bandwidths : theano.vector.tensor
+        :math:`s` in :eq:`BandwidthContrastStimulator-input`
+
+    contrasts : theano.vector.tensor
+        :math:`A` in :eq:`BandwidthContrastStimulator-input`
+
+    smoothness : float
+        :math:`l` in :eq:`BandwidthContrastStimulator-input`
 
     """
 
@@ -135,6 +162,16 @@ class EulerSSNLayer(lasagne.layers.Layer):
 
 
 class EulerSSNModel(BaseComponent):
+
+    r"""
+    Implementation of SSN in Theano.
+
+    Attributes
+    ----------
+    dynamics_penalty : Theano scalar expression
+        :math:`\mathtt{mean}_{b,i,t} (r_{b,i}(t) - r_{b,i}(t - \Delta t))^2`
+
+    """
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type,

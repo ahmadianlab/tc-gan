@@ -30,12 +30,37 @@ jobs:
             - env
           key: v1-dependencies-{{ checksum "requirements-conda.txt" }}-{{ checksum "requirements-pip.txt" }}
 
+      - restore_cache:
+          keys:
+          - v1-theano-cache
+
+      - run:
+          name: restore theano cache
+          command: |
+            mkdir -pv $(dirname $(env/bin/theano-cache))
+            mkdir -pv ~/theano-cache
+            dest=$(env/bin/theano-cache)
+            rm -rf "$dest"
+            mv -v ~/theano-cache "$dest"
+      # `rm -rf "$dest"` since theano-cache creates the directory.
+
       # run tests!
       - run:
           name: run tests
           command: |
             make test-quick PYTEST_OPTS='-n auto'
+            export THEANO_FLAGS=mode=Mode
             make test-slow-only PYTEST_OPTS=--junitxml=test-results/pytest-slow.xml
+
+      - run:
+          name: save theano cache
+          command: |
+            mv -v $(env/bin/theano-cache) ~/theano-cache
+
+      - save_cache:
+          paths:
+            - ~/theano-cache
+          key: v1-theano-cache
 
       - store_test_results:
           path: test-results

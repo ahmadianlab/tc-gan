@@ -374,6 +374,10 @@ def load_any_file(path):
         return module.load(f)
 
 
+def is_theano(a):
+    return isinstance(a, theano.Variable)
+
+
 def get_array_module(array):
     """
     Return `numpy` or `theano.tensor` depending on `array` type.
@@ -386,6 +390,19 @@ def get_array_module(array):
         return np
     else:
         return theano.tensor
+
+
+def asarray(arrays):
+    """
+    Appropriately do `numpy.asarray` or `theano.tensor.as_tensor_variable`.
+    """
+    if is_theano(arrays):
+        return arrays
+    arrays = list(arrays)
+    if any(map(is_theano, arrays)):
+        return theano.tensor.as_tensor_variable(arrays)
+    else:
+        return np.asarray(arrays)
 
 
 def objectpath(obj):

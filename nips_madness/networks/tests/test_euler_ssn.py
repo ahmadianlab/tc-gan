@@ -12,6 +12,7 @@ def make_ssn(model_config):
     kwds.pop('bandwidths', None)
     kwds.pop('contrasts', None)
     kwds.pop('sample_sites', None)
+    kwds.pop('batchsize', None)
     stimulator, kwds = BandwidthContrastStimulator.consume_kwargs(**kwds)
     model, kwds = EulerSSNModel.consume_kwargs(stimulator, **kwds)
     assert not kwds
@@ -42,7 +43,7 @@ def test_compare_with_ssnode(num_sites):
 
     # ssnode_fps.shape: (batchsize, num_tcdom, 2N)
     zs, ssnode_fps, info = ssnode.sample_fixed_points(
-        model.batchsize,
+        1,  # batchsize
         N=num_sites,
         bandwidths=bandwidths,
         contrast=contrasts,

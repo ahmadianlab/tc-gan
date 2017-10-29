@@ -8,7 +8,7 @@ from ..core import BaseComponent
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import (
     cached_property, cartesian_product, StopWatch,
-    theano_function, log_timing,
+    theano_function, log_timing, asarray,
 )
 from .bptt_gan import DEFAULT_PARAMS, BaseTrainer
 from .ssn import TuningCurveGenerator
@@ -30,10 +30,6 @@ def sample_moments(samples):
         An array of shape ``(2, channels)``.
 
     """
-    if isinstance(samples, np.ndarray):
-        asarray = np.asarray
-    else:
-        asarray = theano.tensor.as_tensor_variable
     return asarray([samples.mean(axis=0), samples.var(axis=0)])
 
 
@@ -257,7 +253,7 @@ class BPTTMomentMatcher(BaseComponent):
         self.stimulator_contrasts, self.stimulator_bandwidths \
             = cartesian_product(contrasts, bandwidths)
 
-    batchsize = property(lambda self: self.gen.model.batchsize)
+    batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)
 
     def get_gen_param(self):

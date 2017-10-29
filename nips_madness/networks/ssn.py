@@ -7,7 +7,7 @@ import theano
 from .. import ssnode
 from ..core import BaseComponent
 from ..gradient_expressions.make_w_batch import make_W_with_x
-from ..utils import cached_property, theano_function, log_timing
+from ..utils import cached_property, theano_function, log_timing, asarray
 
 
 def int_or_lscalr(value, name):
@@ -181,10 +181,9 @@ class EulerSSNModel(BaseComponent):
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type,
                  unroll_scan=False,
-                 skip_steps=None, seqlen=None, batchsize=None):
+                 skip_steps=None, seqlen=None):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
-        self.batchsize = int_or_lscalr(batchsize, 'batchsize')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
 
         # num_tcdom = "batch dimension" when using Lasagne:
@@ -253,6 +252,8 @@ class EulerSSNModel(BaseComponent):
     D = property(lambda self: self.l_ssn.ssn.D)
     S = property(lambda self: self.l_ssn.ssn.S)
 
+    num_tcdom = property(lambda self: self.stimulator.num_tcdom)
+
     @cached_property
     def compute_trajectories(self):
         return theano_function(
@@ -277,7 +278,7 @@ class FixedProber(BaseComponent):
     batches and the points in :term:`tuning curve domain`.
 
     For a demonstration purpose, let's setup a fake model.  All
-    `FixedProber` cares are `.time_avg` and `.batchsize` attributes:
+    `FixedProber` cares are `.time_avg` and `.num_tcdom` attributes:
 
     >>> from types import SimpleNamespace
     >>> batchsize = 3
@@ -287,7 +288,7 @@ class FixedProber(BaseComponent):
     >>> time_avg = time_avg.reshape((batchsize, num_tcdom, num_neurons))
     >>> model = SimpleNamespace(
     ...     time_avg=theano.shared(time_avg),
-    ...     batchsize=batchsize)
+    ...     num_tcdom=num_tcdom)
 
     To probe `model.time_avg`, give the indices of neurons to be
     probed as `probes` argument:
@@ -328,12 +329,15 @@ class FixedProber(BaseComponent):
 
     def __init__(self, model, probes):
         self.model = model
-        self.probes = probes
+        self.probes = asarray(probes)
+
+        num_tcdom = self.model.num_tcdom
+        num_probes = self.probes.shape[0]
 
         # time_avg.shape: (batchsize, num_tcdom, num_neurons)
         tc = self.model.time_avg[:, :, self.probes]
         # tuning_curve.shape: (batchsize, num_tcdom * len(probes))
-        self.tuning_curve = tc.reshape((self.model.batchsize, -1))
+        self.tuning_curve = tc.reshape((-1, num_tcdom * num_probes))
         self.tuning_curve.name = 'tuning_curve'
 
         self.outputs = (self.tuning_curve,)
@@ -358,12 +362,14 @@ class TuningCurveGenerator(BaseComponent):
         stimulator, rest = cls.stimulator_class.consume_kwargs(**kwargs)
         model, rest = cls.model_class.consume_kwargs(stimulator, **rest)
         prober, rest = cls.prober_class.consume_kwargs(model, **rest)
-        return cls(stimulator, model, prober), rest
+        return super(TuningCurveGenerator, cls).consume_kwargs(
+            stimulator, model, prober, **rest)
 
-    def __init__(self, stimulator, model, prober):
+    def __init__(self, stimulator, model, prober, batchsize):
         self.stimulator = stimulator
         self.model = model
         self.prober = prober
+        self.batchsize = batchsize
 
         out_names = collect_names(['stimulator_', 'model_', 'prober_'],
                                   [self.stimulator.outputs,
@@ -385,7 +391,6 @@ class TuningCurveGenerator(BaseComponent):
     num_tcdom = property(lambda self: self.stimulator.num_tcdom)
     num_sites = property(lambda self: self.stimulator.num_sites)
     num_neurons = property(lambda self: self.stimulator.num_neurons)
-    batchsize = property(lambda self: self.model.batchsize)
     dt = property(lambda self: self.model.dt)
     probes = property(lambda self: self.prober.probes)
 

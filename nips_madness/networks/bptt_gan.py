@@ -195,7 +195,7 @@ class BPTTWassersteinGAN(BaseComponent):
         self.stimulator_contrasts, self.stimulator_bandwidths \
             = cartesian_product(contrasts, bandwidths)
 
-    batchsize = property(lambda self: self.gen.model.batchsize)
+    batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)
 
     # To be compatible with GANDriver:

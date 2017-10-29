@@ -22,6 +22,7 @@ jobs:
             apt-get update --fix-missing
             apt-get install -y build-essential
             make configure-default
+            make env-update
             make
 
       - save_cache:

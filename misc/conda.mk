@@ -1,5 +1,5 @@
 CONDA = conda
-CONDA_OPTS ?=
+CONDA_OPTS ?= --yes
 
 CONDA_INSTALL_OPTS = \
 ${CONDA_OPTS} --prefix env --file requirements-conda.txt

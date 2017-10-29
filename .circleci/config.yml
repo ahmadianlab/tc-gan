@@ -1,0 +1,45 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: continuumio/miniconda3
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "requirements-conda.txt" }}-{{ checksum "requirements-pip.txt" }}
+
+          - v1-dependencies-
+
+      - run:
+          name: install dependencies
+          command: |
+            apt-get update --fix-missing
+            apt-get install -y build-essential
+            make configure-default
+            make
+
+      - save_cache:
+          paths:
+            - env
+          key: v1-dependencies-{{ checksum "requirements-conda.txt" }}-{{ checksum "requirements-pip.txt" }}
+
+      # run tests!
+      - run:
+          name: run tests
+          command: |
+            make test-quick
+
+      - store_test_results:
+          path: tmp/pytest.xml
+      # https://circleci.com/docs/2.0/collect-test-data/
+
+      - store_artifacts:
+          path: tmp/pytest.xml
+          destination: test-reports
+      # https://circleci.com/docs/2.0/artifacts/

@@ -11,7 +11,7 @@ from .. import ssnode
 from .. import utils
 from ..drivers import GANDriver
 from ..gradient_expressions.utils import sample_sites_from_stim_space
-from ..networks.bptt_gan import make_gan
+from ..networks.bptt_gan import make_gan, DEFAULT_PARAMS
 from ..recorders import UpdateResult
 
 logger = getLogger(__name__)
@@ -166,6 +166,13 @@ def make_parser():
         '--batchsize', '--n_samples', default=15, type=eval,
         help='''Number of samples to draw from G each step
         (aka NZ, minibatch size). (default: %(default)s)''')
+    parser.add_argument(
+        '--seqlen', default=DEFAULT_PARAMS['seqlen'], type=int,
+        help='Total time steps for SSN.')
+    parser.add_argument(
+        '--skip-steps', default=DEFAULT_PARAMS['skip_steps'], type=int,
+        help='''First time steps to be excluded from tuning curve and
+        dynamics penalty calculations.''')
     parser.add_argument(
         '--sample-sites', default=[0], type=utils.csv_line(float),
         help='''Locations (offsets) of neurons to be sampled from SSN in the

@@ -12,6 +12,8 @@ def single_g_step(args):
         '--n_samples', '1',
         '--n_bandwidths', '1',
         '--WGAN_n_critic0', '1',
+        '--seqlen', '4',
+        '--skip-steps', '2',
     ] + args)
 
 

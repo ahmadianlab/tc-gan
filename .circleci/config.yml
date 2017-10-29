@@ -33,7 +33,7 @@ jobs:
       - run:
           name: run tests
           command: |
-            make test-quick
+            make test-quick PYTEST_OPTS='-n auto'
 
       - store_test_results:
           path: tmp/pytest.xml

@@ -1,18 +1,21 @@
 .PHONY: doc ext test* prepare
 
+PYTEST = misc/pytest $(PYTEST_OPTS)
+PYTEST_OPTS ?=
+
 prepare: env ext
 
 ext: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=nips_madness/ext
 
 test: prepare
-	misc/pytest
+	$(PYTEST)
 
 test-quick: prepare
-	misc/pytest -k 'not slowtest'
+	$(PYTEST) -k 'not slowtest'
 
 test-flakes: prepare
-	misc/pytest -m flakes
+	$(PYTEST) -m flakes
 
 doc: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=doc html

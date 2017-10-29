@@ -37,10 +37,12 @@ jobs:
             make test-quick PYTEST_OPTS='-n auto'
 
       - store_test_results:
-          path: tmp/pytest.xml
-      # https://circleci.com/docs/2.0/collect-test-data/
+          path: test-results
+# https://circleci.com/docs/2.0/collect-test-data/
+# https://circleci.com/docs/2.0/configuration-reference/#store_test_results
 
       - store_artifacts:
-          path: tmp/pytest.xml
-          destination: test-reports
-      # https://circleci.com/docs/2.0/artifacts/
+          path: test-results
+          destination: test-results
+# https://circleci.com/docs/2.0/artifacts/
+# https://circleci.com/docs/2.0/configuration-reference/#store_artifacts

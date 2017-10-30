@@ -25,6 +25,10 @@ class MomentMatchingData(object):
             self.info = json.load(file)
 
     @property
+    def total_steps(self):
+        return len(self.log.learning.data)
+
+    @property
     def epochs(self):
         return self.step_to_epoch(self.log.learning.data[:, 0])
 
@@ -42,6 +46,12 @@ class MomentMatchingData(object):
         return np.asarray(self.info['run_config']
                           .get('true_ssn_options', {})
                           .get(name, ssnode.DEFAULT_PARAMS[name]))
+
+    def iter_gen_params(self, indices=None):
+        if indices is None:
+            indices = slice(None)
+        gen = self.gen_matrices
+        return zip(gen.J[indices], gen.D[indices], gen.S[indices])
 
     def gen_param(self, name):
         return getattr(self.gen_matrices, name)
@@ -64,3 +74,6 @@ class MomentMatchingData(object):
             keys = self.default_spec_keys
         run_config = self.info['run_config']
         return ' '.join('{}={}'.format(k, run_config[k]) for k in keys)
+
+    def params(self):
+        return self.info['run_config']

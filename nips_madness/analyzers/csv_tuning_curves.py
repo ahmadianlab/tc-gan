@@ -34,7 +34,7 @@ def csv_tuning_curves(logpath, output, sample_epochs, quiet,
         sample_sites=sample_sites_from_stim_space(sample_sites, num_sites),
         **kwargs)
 
-    sample_epochs = sample_epochs[sample_epochs < len(data.main)]
+    sample_epochs = sample_epochs[sample_epochs < data.total_steps]
     tuning_curves = generated_tuning_curves(data, indices=sample_epochs,
                                             **ssn_params)
     bar = make_progressbar(quiet=quiet, max_value=len(sample_epochs))

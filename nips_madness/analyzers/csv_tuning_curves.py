@@ -1,3 +1,12 @@
+"""
+Generate tuning curves from generator parameters.
+
+.. WARNING:: epochs here means (generator) update steps.
+
+.. TODO:: consistently rename epochs to steps.
+
+"""
+
 from __future__ import print_function, division
 
 import os

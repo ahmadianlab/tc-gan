@@ -276,6 +276,10 @@ class GANData(object):
         return df
 
     @property
+    def total_steps(self):
+        return len(self.main)
+
+    @property
     def epochs(self):
         return self.gen_step_to_epoch(self.main[:, 0])
 

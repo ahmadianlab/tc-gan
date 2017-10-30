@@ -35,7 +35,7 @@ def learn(
         contrast,
         offsets,
         datastore, J0, D0, S0,
-        timetest, convtest, testDW, DRtest, truth_size_per_batch,
+        timetest, convtest, testDW, DRtest, truth_size_per_batch, use_inhibitory,
         # ignore:
         gan, driver):
     iterations = driver.iterations
@@ -104,7 +104,9 @@ def learn(
         contrast = contrast,
         offset = offsets,
         N=n_sites,
+        rate_stop_at=200,
         track_offset_identity=track_offset_identity,
+        include_inhibitory_neurons = use_inhibitory,
         **dict(ssn_params, io_type=true_IO_type))
     
     print("DONE")
@@ -113,8 +115,9 @@ def learn(
         
     # Check for sanity:
     n_stim = len(bandwidths) * len(contrast)  # number of stimulus conditions
+
     if track_offset_identity:
-        assert n_stim * len(sample_sites) == data.shape[-1]
+        assert n_stim * len(sample_sites) * (2 if use_inhibitory else 1) == data.shape[-1]
     else:
         assert n_stim == data.shape[-1]
 
@@ -136,7 +139,6 @@ def learn(
 
     #these are the parameters to be fit
     dp = init_disturbance
-    dp = -1.5
     
     if isinstance(dp, tuple):
         J_dis, D_dis, S_dis = dp
@@ -224,7 +226,7 @@ def learn(
     
     G_train_func,G_loss_func,get_reduced = make_functions(
         rate_vector=rvec, NZ=NZ, NB=NB, LOSS=loss,
-        sample_sites=sample_sites, track_offset_identity=track_offset_identity,
+        sample_sites=sample_sites, track_offset_identity=track_offset_identity,use_inhibitory = use_inhibitory,
         g_lr=gen_learn_rate, rate_cost=rate_cost,
         rate_penalty_threshold=rate_penalty_threshold,
         rate_penalty_no_I=rate_penalty_no_I,
@@ -264,7 +266,7 @@ def learn(
         allpar = np.reshape(np.concatenate([jj,dd,ss]),[-1]).tolist()
         datastore.tables.saverow('generator.csv', [k] + allpar)
 
-        if k == 1000:
+        if k == 3000:
             break
 
 ###I need theano functions that compute each of the things we want to moment match.
@@ -342,13 +344,14 @@ def MOMENT_update(G_train_func,iterations,N,NZ,NB,data,W,W_test,INPUT,ssn_params
 
     return Gloss,rtest,true,model_info,SSsolve_time.sum(),gradient_time.sum()
 
-def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,LOSS,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,lam):
+def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,LOSS,g_lr,rate_cost,rate_penalty_threshold,rate_penalty_no_I,ivec,Z,J,D,S,N,R_grad,track_offset_identity,lam,use_inhibitory):
 
     print(sample_sites)
     
     # Convert rate_vector of shape [NZ, NB, 2N] to an array of shape INSHAPE
     red_R_fake = subsample_neurons(rate_vector, N=N, NZ=NZ, NB=NB,
                                    sample_sites=sample_sites,
+                                   include_inhibitory_neurons = use_inhibitory,
                                    track_offset_identity=track_offset_identity)
 
     get_reduced = theano.function([rate_vector],red_R_fake,allow_input_downcast = True)
@@ -378,14 +381,14 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,LOSS,g_lr,rate_cost,rat
     #We have to do this by hand because hte SS soluytion is not written in a way that theano can solve
     #
     #to get the grads w.r.t. the generators parameters we need to do a jacobian 
-    fake_dis_grad = T.jacobian(T.flatten(loss_exp_train),rate_vector) #gradient of generator loss w.r.t rates [30,45,402]
+    fake_dis_grad = T.jacobian(loss_exp_train,rate_vector) #gradient of generator loss w.r.t rates [30,45,402]
     
     nstim = NB
         
-    fake_dis_grad = T.reshape(fake_dis_grad,[NZ,nstim,2*N])
+#    fake_dis_grad = T.reshape(fake_dis_grad,[NZ,nstim,2*N])
 
     #reshape the generator gradient to fit with Dr/Dth
-    fake_dis_grad_expanded = T.reshape(fake_dis_grad,[NZ,nstim,2*N,1,1])
+    fake_dis_grad_expanded = fake_dis_grad.dimshuffle([0,1,2,'x','x'])
 
     #putthem together and sum of the z,b,and N axes to get a [2,2] tensor that is the gradient of the loss w.r.t. parameters
     dLdJ_exp = (fake_dis_grad_expanded*R_grad[0]).sum(axis = (0,1,2))
@@ -402,12 +405,13 @@ def make_MOMENT_functions(rate_vector,sample_sites,NZ,NB,LOSS,g_lr,rate_cost,rat
     b2 = .9
 
     cut_value = 10.
+    
     def cut(tensor):
         return lasagne.updates.norm_constraint(tensor,cut_value)
     
     G_updates = lasagne.updates.sgd([cut(dLdJ_exp),cut(dLdD_exp),cut(dLdS_exp)],[J,D,S], g_lr)#,beta1 = b1,beta2 = b2)
 
-    G_train_func = theano.function([rate_vector,dat_mean,dat_vari,ivec,Z],loss_exp,updates = G_updates,allow_input_downcast = True)
+    G_train_func = theano.function([rate_vector,dat_mean,dat_vari,ivec,Z],loss_exp_train,updates = G_updates,allow_input_downcast = True)
     
     G_loss_func = theano.function([rate_vector,dat_mean,dat_vari,ivec,Z],loss_exp,allow_input_downcast = True,on_unused_input = 'ignore')
 
@@ -420,7 +424,7 @@ def main(args=None):
         '--seed', default=0, type=int,
         help='Seed for random numbers (default: %(default)s)')
     parser.add_argument(
-        '--init-disturbance', default=0.5, type=eval,
+        '--init-disturbance', default=-1.5, type=eval,
         help='''Initial disturbance to the parameter.  If it is
         evaluated to be a 3-tuple, the components are used for the
         disturbance for J, D (delta), S (sigma), respectively.  It
@@ -459,6 +463,10 @@ def main(args=None):
         If True, stack samples into NB axis; i.e., let discriminator
         know that those neurons are from the different offset of the
         same SSN.''')
+
+    parser.add_argument(
+        '--use_inhibitory', action='store_true',
+        help='''If False (default) use only excitatory TC. If True use excitatory and inhibitory''')
     parser.add_argument(
         '--contrast',
         default=[5,20],
@@ -530,7 +538,7 @@ def main(args=None):
 
     add_learning_options(parser)
     parser.set_defaults(
-        datastore_template='logfiles/moments_{IO_type}_{rate_cost}_{lam}_{truth_size_per_batch}',
+        datastore_template='logfiles/moments_{IO_type}_{rate_cost}_{lam}_{n_samples}_{init_disturbance}',
     )
 
     ns = parser.parse_args(args)

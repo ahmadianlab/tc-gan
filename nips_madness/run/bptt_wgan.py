@@ -11,34 +11,29 @@ from .. import ssnode
 from .. import utils
 from ..drivers import GANDriver
 from ..gradient_expressions.utils import sample_sites_from_stim_space
-from ..networks.bptt_gan import make_gan
+from ..networks.bptt_gan import make_gan, DEFAULT_PARAMS
 from ..recorders import UpdateResult
 
 logger = getLogger(__name__)
 
 
-def learn(
-        driver, truth_size, truth_seed,
+def generate_dataset(
+        driver,
+        num_sites, bandwidths, contrasts,
+        truth_size, truth_seed,
         sample_sites, include_inhibitory_neurons,
         true_ssn_options={}):
-
-    np.random.seed(0)
-    gan = driver.gan
-    logger.info('Compiling Theano functions...')
-    with utils.log_timing('gan.prepare()'):
-        gan.prepare()
-    ssn = gan.gen
-    sample_sites = sample_sites_from_stim_space(sample_sites, ssn.num_sites)
+    sample_sites = sample_sites_from_stim_space(sample_sites, num_sites)
 
     logger.info('Generating the truth...')
     with utils.log_timing('sample_tuning_curves()'):
-        data, _ = ssnode.sample_tuning_curves(
+        data, (_, _, fpinfo) = ssnode.sample_tuning_curves(
             sample_sites=sample_sites,
             NZ=truth_size,
             seed=truth_seed,
-            bandwidths=gan.bandwidths,
-            contrast=gan.contrasts,
-            N=ssn.num_sites,
+            bandwidths=bandwidths,
+            contrast=contrasts,
+            N=num_sites,
             track_offset_identity=True,
             include_inhibitory_neurons=include_inhibitory_neurons,
             **dict(dict(
@@ -60,12 +55,39 @@ def learn(
             ), **true_ssn_options))
     data = np.array(data.T)      # shape: (N_data, nb)
 
+    logger.info('Information of sampled tuning curves:')
+    logger.info('  len(data): %s', len(data))
+    logger.info('  rejections: %s', fpinfo.rejections)
+    logger.info('  rejection rate'
+                ' = rejections / (rejections + len(data)) : %s',
+                fpinfo.rejections / (fpinfo.rejections + len(data)))
+    logger.info('  error codes: %r', fpinfo.counter)
+
     with utils.log_timing('numpy.save("truth.npy", data)'):
         np.save(driver.datastore.path('truth.npy'), data)
     # Note: saving in .npy rather than .npz so that it can be
     # deduplicated (by, e.g., git-annex).
 
-    gan.init_dataset(data)
+    return data
+
+
+def learn(driver, **generate_dataset_kwargs):
+
+    np.random.seed(0)
+    gan = driver.gan
+    logger.info('Compiling Theano functions...')
+    with utils.log_timing('gan.prepare()'):
+        gan.prepare()
+
+    ssn = gan.gen
+    data = generate_dataset(
+        driver,
+        num_sites=ssn.num_sites,
+        bandwidths=gan.bandwidths,
+        contrasts=gan.contrasts,
+        **generate_dataset_kwargs)
+
+    gan.set_dataset(data)
 
     learning_it = gan.learning()
 
@@ -145,6 +167,13 @@ def make_parser():
         help='''Number of samples to draw from G each step
         (aka NZ, minibatch size). (default: %(default)s)''')
     parser.add_argument(
+        '--seqlen', default=DEFAULT_PARAMS['seqlen'], type=int,
+        help='Total time steps for SSN.')
+    parser.add_argument(
+        '--skip-steps', default=DEFAULT_PARAMS['skip_steps'], type=int,
+        help='''First time steps to be excluded from tuning curve and
+        dynamics penalty calculations.''')
+    parser.add_argument(
         '--sample-sites', default=[0], type=utils.csv_line(float),
         help='''Locations (offsets) of neurons to be sampled from SSN in the
         "bandwidth" space [-1, 1].  0 means the center of the
@@ -157,19 +186,23 @@ def make_parser():
     parser.add_argument(
         '--include-inhibitory-neurons', action='store_true',
         help='Sample TCs from inhibitory neurons if given.')
+    parser.add_argument(
+        '--unroll-scan', action='store_true',
+        help='''Unroll recurrent steps for SSN.  It may make SSN
+        forward/backward computations time-efficient at the cost of
+        increased memory consumption.
+        See: lasagne.layers.CustomRecurrentLayer''')
 
     for name in 'JDS':
         parser.add_argument(
             '--gen-{}-min'.format(name),
             default=1e-3, type=eval,
             help='''Lower limit of the parameter {}.
-            Used only if --gen-param-type=clip.
             '''.format(name))
         parser.add_argument(
             '--gen-{}-max'.format(name),
             default=10, type=eval,
             help='''Upper limit of the parameter {}.
-            Used only if --gen-param-type=clip.
             '''.format(name))
 
     # Generator trainer

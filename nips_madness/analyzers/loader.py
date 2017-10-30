@@ -1,3 +1,4 @@
+from pathlib import Path
 import collections
 import json
 import os
@@ -56,6 +57,25 @@ def parse_tag(tag):
     layers = list(map(int, layers))
     del _, iot0, iot1, tag
     return locals()
+
+
+class LazyLogFileLoader(object):
+
+    def __init__(self, datastore, filenames):
+        self.__datastore = Path(datastore)
+        self.__filenames = filenames
+        self.__namemap = {Path(name).stem: name for name in filenames}
+
+    def __getattr__(self, name):
+        if name not in self.__namemap:
+            raise AttributeError('{} not in {}'.format(name, self.__namemap))
+        try:
+            return self.__dict__[name]
+        except KeyError:
+            pass
+        path = self.__datastore.joinpath(self.__namemap[name])
+        self.__dict__[name] = logfile = load_logfile(str(path))
+        return logfile
 
 
 class GANData(object):
@@ -118,12 +138,17 @@ class GANData(object):
     @property
     def disc(self):
         if not hasattr(self, '_disc'):
-            from .disc_learning import DiscriminatorLog
-            self._disc = DiscriminatorLog(self.main_logpath)
+            from .disc_learning import load_disc_log
+            self._disc = load_disc_log(self.main_logpath)
         return self._disc
 
     def gen_param(self, name):
         return getattr(self, name)
+
+    def true_param(self, name):
+        return np.asarray(self.info['run_config']
+                          .get('true_ssn_options', {})
+                          .get(name, ssnode.DEFAULT_PARAMS[name]))
 
     def iter_gen_params(self, indices=None):
         if indices is None:
@@ -138,10 +163,13 @@ class GANData(object):
             return 0
 
     def fake_JDS(self):
-        return np.exp(self.gen[:, 1:])
+        if self.data_version < 1:
+            return np.exp(self.gen[:, 1:])
+        else:
+            return self.gen[:, 1:]
 
     def true_JDS(self):
-        JDS = list(map(ssnode.DEFAULT_PARAMS.get, 'JDS'))
+        JDS = list(map(self.true_param, 'JDS'))
         return np.concatenate(JDS).flatten()
 
     @property
@@ -149,7 +177,10 @@ class GANData(object):
         try:
             return self.info['run_config']['track_offset_identity']
         except (AttributeError, KeyError):
-            return False
+            if self.run_module == 'bptt_wgan':
+                return True
+            else:
+                return False
 
     @property
     def include_inhibitory_neurons(self):
@@ -188,11 +219,13 @@ class GANData(object):
             return self.n_stim
 
     @property
+    def contrasts(self):
+        run_config = self.info['run_config']
+        return run_config.get('contrasts') or run_config.get('contrast', [20])
+
+    @property
     def n_contrasts(self):
-        try:
-            return len(self.info['run_config']['contrast'])
-        except (AttributeError, KeyError):
-            return 1
+        return len(self.contrasts)
 
     @property
     def n_stim(self):
@@ -290,7 +323,7 @@ class GANData(object):
         try:
             return run_config['critic_iters']
         except KeyError:
-            return run_config['WGAN_n_critic']
+            return run_config.get('WGAN_n_critic', 5)
 
     @property
     def critic_iters_init(self):
@@ -298,14 +331,14 @@ class GANData(object):
         try:
             return run_config['critic_iters_init']
         except KeyError:
-            return run_config['WGAN_n_critic0']
+            return run_config.get('WGAN_n_critic0', 50)
 
     @property
     def gan_type(self):
         try:
             loss = self.info['run_config']['loss']
         except KeyError:
-            if self.info['extra_info']['script_file'].endswith('bptt_wgan.py'):
+            if self.run_module == 'bptt_wgan':
                 loss = 'WD'
             else:
                 raise
@@ -318,6 +351,10 @@ class GANData(object):
         except KeyError:
             pass
         return '{}-GAN'.format(loss)
+
+    @property
+    def run_module(self):
+        return guess_run_module(self.info)
 
     def params(self):
         params = self.info['run_config']
@@ -408,3 +445,40 @@ def load_gandata(paths, **kwds):
     if isinstance(paths, string_types):
         return GANData.load(paths)
     return GANGrid(map(GANData.load, paths), **kwds)
+
+
+def guess_run_module(info):
+    try:
+        script_file = info['extra_info']['script_file']
+    except KeyError:
+        return 'gan'
+    return Path(script_file).stem
+
+
+def get_run_module(path):
+    datastore = Path(path)
+    if not datastore.is_dir():
+        datastore = datastore.parent
+    with open(str(datastore.joinpath('info.json'))) as file:
+        info = json.load(file)
+    return guess_run_module(info)
+
+
+def get_loader(paths):
+    if isinstance(paths, string_types):
+        first_path = paths
+    else:
+        first_path = paths[0]
+    run_module = get_run_module(first_path)
+    if run_module == 'bptt_moments':
+        from .mm_loader import MomentMatchingData
+        if isinstance(paths, string_types):
+            return MomentMatchingData
+        else:
+            return lambda paths: map(MomentMatchingData, paths)
+    else:
+        return load_gandata
+
+
+def load_learning(paths, **kwds):
+    return get_loader(paths)(paths, **kwds)

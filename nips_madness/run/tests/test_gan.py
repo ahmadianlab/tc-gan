@@ -6,6 +6,7 @@ import pytest
 from .. import gan
 from ... import recorders
 from ...analyzers import load_logfile
+from ...conftest import old_gan
 
 
 def single_g_step(args):
@@ -14,6 +15,7 @@ def single_g_step(args):
         '--truth_size', '1',
         '--n_samples', '1',
         '--contrast', '20',
+        '--n_bandwidths', '1',
         '--WGAN_n_critic0', '1',
     ] + args)
 
@@ -44,6 +46,7 @@ def make_gan(n_samples, bandwidths, contrast, **run_config):
         **run_config)
 
 
+@old_gan
 @pytest.mark.parametrize('args', [
     [],
     ['--loss', 'CE'],
@@ -82,6 +85,7 @@ def test_single_g_step_slowtest(args, cleancwd):
     assert data.gen_names == list(recorders.GenParamRecorder.column_names)
 
 
+@old_gan
 def test_disc_param_save_slowtest(cleancwd, single_g_step=single_g_step):
     single_g_step([
         '--disc-param-save-interval', '1',

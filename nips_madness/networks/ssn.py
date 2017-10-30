@@ -5,9 +5,9 @@ import numpy as np
 import theano
 
 from .. import ssnode
+from ..core import BaseComponent
 from ..gradient_expressions.make_w_batch import make_W_with_x
-from ..utils import cached_property, theano_function
-from .core import BaseComponent
+from ..utils import cached_property, theano_function, log_timing
 
 
 def int_or_lscalr(value, name):
@@ -22,12 +22,39 @@ def int_or_lscalr(value, name):
 
 
 class BandwidthContrastStimulator(BaseComponent):
-    """
+    r"""
     Stimulator for varying bandwidths and contrasts.
 
-    .. attribute:: num_tcdom
+    We set the stimulus input to excitatory and inhibitory neurons at
+    site :math:`i` to
 
-       Number of points in tuning curve (TC) domain.
+    .. math::
+       :label: BandwidthContrastStimulator-input
+
+       I_i(s) = A\,
+       \sigma\!\left( \frac{{s}/{2} + x_i}{l} \right)\,
+       \sigma\!\left( \frac{{s}/{2} - x_i}{l} \right)
+
+    where :math:`\sigma(u) = (1+\exp(-u))^{-1}` is the logistic
+    function, :math:`A` denotes the stimulus intensity (`contrast`),
+    and :math:`s \in S` (= `bandwidths`) are the stimulus size.
+
+    Attributes
+    ----------
+    num_sites : int
+        Size of the SSN to be stimulated.
+
+    num_tcdom : int
+        Number of points in :term:`tuning curve domain` (TC dom).
+
+    bandwidths : theano.vector.tensor
+        :math:`s` in :eq:`BandwidthContrastStimulator-input`
+
+    contrasts : theano.vector.tensor
+        :math:`A` in :eq:`BandwidthContrastStimulator-input`
+
+    smoothness : float
+        :math:`l` in :eq:`BandwidthContrastStimulator-input`
 
     """
 
@@ -40,7 +67,8 @@ class BandwidthContrastStimulator(BaseComponent):
         self.bandwidths = theano.tensor.vector('bandwidths')
         self.contrasts = theano.tensor.vector('contrasts')
         self.smoothness = smoothness
-        self.site_to_band = np.linspace(-0.5, 0.5, self.num_sites)
+        self.site_to_band = np.linspace(-0.5, 0.5, self.num_sites,
+                                        dtype=theano.config.floatX)
 
         def sigm(x):
             from theano.tensor import exp
@@ -66,9 +94,9 @@ class EulerSSNCore(BaseComponent):
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type):
 
-        J = np.asarray(J)
-        D = np.asarray(D)
-        S = np.asarray(S)
+        J = np.asarray(J, dtype=theano.config.floatX)
+        D = np.asarray(D, dtype=theano.config.floatX)
+        S = np.asarray(S, dtype=theano.config.floatX)
         assert J.shape == D.shape == S.shape == (2, 2)
 
         self.stimulator = stimulator
@@ -109,7 +137,11 @@ class EulerSSNCore(BaseComponent):
         I = self.stimulator.stimulus
         eps = self.eps.reshape((1, -1))
         co_eps = (1 - self.eps).reshape((1, -1))
-        return co_eps * r + eps * f(r.dot(Wt) + I)
+        r_next = co_eps * r + eps * f(r.dot(Wt) + I)
+        r_next = theano.tensor.patternbroadcast(r_next, r.broadcastable)
+        # patternbroadcast is required for the case num_tcdom=1.
+        r_next.name = 'r_next'
+        return r_next
 
 
 class EulerSSNLayer(lasagne.layers.Layer):
@@ -136,8 +168,19 @@ class EulerSSNLayer(lasagne.layers.Layer):
 
 class EulerSSNModel(BaseComponent):
 
+    r"""
+    Implementation of SSN in Theano.
+
+    Attributes
+    ----------
+    dynamics_penalty : Theano scalar expression
+        :math:`\mathtt{mean}_{b,i,t} (r_{b,i}(t) - r_{b,i}(t - \Delta t))^2`
+
+    """
+
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type,
+                 unroll_scan=False,
                  skip_steps=None, seqlen=None, batchsize=None):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
@@ -175,7 +218,9 @@ class EulerSSNModel(BaseComponent):
             hidden_to_hidden=self.l_ssn,
             nonlinearity=None,  # let EulerSSNLayer handle the nonlinearity
             precompute_input=False,  # True (default) is maybe better?
+            unroll_scan=unroll_scan,
         )
+        self.unroll_scan = unroll_scan
 
         self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
         rs = rates[:, self.skip_steps:]
@@ -376,5 +421,7 @@ class TuningCurveGenerator(BaseComponent):
         return theano.clone(self.prober.outputs[0], replace)
 
     def prepare(self):
-        """ Force compile Theno functions. """
-        self._forward
+        """ Force compile Theano functions. """
+        with log_timing("compiling {}._forward"
+                        .format(self.__class__.__name__)):
+            self._forward

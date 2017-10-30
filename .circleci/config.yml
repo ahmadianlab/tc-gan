@@ -1,0 +1,79 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: continuumio/miniconda3
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "requirements-conda.txt" }}-{{ checksum "requirements-pip.txt" }}
+
+          - v1-dependencies-
+
+      - run:
+          name: install dependencies
+          command: |
+            apt-get update --fix-missing
+            apt-get install -y build-essential
+            make configure-default
+            make env-update
+            make
+
+      - save_cache:
+          paths:
+            - env
+          key: v1-dependencies-{{ checksum "requirements-conda.txt" }}-{{ checksum "requirements-pip.txt" }}
+
+      - restore_cache:
+          keys:
+          - v1-theano-cache
+
+      - run:
+          name: restore theano cache
+          command: |
+            mkdir -pv $(dirname $(env/bin/theano-cache))
+            mkdir -pv ~/theano-cache
+            dest=$(env/bin/theano-cache)
+            rm -rf "$dest"
+            mv -v ~/theano-cache "$dest"
+      # `rm -rf "$dest"` since theano-cache creates the directory.
+
+      # run tests!
+      - run:
+          name: run tests
+          command: |
+            make test-quick PYTEST_OPTS='-n 2'
+            export THEANO_FLAGS=mode=Mode
+            make test-slow-only PYTEST_OPTS='-n 2 --junitxml=test-results/pytest-slow.xml'
+# Pass '-n 2' to pytest-xdist to limit number of CPUs to 2 which is
+# the number of CPUs for default "resource_class: medium" [*].  Note
+# that '-n auto' somehow detects much more CPUs.
+#
+# [*] https://circleci.com/docs/2.0/configuration-reference/#resource_class
+
+      - run:
+          name: save theano cache
+          command: |
+            mv -v $(env/bin/theano-cache) ~/theano-cache
+
+      - save_cache:
+          paths:
+            - ~/theano-cache
+          key: v1-theano-cache
+
+      - store_test_results:
+          path: test-results
+# https://circleci.com/docs/2.0/collect-test-data/
+# https://circleci.com/docs/2.0/configuration-reference/#store_test_results
+
+      - store_artifacts:
+          path: test-results
+          destination: test-results
+# https://circleci.com/docs/2.0/artifacts/
+# https://circleci.com/docs/2.0/configuration-reference/#store_artifacts

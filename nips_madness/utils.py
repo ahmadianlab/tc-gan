@@ -386,3 +386,14 @@ def get_array_module(array):
         return np
     else:
         return theano.tensor
+
+
+def objectpath(obj):
+    """
+    Get an importable path of an object `obj`.
+
+    >>> import json
+    >>> objectpath(json.load)
+    'json.load'
+    """
+    return obj.__module__ + '.' + obj.__name__

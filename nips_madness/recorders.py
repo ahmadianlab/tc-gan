@@ -104,6 +104,26 @@ class LearningRecorder(BaseRecorder):
         return cls.make(driver.datastore, quiet=driver.quiet)
 
 
+class MMLearningRecorder(BaseRecorder):
+
+    filename = "learning.csv"
+    column_names = (
+        "step", "loss", "dynamics_penalty", "train_time",
+    )
+
+    def record(self, gen_step, update_result):
+        self._saverow([
+            gen_step,
+            update_result.loss,
+            update_result.dynamics_penalty,
+            update_result.train_time,
+        ])
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, quiet=driver.quiet)
+
+
 class DiscLearningRecorder(BaseRecorder):
 
     filename = 'disc_learning.csv'

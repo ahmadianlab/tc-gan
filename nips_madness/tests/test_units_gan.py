@@ -5,6 +5,7 @@ Unit tests for GAN.
 import numpy as np
 import pytest
 
+from ..conftest import old_gan
 from ..drivers import GANDriver
 from ..gradient_expressions.utils import subsample_neurons, \
     sample_sites_from_stim_space
@@ -107,10 +108,11 @@ def mock_data(gan, truth_size=200):
     return np.arange(0, np.prod(shape)).reshape(shape)
 
 
+@old_gan
 @pytest.mark.parametrize('sample_sites', [[0], [0, 1], [0, 0.5, 1]])
 @pytest.mark.parametrize('track_offset_identity', [False, True])
 @pytest.mark.parametrize('include_inhibitory_neurons', [False, True])
-def test_get_reduced_equal_subsample_neurons_slowtest(
+def test_get_reduced_equal_subsample_neurons(
         sample_sites,
         track_offset_identity, include_inhibitory_neurons,
         ):
@@ -127,6 +129,7 @@ def test_get_reduced_equal_subsample_neurons_slowtest(
     np.testing.assert_equal(reduced, subsampled)
 
 
+@old_gan
 def test_smoke_train_gan():
     gan = make_gan()
     datastore = fake_datastore()

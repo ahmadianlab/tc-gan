@@ -1,5 +1,6 @@
 import json
 import os
+import warnings
 
 from matplotlib import pyplot
 import numpy as np
@@ -39,17 +40,37 @@ def param_stats_to_pretty_label(name):
 
 class DiscriminatorLog(object):
 
-    def __init__(self, logpath):
+    @classmethod
+    def load(cls, logpath):
         import pandas
 
         if not os.path.isdir(logpath):
             logpath = os.path.dirname(logpath)
+
+        learning = pandas.read_csv(
+            os.path.join(logpath, 'disc_learning.csv'))
+        param_stats = pandas.read_csv(
+            os.path.join(logpath, 'disc_param_stats.csv'))
+
+        return cls(learning, param_stats, logpath)
+
+    def __init__(self, learning, param_stats, logpath=None):
+        self.learning = learning
+        self.param_stats = param_stats
         self._datadir = logpath
 
-        self.learning = pandas.read_csv(
-            os.path.join(logpath, 'disc_learning.csv'))
-        self.param_stats = pandas.read_csv(
-            os.path.join(logpath, 'disc_param_stats.csv'))
+        rows_learning = len(self.learning)
+        rows_param_stats = len(self.param_stats)
+        if rows_learning != rows_param_stats:
+            min_rows = min(rows_learning, rows_param_stats)
+            self.learning = self.learning.iloc[:min_rows].copy()
+            self.param_stats = self.param_stats.iloc[:min_rows].copy()
+
+            warnings.warn(
+                'Rows in disc_learning.csv ({}) and rows in'
+                ' disc_param_stats.csv ({}) differ.'
+                ' Resetting the shortest ({}).'
+                .format(rows_learning, rows_param_stats, min_rows))
 
         assert list(self.param_stats.columns[:2]) == ['gen_step', 'disc_step']
         self.param_stats_names = list(self.param_stats.columns[2:])
@@ -132,7 +153,7 @@ class DiscriminatorLog(object):
         return ' '.join('{}={}'.format(k, run_config[k]) for k in title_params)
 
 
-load_disc_log = DiscriminatorLog
+load_disc_log = DiscriminatorLog.load
 
 
 def analyze_disc_learning(logpath, figpath=None, show=False, **kwds):

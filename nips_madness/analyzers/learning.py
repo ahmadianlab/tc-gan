@@ -5,9 +5,8 @@ from matplotlib import pyplot
 import matplotlib
 import numpy as np
 
-from ..ssnode import DEFAULT_PARAMS
 from ..utils import csv_line
-from .loader import load_gandata
+from .loader import load_learning
 
 
 def clip_ymax(ax, ymax, ymin=0):
@@ -108,7 +107,7 @@ def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
     if axes is None:
         _, axes = pyplot.subplots(ncols=3, sharex=True, figsize=(9, 3))
     for column, name in enumerate('JDS'):
-        true_param = DEFAULT_PARAMS[name]
+        true_param = data.true_param(name)
         fake_param = data.gen_param(name)
         for c, ((i, p), (j, q)) in enumerate(itertools.product(
                 enumerate('EI'), enumerate('EI'))):
@@ -281,8 +280,17 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     return ax
 
 
-def analyze_learning(logpath, show, figpath, title_params):
-    arts = plot_learning(load_gandata(logpath), title_params)
+def analyze_learning(logpath, title_params):
+    data = load_learning(logpath)
+    if data.run_module == 'bptt_moments':
+        from .mm_learning import plot_mm_learning
+        return plot_mm_learning(data, title_params)
+    else:
+        return plot_learning(data, title_params)
+
+
+def cli_analyze_learning(logpath, title_params, show, figpath):
+    arts = analyze_learning(logpath, title_params)
     fig = arts.fig
     if show:
         pyplot.show()
@@ -303,7 +311,7 @@ def main(args=None):
         '--title-params', type=csv_line(str),
         help='Comma separated name of parameters to be used in figure title.')
     ns = parser.parse_args(args)
-    analyze_learning(**vars(ns))
+    cli_analyze_learning(**vars(ns))
 
 
 if __name__ == '__main__':

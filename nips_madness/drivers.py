@@ -7,7 +7,7 @@ from . import execution
 from . import lasagne_param_file
 from . import ssnode
 from .recorders import LearningRecorder, GenParamRecorder, \
-    DiscLearningRecorder, DiscParamStatsRecorder
+    DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder
 
 
 def net_isfinite(layer):
@@ -241,3 +241,73 @@ class WGANDiscLossLimiter(object):
     @classmethod
     def from_driver(cls, driver):
         return cls(driver.datastore)
+
+
+class MomentMatchingDriver(object):
+
+    # TODO: refactor out common code with GANDriver
+
+    def __init__(self, mmatcher, datastore, iterations, quiet,
+                 quit_JDS_threshold=-1):
+        self.mmatcher = mmatcher
+        self.datastore = datastore
+        self.iterations = iterations
+        self.quiet = quiet
+        self.quit_JDS_threshold = quit_JDS_threshold
+
+    # For compatibility with GenParamRecorder:
+    gan = property(lambda self: self.mmatcher)
+
+    def pre_loop(self):
+        self.learning_recorder = MMLearningRecorder.from_driver(self)
+        self.generator_recorder = GenParamRecorder.from_driver(self)
+
+    def post_update(self, gen_step, update_result):
+        self.learning_recorder.record(gen_step, update_result)
+
+        self.datastore.tables.saverow(
+            'gen_moments.csv',
+            list(update_result.gen_moments.flat))
+
+        jj, dd, ss = self.generator_recorder.record(gen_step)
+
+        maybe_quit(
+            self.datastore,
+            JDS_fake=list(map(np.exp, [jj, dd, ss])),
+            JDS_true=list(map(ssnode.DEFAULT_PARAMS.get, 'JDS')),
+            quit_JDS_threshold=self.quit_JDS_threshold,
+        )
+
+    def post_loop(self):
+        self.datastore.dump_json(dict(
+            reason='end_of_iteration',
+            good=True,
+        ), 'exit.json')
+
+    def iterate(self, update_func):
+        """
+        Iteratively call `update_func` for `.iterations` times.
+
+        A callable `update_func` must have the following signature:
+
+        .. function:: update_func(gen_step : int) -> MMUpdateResult
+
+           It must accept a positional argument which is the generator
+           update step.  It then must return an instance of
+           `.MMUpdateResult` with all mandatory attributes mentioned in
+           the document of `.MMUpdateResult`.
+
+        """
+        self.pre_loop()
+        for gen_step in range(self.iterations):
+            self.post_update(gen_step, update_func(gen_step))
+        self.post_loop()
+
+    def run(self, learner):
+        learning_it = learner.learning()
+
+        @self.iterate
+        def update_func(k):
+            info = next(learning_it)
+            assert info.step == k
+            return info

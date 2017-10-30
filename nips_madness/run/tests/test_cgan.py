@@ -1,7 +1,8 @@
 import pytest
 
-from .. import cgan
 from . import test_gan
+from .. import cgan
+from ...conftest import old_gan
 from .test_gan import load_json
 
 
@@ -10,11 +11,13 @@ def single_g_step(args):
         '--iterations', '1',
         '--truth_size', '1',
         '--n_samples', '1',
+        '--n_bandwidths', '1',
         '--contrast', '20',
         '--WGAN_n_critic0', '1',
     ] + args)
 
 
+@old_gan
 @pytest.mark.parametrize('args', [
     [],
     ['--disc-param-save-interval', '1'],
@@ -31,5 +34,6 @@ def test_smoke_slowtest(args, cleancwd):
     assert info['extra_info']['script_file'] == cgan.__file__
 
 
+@old_gan
 def test_disc_param_save_slowtest(cleancwd):
     test_gan.test_disc_param_save_slowtest(cleancwd, single_g_step)

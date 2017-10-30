@@ -8,17 +8,43 @@ Welcome to NIPS madness!
 
 Quick links:
 
-`.run.gan`
-  Entry point for running (non-conditional) GAN.
+- Entry points:
 
-`.run.cgan`
-  Entry point for running cGAN.
+  `.run.bptt_wgan`
+    WGAN with BPTT-based gradient calculation.
 
-`.ssnode`
-  Fixed-point solver for SSN.
+  `.run.bptt_moments`
+    Moment matching with BPTT-based gradient calculation.
 
-`.gradient_expressions`
-  Implementation of generator gradient.
+  `.run.gan`
+    GAN with gradient calculated exactly at the fixed-point.
+
+  `.run.cgan`
+    cGAN with gradient calculated exactly at the fixed-point.
+
+  `.run.moments`
+    Moment matching with gradient calculated exactly at the fixed-point.
+
+- Submodules:
+
+  `.networks`
+
+      Implementations GANs and their components including:
+
+      `.EulerSSNModel`
+          Implementation of SSN in Theano and Lasagne.
+
+      `.TuningCurveGenerator`
+          Tuning curve generator based on `.EulerSSNModel`.
+
+      `.BPTTWassersteinGAN`
+          WGAN based on `.TuningCurveGenerator`.
+
+  `.ssnode`
+    Fixed-point solver for SSN.
+
+  `.gradient_expressions`
+    Implementation of analytical generator gradient at fixed-point.
 
 
 .. toctree::
@@ -27,6 +53,7 @@ Quick links:
 
    ssn.rst
    api/modules.rst
+   glossary
 
 
 Indices and tables

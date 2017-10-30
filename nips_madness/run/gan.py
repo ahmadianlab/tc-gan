@@ -1103,7 +1103,7 @@ def main(args=None):
 
     add_learning_options(parser)
     ns = parser.parse_args(args)
-    do_learning(learn, vars(ns))
+    do_learning(learn, vars(ns), script_file=__file__)
 
 
 def add_learning_options(parser):
@@ -1142,7 +1142,7 @@ def add_learning_options(parser):
 
     # Arguments handled in `preprocess`:
     parser.add_argument(
-        '--n_bandwidths', default=4, type=int, choices=(4, 5, 8),
+        '--n_bandwidths', default=4, type=int, choices=(1, 4, 5, 8),
         help='Number of bandwidths (default: %(default)s)')
     parser.add_argument(
         '--load-gen-param',
@@ -1159,7 +1159,9 @@ def preprocess(run_config):
     # Set `bandwidths` outside the `learn` function, so that
     # `bandwidths` is stored in info.json:
     n_bandwidths = run_config.pop('n_bandwidths')
-    if n_bandwidths == 4:
+    if n_bandwidths == 1:
+        bandwidths = [0.0625]   # useful only for testing
+    elif n_bandwidths == 4:
         bandwidths = [0.0625, 0.125, 0.25, 0.75]
     elif n_bandwidths == 5:
         bandwidths = [0.0625, 0.125, 0.25, 0.5, 0.75]
@@ -1223,8 +1225,8 @@ def init_driver(
     return dict(run_config, datastore=datastore, gan=gan, driver=driver)
 
 
-def do_learning(learn, run_config, init_driver=init_driver,
-                script_file=__file__, extra_info={}):
+def do_learning(learn, run_config, script_file,
+                init_driver=init_driver, extra_info={}):
     """
     Wrap `.execution.do_learning` with some pre-processing.
     """
@@ -1237,6 +1239,8 @@ def do_learning(learn, run_config, init_driver=init_driver,
             load_gen_param=run_config['load_gen_param'],
             data_version=1,
             script_file=script_file,
+            learn=utils.objectpath(learn),
+            init_driver=utils.objectpath(init_driver),
             **extra_info))
 
 

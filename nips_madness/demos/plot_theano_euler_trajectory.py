@@ -43,6 +43,7 @@ def plot_theano_euler_trajectory(**sampler_config):
 
 def main(args=None):
     import argparse
+    from ..networks.finite_time_sampler import DEFAULT_PARAMS
 
     class CustomFormatter(argparse.RawDescriptionHelpFormatter,
                           argparse.ArgumentDefaultsHelpFormatter):
@@ -50,6 +51,17 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=CustomFormatter,
         description=__doc__)
+
+    for key in sorted(DEFAULT_PARAMS):
+        val = DEFAULT_PARAMS[key]
+        if isinstance(val, (str, float, int)):
+            argtype = type(val)
+        else:
+            argtype = eval
+        parser.add_argument(
+            '--{}'.format(key), type=argtype, default=val,
+            help='for SSN')
+
     ns = parser.parse_args(args)
     plot_theano_euler_trajectory(**vars(ns))
 

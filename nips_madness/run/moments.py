@@ -542,7 +542,7 @@ def main(args=None):
     )
 
     ns = parser.parse_args(args)
-    do_learning(learn, vars(ns))
+    do_learning(learn, vars(ns), script_file=__file__)
 
 
 if __name__ == "__main__":

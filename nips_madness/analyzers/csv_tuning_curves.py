@@ -4,21 +4,22 @@ import os
 
 import numpy as np
 
+from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import make_progressbar, csv_line
 from ..ssnode import DEFAULT_PARAMS
-from .loader import load_gandata
+from .loader import load_learning
 from .distdiff import generated_tuning_curves
 
 
 def csv_tuning_curves(logpath, output, sample_epochs, quiet,
-                      bandwidths, contrast, **kwargs):
+                      bandwidths, sample_sites, **kwargs):
     if not os.path.exists(output):
         os.makedirs(output)
     if isinstance(sample_epochs, str):
         sample_epochs = eval(sample_epochs, {}, vars(np))
     sample_epochs = np.asarray(sample_epochs)
 
-    data = load_gandata(logpath)
+    data = load_learning(logpath)
 
     gan_params = data.params()
     ssn_params = {key: gan_params[key] for key in DEFAULT_PARAMS
@@ -26,8 +27,12 @@ def csv_tuning_curves(logpath, output, sample_epochs, quiet,
     if not quiet:
         print("Recorded SSN parameters:")
         print(ssn_params)
-        
-    ssn_params.update(bandwidths=bandwidths, contrast=[contrast],**kwargs)
+
+    num_sites = ssn_params.get('N', DEFAULT_PARAMS['N'])
+    ssn_params.update(
+        bandwidths=bandwidths,
+        sample_sites=sample_sites_from_stim_space(sample_sites, num_sites),
+        **kwargs)
 
     sample_epochs = sample_epochs[sample_epochs < len(data.main)]
     tuning_curves = generated_tuning_curves(data, indices=sample_epochs,
@@ -63,13 +68,15 @@ def main(args=None):
         help='Comma separated value of floats')
     parser.add_argument(
         '--sample-sites',
-        default=3,
-        help='Number of neurons per SSN to be sampled.')
+        default=[0],
+        type=csv_line(float),
+        help='''Probe offsets in [0, 1]-coordinate (bandwidth unit).
+        Comma separated value of floats.''')
     parser.add_argument(
-        '--contrast',
-        default=20.,
-        type = float,
-        help='Contrast of stimulus.')
+        '--contrast', '--contrasts',
+        default=[20.],
+        type=csv_line(float),
+        help='Contrasts of stimulus.')
     parser.add_argument(
         '--NZ', default=30, type=int,
         help='Number of SSNs to be sampled.')

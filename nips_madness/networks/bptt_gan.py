@@ -5,13 +5,14 @@ import lasagne
 import numpy as np
 
 from .. import ssnode
+from ..core import BaseComponent, consume_subdict
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
-    theano_function,
+    theano_function, log_timing,
 )
-from .core import BaseComponent, consume_subdict
 from .ssn import TuningCurveGenerator
+from .utils import largerrecursionlimit
 
 
 DEFAULT_PARAMS = dict(
@@ -62,7 +63,7 @@ class UnConditionalDiscriminator(BaseComponent):
         return lasagne.layers.get_output(self.l_out, inputs=inputs)
 
     def prepare(self):
-        """ Force compile Theno functions. """
+        """ Force compile Theano functions. """
         self.accuracy
 
 
@@ -104,15 +105,17 @@ class BaseTrainer(BaseComponent):
             *args, updater=updater, **rest)
 
     def get_updates(self):
-        return self.updater(self.loss, self.target.get_all_params())
+        with log_timing("{}.update()".format(self.__class__.__name__)):
+            return self.updater(self.loss, self.target.get_all_params())
 
     @cached_property
     def train(self):
-        return theano_function(self.inputs, self.loss,
-                               updates=self.get_updates())
+        with log_timing("compiling {}.train".format(self.__class__.__name__)):
+            return theano_function(self.inputs, self.loss,
+                                   updates=self.get_updates())
 
     def prepare(self):
-        """ Force compile Theno functions. """
+        """ Force compile Theano functions. """
         self.train
 
 
@@ -208,16 +211,18 @@ class BPTTWassersteinGAN(BaseComponent):
             self.gen.model.S.get_value(),
         ]
 
-    def init_dataset(self, data):
+    def set_dataset(self, data):
         self.dataset = random_minibatches(self.batchsize, data)
 
     def next_minibatch(self):
         return next(self.dataset)
 
     def prepare(self):
-        """ Force compile Theno functions. """
-        self.gen.prepare()
-        self.gen_trainer.prepare()
+        """ Force compile Theano functions. """
+        with largerrecursionlimit(self.gen.model.unroll_scan,
+                                  self.gen.model.seqlen):
+            self.gen.prepare()
+            self.gen_trainer.prepare()
         self.disc.prepare()
         self.disc_trainer.prepare()
 

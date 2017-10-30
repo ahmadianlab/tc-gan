@@ -26,8 +26,8 @@ def csv_tuning_curves(logpath, output, sample_epochs, quiet,
     if not quiet:
         print("Recorded SSN parameters:")
         print(ssn_params)
-        
-    ssn_params.update(bandwidths=bandwidths, contrast=[contrast],**kwargs)
+
+    ssn_params.update(bandwidths=bandwidths, contrast=[contrast], **kwargs)
 
     sample_epochs = sample_epochs[sample_epochs < len(data.main)]
     tuning_curves = generated_tuning_curves(data, indices=sample_epochs,
@@ -68,7 +68,7 @@ def main(args=None):
     parser.add_argument(
         '--contrast',
         default=20.,
-        type = float,
+        type=float,
         help='Contrast of stimulus.')
     parser.add_argument(
         '--NZ', default=30, type=int,

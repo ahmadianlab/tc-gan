@@ -8,7 +8,7 @@ def single_g_step(args):
     bptt_cwgan.main([
         '--iterations', '1',
         '--truth_size', '1',
-        '--num-models', '1',
+        '--num-models', '2',
         '--n_bandwidths', '1',
         '--WGAN_n_critic0', '1',
         '--seqlen', '4',
@@ -18,6 +18,7 @@ def single_g_step(args):
 
 @pytest.mark.parametrize('args', [
     [],
+    ['--num-models', '1'],
     ['--sample-sites', '0, 0.5'],
     ['--include-inhibitory-neurons'],
 ])

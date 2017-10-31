@@ -22,6 +22,7 @@ DEFAULT_PARAMS = dict(
     probes_per_model=10,
 )
 del DEFAULT_PARAMS['batchsize']
+del DEFAULT_PARAMS['sample_sites']
 
 
 class ConditionalProber(BaseComponent):
@@ -234,7 +235,7 @@ class RandomChoiceSampler(object):
             return self.rng.choice(2, shape,
                                    p=[self.e_ratio, 1 - self.e_ratio])
         else:
-            return np.zeros(shape)
+            return np.zeros(shape, dtype='uint16')
 
     def select_minibatch(self, num_models, probes_per_model):
         shape = (num_models, probes_per_model)
@@ -296,9 +297,9 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         assert gen.batchsize == self.num_models * self.probes_per_model
         assert self.probes_per_model < gen.num_neurons
 
-    def set_dataset_from_grid_data(self, *args, **kwargs):
+    def set_dataset(self, data, **kwargs):
         self.sampler = RandomChoiceSampler.from_grid_data(
-            *args,
+            data,
             bandwidths=self.bandwidths,
             contrasts=self.contrasts,
             probe_offsets=self.probe_offsets,

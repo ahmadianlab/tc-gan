@@ -1,5 +1,5 @@
 """
-Run SSN-BTTP GAN learning.
+Run SSN-BPTT Wasserstein GAN learning.
 """
 
 from logging import getLogger
@@ -140,6 +140,25 @@ def make_parser():
         formatter_class=CustomFormatter,
         description=__doc__)
 
+    parser.add_argument(
+        '--batchsize', '--n_samples', default=15, type=eval,
+        help='''Number of samples to draw from G each step
+        (aka NZ, minibatch size). (default: %(default)s)''')
+    parser.add_argument(
+        '--sample-sites', default=[0], type=utils.csv_line(float),
+        help='''Locations (offsets) of neurons to be sampled from SSN in the
+        "bandwidth" space [-1, 1].  0 means the center of the
+        network. (default: %(default)s)''')
+
+    add_bptt_common_options(parser)
+    plain_gan.add_learning_options(parser)
+    parser.set_defaults(
+        datastore_template='logfiles/BPTT_WGAN_{layers_str}',
+    )
+    return parser
+
+
+def add_bptt_common_options(parser):
     # Dataset
     parser.add_argument(
         '--truth_size', default=1000, type=int,
@@ -163,21 +182,12 @@ def make_parser():
 
     # Generator
     parser.add_argument(
-        '--batchsize', '--n_samples', default=15, type=eval,
-        help='''Number of samples to draw from G each step
-        (aka NZ, minibatch size). (default: %(default)s)''')
-    parser.add_argument(
         '--seqlen', default=DEFAULT_PARAMS['seqlen'], type=int,
         help='Total time steps for SSN.')
     parser.add_argument(
         '--skip-steps', default=DEFAULT_PARAMS['skip_steps'], type=int,
         help='''First time steps to be excluded from tuning curve and
         dynamics penalty calculations.''')
-    parser.add_argument(
-        '--sample-sites', default=[0], type=utils.csv_line(float),
-        help='''Locations (offsets) of neurons to be sampled from SSN in the
-        "bandwidth" space [-1, 1].  0 means the center of the
-        network. (default: %(default)s)''')
     parser.add_argument(
         '--contrasts', '--contrast',
         default=[20],
@@ -241,12 +251,6 @@ def make_parser():
         '--WGAN_n_critic',  # to be compatible with gan.py
         default=5, type=int,
         help='Critic iterations (default: %(default)s)')
-
-    plain_gan.add_learning_options(parser)
-    parser.set_defaults(
-        datastore_template='logfiles/BPTT_GAN_{layers_str}',
-    )
-    return parser
 
 
 def init_driver(

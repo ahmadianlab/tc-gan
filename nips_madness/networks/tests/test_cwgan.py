@@ -41,7 +41,7 @@ def fake_data(gan, truth_size):
 def test_smoke_cgan():
     gan, rest = make_gan()
     data = fake_data(gan, rest['truth_size'])
-    gan.set_dataset_from_grid_data(data)
+    gan.set_dataset(data)
     learning_it = gan.learning()
 
     info = next(learning_it)

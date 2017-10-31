@@ -176,12 +176,15 @@ class ConditionalMinibatch(object):
             stimulator_bandwidths=bandwidths.astype(theano.config.floatX),
             stimulator_contrasts=contrasts.astype(theano.config.floatX),
             prober_probe_offsets=probe_offsets.astype(theano.config.floatX),
-            prober_cell_types=cell_types,
-            prober_model_ids=self.model_ids)
+            prober_cell_types=cell_types.astype('uint16'),
+            prober_model_ids=self.model_ids.astype('uint16'))
     # TODO: Find out why I need .astype(floatX) above.  Without them,
     # I have NaNs in gen_out.prober_tuning_curve.  However, since I'm
     # using allow_input_downcast=True, they should be unnecessarily.
     # It probably occurs when I have int type for contrasts.
+    #
+    # I didn't need .astype('uint16') for it to run but let's be extra
+    # cautious.
 
     @property
     def tuning_curves(self):

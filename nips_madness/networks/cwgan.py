@@ -70,7 +70,7 @@ class ConditionalTuningCurveGenerator(TuningCurveGenerator):
     def get_output(self):
         conditions = theano.tensor.as_tensor_variable([
             self.prober.contrasts,
-            self.prober.probe_offsets,
+            abs(self.prober.probe_offsets),  # since SSN is symmetric
             self.prober.cell_types.astype(theano.config.floatX),
         ]).T  # shape: (batchsize, 3)
         conditions.name = 'conditions'

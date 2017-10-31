@@ -20,6 +20,9 @@ test-quick: prepare
 test-flakes: prepare
 	$(PYTEST) -m flakes
 
+test-old-gan: prepare
+	TEST_OLD_GAN=yes $(PYTEST)
+
 doc: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=doc html
 

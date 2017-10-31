@@ -1204,6 +1204,15 @@ def preprocess(run_config):
     for key in ('J0', 'D0', 'S0'):
         run_config[key] = np.broadcast_to(run_config[key], (2, 2)).tolist()
 
+    if 'true_ssn_options' not in run_config:
+        true_ssn_options = run_config['true_ssn_options'] = {}
+        J = SSsolve.DEFAULT_PARAMS['J']
+        D = SSsolve.DEFAULT_PARAMS['D']
+        D_new = D / 2
+        J_new = J + D / 2 - D_new / 2
+        true_ssn_options['J'] = J_new.tolist()
+        true_ssn_options['D'] = D_new.tolist()
+
 
 def init_driver(
         datastore,

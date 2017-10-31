@@ -27,6 +27,10 @@ del DEFAULT_PARAMS['sample_sites']
 
 class ConditionalProber(BaseComponent):
 
+    """
+    Probe `model` output with varying probe.
+    """
+
     def __init__(self, model):
         self.model = model
 

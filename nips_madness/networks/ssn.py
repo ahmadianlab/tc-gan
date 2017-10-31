@@ -288,8 +288,9 @@ class FixedProber(BaseComponent):
     Here, fixed/constant means that `probe` does not co-vary with
     batches and the points in :term:`tuning curve domain`.
 
-    For a demonstration purpose, let's setup a fake model.  All
-    `FixedProber` cares are `.time_avg` and `.num_tcdom` attributes:
+    For a demonstration purpose, let's setup a fake model.  Since all
+    `FixedProber` cares are `.time_avg` and `.num_tcdom` attributes,
+    it is easy to mock the model for it:
 
     >>> from types import SimpleNamespace
     >>> batchsize = 3

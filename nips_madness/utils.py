@@ -414,3 +414,14 @@ def objectpath(obj):
     'json.load'
     """
     return obj.__module__ + '.' + obj.__name__
+
+
+def report_allclose_tols(a, b, rtols, atols, **isclose_kwargs):
+    """
+    Print %mismatch of `a` and `b` with combinations of `rtols` and `atols`.
+    """
+    for rtol in rtols:
+        for atol in atols:
+            p = np.isclose(a, b, rtol=rtol, atol=atol, **isclose_kwargs).mean()
+            print('mismatch {:>7.3%} with rtol={:<4.1e} atol={:<4.1e}'
+                  .format(1 - p, rtol, atol))

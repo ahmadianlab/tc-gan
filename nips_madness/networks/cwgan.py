@@ -397,7 +397,7 @@ def _make_gan_from_kwargs(
         rest,
         batchsize=num_models * probes_per_model,
         # Stimulator:
-        num_tcdom=len(bandwidths) * len(contrasts),
+        num_tcdom=len(bandwidths),
         num_sites=num_sites,
         # Model / SSN:
         J=J0,

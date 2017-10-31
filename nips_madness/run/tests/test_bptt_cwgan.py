@@ -20,6 +20,7 @@ def single_g_step(args):
     [],
     ['--num-models', '1'],
     ['--sample-sites', '0, 0.5'],
+    ['--contrasts', '5, 20'],
     ['--include-inhibitory-neurons'],
 ])
 def test_single_g_step_slowtest(args, cleancwd):

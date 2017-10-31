@@ -2,8 +2,8 @@ import numpy as np
 
 from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
-from ..utils import cartesian_product
-from .bptt_gan import TuningCurveGenerator, DEFAULT_PARAMS
+from .bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
+from .ssn import TuningCurveGenerator
 
 
 class FiniteTimeTuningCurveSampler(object):
@@ -47,7 +47,7 @@ class FiniteTimeTuningCurveSampler(object):
         self.rng = np.random.RandomState(seed)
 
         self.stimulator_contrasts, self.stimulator_bandwidths \
-            = cartesian_product(contrasts, bandwidths)
+            = grid_stimulator_inputs(contrasts, bandwidths, self.batchsize)
 
     num_neurons = property(lambda self: self.num_sites * 2)
     num_sites = property(lambda self: self.gen.num_sites)
@@ -66,9 +66,9 @@ class FiniteTimeTuningCurveSampler(object):
         return out.prober_tuning_curve
 
     def compute_trajectories(self):
-        zmat = self.rng.rand(self.num_neurons, self.num_neurons)
+        zs = self.rng.rand(self.batchsize, self.num_neurons, self.num_neurons)
         trajectories = self.gen.model.compute_trajectories(
-            zmat,
+            zs,
             self.stimulator_bandwidths,
             self.stimulator_contrasts,
         )

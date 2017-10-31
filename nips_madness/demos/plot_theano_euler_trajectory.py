@@ -35,8 +35,9 @@ def plot_trajectory(trajectories, sampler):
 
 
 def plot_theano_euler_trajectory(**sampler_config):
+    sampler_config['batchsize'] = 1
     sampler = FiniteTimeTuningCurveSampler.from_dict(sampler_config)
-    trajectories = sampler.compute_trajectories()
+    trajectories, = sampler.compute_trajectories()
     plot_trajectory(trajectories, sampler)
     pyplot.show()
 

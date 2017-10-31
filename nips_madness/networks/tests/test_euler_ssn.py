@@ -2,8 +2,7 @@ import numpy
 import pytest
 
 from ... import ssnode
-from ...utils import cartesian_product
-from ..bptt_gan import DEFAULT_PARAMS
+from ..bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
 from ..ssn import BandwidthContrastStimulator, EulerSSNModel
 
 
@@ -21,11 +20,12 @@ def make_ssn(model_config):
 
 @pytest.mark.parametrize('num_sites', [10])
 def test_compare_with_ssnode(num_sites):
+    batchsize = 1
     bandwidths = DEFAULT_PARAMS['bandwidths']
     contrasts = DEFAULT_PARAMS['contrasts']
     stimulator_contrasts, stimulator_bandwidths \
-        = cartesian_product(contrasts, bandwidths)
-    num_tcdom = len(stimulator_bandwidths)
+        = grid_stimulator_inputs(contrasts, bandwidths, batchsize)
+    num_tcdom = stimulator_bandwidths.shape[-1]
     seqlen = 4000  # 3000 was too small
     # seqlen = DEFAULT_PARAMS['seqlen']
     skip_steps = seqlen - 1
@@ -43,7 +43,7 @@ def test_compare_with_ssnode(num_sites):
 
     # ssnode_fps.shape: (batchsize, num_tcdom, 2N)
     zs, ssnode_fps, info = ssnode.sample_fixed_points(
-        1,  # batchsize
+        batchsize,
         N=num_sites,
         bandwidths=bandwidths,
         contrast=contrasts,

@@ -47,10 +47,10 @@ class BandwidthContrastStimulator(BaseComponent):
     num_tcdom : int
         Number of points in :term:`tuning curve domain` (TC dom).
 
-    bandwidths : theano.vector.tensor
+    bandwidths : theano.vector.matrix
         :math:`s` in :eq:`BandwidthContrastStimulator-input`
 
-    contrasts : theano.vector.tensor
+    contrasts : theano.vector.matrix
         :math:`A` in :eq:`BandwidthContrastStimulator-input`
 
     smoothness : float
@@ -64,8 +64,8 @@ class BandwidthContrastStimulator(BaseComponent):
         self.num_sites = int_or_lscalr(num_sites, 'num_sites')
         self.num_tcdom = int_or_lscalr(num_tcdom, 'num_tcdom')
 
-        self.bandwidths = theano.tensor.vector('bandwidths')
-        self.contrasts = theano.tensor.vector('contrasts')
+        self.bandwidths = theano.tensor.matrix('bandwidths')
+        self.contrasts = theano.tensor.matrix('contrasts')
         self.smoothness = smoothness
         self.site_to_band = np.linspace(-0.5, 0.5, self.num_sites,
                                         dtype=theano.config.floatX)
@@ -74,14 +74,14 @@ class BandwidthContrastStimulator(BaseComponent):
             from theano.tensor import exp
             return 1 / (1 + exp(-x / smoothness))
 
-        x = self.site_to_band.reshape((1, -1))
-        b = self.bandwidths.reshape((-1, 1))
-        c = self.contrasts.reshape((-1, 1))
+        x = self.site_to_band.reshape((1, 1, -1))
+        b = theano.tensor.shape_padright(self.bandwidths)
+        c = theano.tensor.shape_padright(self.contrasts)
         stim = c * sigm(x + b/2) * sigm(b/2 - x)
 
-        self.stimulus = theano.tensor.tile(stim, (1, 2))
+        self.stimulus = theano.tensor.tile(stim, (1, 1, 2))
         """
-        A symbolic array of shape (`.num_tcdom`, 2 * `.num_sites`).
+        A symbolic array of shape (`.batchsize`, `.num_tcdom`, `.num_neurons`).
         """
 
         self.inputs = (self.bandwidths, self.contrasts)
@@ -127,6 +127,8 @@ class EulerSSNCore(BaseComponent):
                                 stimulator.site_to_band)[0].T
         self.Wt.name = 'Wt'
 
+        self.ext = theano.tensor.matrix('ext')
+
         self.f = ssnode.make_io_fun(self.k, self.n, io_type=self.io_type)
 
     # MAYBE: move all the stuff in __init__ to get_output_for
@@ -134,7 +136,7 @@ class EulerSSNCore(BaseComponent):
     def get_output_for(self, r):
         f = self.f
         Wt = self.Wt
-        I = self.stimulator.stimulus
+        I = self.ext
         eps = self.eps.reshape((1, -1))
         co_eps = (1 - self.eps).reshape((1, -1))
         r_next = co_eps * r + eps * f(r.dot(Wt) + I)
@@ -229,15 +231,8 @@ class EulerSSNModel(BaseComponent):
         # self.zs.shape: (batchsize, num_neurons, num_neurons)
         self.zs = theano.tensor.tensor3('zs')
         # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
-        self.time_avg, _ = theano.map(
-            lambda z: theano.clone(time_avg, {self.zmat: z}),
-            [self.zs],
-        )
-        penalties, _ = theano.map(
-            lambda z: theano.clone(dynamics_penalty, {self.zmat: z}),
-            [self.zs],
-        )
-        self.dynamics_penalty = penalties.mean()
+        self.time_avg = self._map_clone(time_avg)
+        self.dynamics_penalty = self._map_clone(dynamics_penalty).mean()
         # TODO: make sure theano.clone is not bottleneck here.
         self.dynamics_penalty.name = 'dynamics_penalty'
         # TODO: find if assigning a name to an expression is a valid usecase
@@ -246,6 +241,7 @@ class EulerSSNModel(BaseComponent):
         self.outputs = (self.dynamics_penalty,)
 
     zmat = property(lambda self: self.l_ssn.ssn.zmat)
+    ext = property(lambda self: self.l_ssn.ssn.ext)
     dt = property(lambda self: self.l_ssn.ssn.dt)
     io_type = property(lambda self: self.l_ssn.ssn.io_type)
     J = property(lambda self: self.l_ssn.ssn.J)
@@ -254,11 +250,24 @@ class EulerSSNModel(BaseComponent):
 
     num_tcdom = property(lambda self: self.stimulator.num_tcdom)
 
+    def _map_clone(self, expr):
+        return theano.map(
+            lambda z, I: theano.clone(expr, {
+                self.zmat: z,
+                self.ext: I,
+            }),
+            [self.zs, self.stimulator.stimulus],
+        )[0]
+
+    @cached_property
+    def all_trajectories(self):
+        return self._map_clone(self.trajectories)
+
     @cached_property
     def compute_trajectories(self):
         return theano_function(
-            (self.zmat,) + self.stimulator.inputs,
-            self.trajectories,
+            (self.zs,) + self.stimulator.inputs,
+            self.all_trajectories,
         )
 
     @cached_property

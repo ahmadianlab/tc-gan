@@ -7,10 +7,10 @@ import theano
 from ..core import BaseComponent
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import (
-    cached_property, cartesian_product, StopWatch,
+    cached_property, StopWatch,
     theano_function, log_timing, asarray,
 )
-from .bptt_gan import DEFAULT_PARAMS, BaseTrainer
+from .bptt_gan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
 from .ssn import TuningCurveGenerator
 from .utils import largerrecursionlimit
 
@@ -230,12 +230,12 @@ class BPTTMomentMatcher(BaseComponent):
 
     stimulator_bandwidths
     stimulator_contrasts : numpy.ndarray
-        Vectors of length ``len(bandwidths) * len(contrasts)``.  These
-        are the actual numerical arrays to be substituted to
+        A matrix of shape ``(batchsize, len(bandwidths) * len(contrasts))``.
+        These are the actual numerical arrays to be substituted to
         `.BandwidthContrastStimulator.bandwidths` and
         `.BandwidthContrastStimulator.contrasts`.  They are
         constructed from `bandwidths` and `contrasts` using
-        `.cartesian_product`.
+        `.grid_stimulator_inputs`.
 
     """
 
@@ -251,7 +251,7 @@ class BPTTMomentMatcher(BaseComponent):
         self.bandwidths = bandwidths
         self.contrasts = contrasts
         self.stimulator_contrasts, self.stimulator_bandwidths \
-            = cartesian_product(contrasts, bandwidths)
+            = grid_stimulator_inputs(contrasts, bandwidths, self.batchsize)
 
     batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)

@@ -174,6 +174,12 @@ class GeneratorTrainer(BaseTrainer):
         return self.clip_JDS(super(GeneratorTrainer, self).get_updates())
 
 
+def grid_stimulator_inputs(contrasts, bandwidths, batchsize):
+    product = cartesian_product(contrasts, bandwidths)
+    return np.tile(product.reshape((1,) + product.shape),
+                   (batchsize,) + (1,) * product.ndim).swapaxes(0, 1)
+
+
 class BPTTWassersteinGAN(BaseComponent):
 
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
@@ -193,7 +199,7 @@ class BPTTWassersteinGAN(BaseComponent):
         self.bandwidths = bandwidths
         self.contrasts = contrasts
         self.stimulator_contrasts, self.stimulator_bandwidths \
-            = cartesian_product(contrasts, bandwidths)
+            = grid_stimulator_inputs(contrasts, bandwidths, self.batchsize)
 
     batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)

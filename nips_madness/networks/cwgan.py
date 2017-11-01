@@ -276,11 +276,16 @@ class RandomChoiceSampler(object):
         else:
             return np.zeros(shape, dtype='uint16')
 
+    def random_cells(self, num_models, probes_per_model):
+        shape = (num_models, probes_per_model)
+        ids_cell_type = self.random_cell_types(shape)
+        ids_probe_offsets = self.rng.choice(len(self.probe_offsets), shape)
+        return ids_cell_type, ids_probe_offsets
+
     def select_minibatch(self, num_models, probes_per_model):
         shape = (num_models, probes_per_model)
         ids_sample = self.rng.choice(len(self.nested), shape)
-        ids_cell_type = self.random_cell_types(shape)
-        ids_probe_offsets = self.rng.choice(len(self.probe_offsets), shape)
+        (ids_cell_type, ids_probe_offsets) = self.random_cells(*shape)
         ids_flat_contrast = self.rng.choice(len(self.contrasts),
                                             num_models)
         ids_contrast = ids_flat_contrast.reshape((-1, 1))

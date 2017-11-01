@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 from ..cwgan import (
-    ConditionalMinibatch, ConditionalProber, RandomChoiceSampler,
+    ConditionalMinibatch, ConditionalProber,
+    RandomChoiceSampler, NaiveRandomChoiceSampler,
 )
 from .test_conditional_prober import mock_model
 
@@ -79,7 +80,11 @@ def test_conditional_minibatch_prober_contrasts(num_models, probes_per_model):
     np.testing.assert_equal(prober_contrasts, batch_contrasts)
 
 
-def test_random_choice_sampler_shape():
+@pytest.mark.parametrize('sampler_class', [
+    RandomChoiceSampler,
+    NaiveRandomChoiceSampler,
+])
+def test_random_choice_sampler_shape(sampler_class):
     truth_size = 100
     num_bandwidths = 5
     num_contrasts = 2
@@ -87,7 +92,7 @@ def test_random_choice_sampler_shape():
     num_cell_types = 2
     shape = (truth_size, num_cell_types, num_offsets, num_contrasts,
              num_bandwidths)
-    sampler = RandomChoiceSampler(
+    sampler = sampler_class(
         arangemd(shape),
         [np.arange(num) for num in shape[1:]],
     )

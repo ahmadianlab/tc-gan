@@ -327,6 +327,23 @@ class RandomChoiceSampler(object):
             yield self.select_minibatch(*args, **kwargs)
 
 
+class NaiveRandomChoiceSampler(RandomChoiceSampler):
+    # TODO: maybe add a way to use this class
+
+    def random_cell_types(self, shape):
+        if len(self.cell_types) == 2:
+            return self.rng.choice(2, shape,
+                                   p=[self.e_ratio, 1 - self.e_ratio])
+        else:
+            return np.zeros(shape, dtype='uint16')
+
+    def random_cells(self, num_models, probes_per_model):
+        shape = (num_models, probes_per_model)
+        ids_cell_type = self.random_cell_types(shape)
+        ids_probe_offsets = self.rng.choice(len(self.probe_offsets), shape)
+        return ids_cell_type, ids_probe_offsets
+
+
 class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
 
     def __init__(self, gen, disc, gen_trainer, disc_trainer,

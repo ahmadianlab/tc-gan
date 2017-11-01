@@ -7,9 +7,9 @@ from ..networks.tests.test_conditional_minibatch import arangemd
 
 def test_ctc_analyze_rect_data():
     contrasts = [5, 20]
-    probe_offsets = [0, 0.5]
+    norm_probes = [0, 0.5]
     cell_types = [0, 1]
-    conditions = cartesian_product(contrasts, probe_offsets, cell_types).T
+    conditions = cartesian_product(contrasts, norm_probes, cell_types).T
     num_conditions = len(conditions)
 
     num_bandwidths = 5

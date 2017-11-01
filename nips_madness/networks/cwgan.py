@@ -32,7 +32,7 @@ class ConditionalProber(BaseComponent):
 
     Attributes
     ----------
-    probe_offsets : theano.tensor.vector
+    norm_probes : theano.tensor.vector
         Array of length `.batchsize` specifying probe offset in
         ``[-1, 1]`` bandwidth coordinate.
 
@@ -47,7 +47,7 @@ class ConditionalProber(BaseComponent):
 
     probes : theano.tensor.var.TensorVariable
         Array of length `.batchsize` and type uint16.
-        Same as `.probe_offsets` but in neural index.
+        Same as `.norm_probes` but in neural index.
 
     contrasts : theano.tensor.var.TensorVariable
         Array of length `.batchsize`.  This is a reshaped one
@@ -62,12 +62,12 @@ class ConditionalProber(BaseComponent):
     def __init__(self, model):
         self.model = model
 
-        self.probe_offsets = theano.tensor.vector('probe_offsets')
+        self.norm_probes = theano.tensor.vector('norm_probes')
         self.cell_types = theano.tensor.vector('cell_types', 'uint16')
         self.model_ids = theano.tensor.vector('model_ids', 'uint16')
         # Invariants:
         #    * length of those vectors = batchsize
-        #    * all(-1 <= probe_offsets <= 1)
+        #    * all(-1 <= norm_probes <= 1)
         #    * all(0 <= model_ids < num_models)
         #    * all(cell_types in {0, 1})
 
@@ -79,7 +79,7 @@ class ConditionalProber(BaseComponent):
         num_sites = self.model.num_sites
 
         self.probes = sample_sites_from_stim_space_impl(
-            self.probe_offsets, num_sites, type='uint16',
+            self.norm_probes, num_sites, type='uint16',
         ) + self.cell_types * num_sites
         self.probes.name = 'probes'
 
@@ -88,7 +88,7 @@ class ConditionalProber(BaseComponent):
         self.tuning_curve = self.model.time_avg[self.model_ids, :, self.probes]
         self.tuning_curve.name = 'tuning_curve'
 
-        self.inputs = (self.probe_offsets, self.model_ids, self.cell_types)
+        self.inputs = (self.norm_probes, self.model_ids, self.cell_types)
         self.outputs = (self.tuning_curve,)
 
 
@@ -102,7 +102,7 @@ class ConditionalTuningCurveGenerator(TuningCurveGenerator):
     def get_output(self):
         conditions = theano.tensor.as_tensor_variable([
             self.prober.contrasts,
-            abs(self.prober.probe_offsets),  # since SSN is symmetric
+            abs(self.prober.norm_probes),  # since SSN is symmetric
             self.prober.cell_types.astype(theano.config.floatX),
         ]).T  # shape: (batchsize, 3)
         conditions.name = 'conditions'
@@ -203,11 +203,11 @@ class ConditionalMinibatch(object):
             self.contrasts.reshape((-1, 1)),
             self.bandwidths.reshape((1, -1)),
         )
-        _, probe_offsets, cell_types = self._conditions_T
+        _, norm_probes, cell_types = self._conditions_T
         return dict(
             stimulator_bandwidths=bandwidths.astype(theano.config.floatX),
             stimulator_contrasts=contrasts.astype(theano.config.floatX),
-            prober_probe_offsets=probe_offsets.astype(theano.config.floatX),
+            prober_norm_probes=norm_probes.astype(theano.config.floatX),
             prober_cell_types=cell_types.astype('uint16'),
             prober_model_ids=self.model_ids.astype('uint16'))
     # TODO: Find out why I need .astype(floatX) above.  Without them,
@@ -247,11 +247,11 @@ class RandomChoiceSampler(object):
     """
 
     @classmethod
-    def from_grid_data(cls, data, bandwidths, contrasts, probe_offsets,
+    def from_grid_data(cls, data, bandwidths, contrasts, norm_probes,
                        include_inhibitory_neurons,
                        **kwargs):
         cell_types = [0, 1] if include_inhibitory_neurons else [0]
-        cond_values = [cell_types, probe_offsets, contrasts, bandwidths]
+        cond_values = [cell_types, norm_probes, contrasts, bandwidths]
         shape = (len(data),) + tuple(map(len, cond_values))
         nested = data.reshape(shape)
         return cls(nested, cond_values, **kwargs)
@@ -262,7 +262,7 @@ class RandomChoiceSampler(object):
         self.cond_values = cond_values = list(map(np.asarray, cond_values))
         self.e_ratio = e_ratio
         (self.cell_types,
-         self.probe_offsets,
+         self.norm_probes,
          self.contrasts,
          self.bandwidths) = cond_values
         self.rng = as_randomstate(seed)
@@ -274,12 +274,12 @@ class RandomChoiceSampler(object):
         Choose cells in such a way that every cell is chosen at most once.
         """
         cellids = cartesian_product(np.arange(len(self.cell_types)),
-                                    np.arange(len(self.probe_offsets)),
+                                    np.arange(len(self.norm_probes)),
                                     dtype=int).T
         if len(self.cell_types) == 2:
             probs = np.zeros(len(cellids))
-            probs[:len(self.probe_offsets)] = self.e_ratio
-            probs[len(self.probe_offsets):] = 1 - self.e_ratio
+            probs[:len(self.norm_probes)] = self.e_ratio
+            probs[len(self.norm_probes):] = 1 - self.e_ratio
             probs /= probs.sum()
         else:
             probs = None
@@ -291,15 +291,15 @@ class RandomChoiceSampler(object):
         # ids.shape: (num_models, probes_per_model, 2)
         ids = np.asarray([cellids[choice()] for _ in range(num_models)])
 
-        ids_cell_type, ids_probe_offsets = ids.transpose((2, 0, 1))
-        assert ids_cell_type.shape == ids_probe_offsets.shape \
+        ids_cell_type, ids_norm_probes = ids.transpose((2, 0, 1))
+        assert ids_cell_type.shape == ids_norm_probes.shape \
             == (num_models, probes_per_model)
-        return ids_cell_type, ids_probe_offsets
+        return ids_cell_type, ids_norm_probes
 
     def select_minibatch(self, num_models, probes_per_model):
         shape = (num_models, probes_per_model)
         ids_sample = self.rng.choice(len(self.nested), shape)
-        (ids_cell_type, ids_probe_offsets) = self.random_cells(*shape)
+        (ids_cell_type, ids_norm_probes) = self.random_cells(*shape)
         ids_flat_contrast = self.rng.choice(len(self.contrasts),
                                             num_models)
         ids_contrast = ids_flat_contrast.reshape((-1, 1))
@@ -307,7 +307,7 @@ class RandomChoiceSampler(object):
         tc_md = self.nested[
             ids_sample,
             ids_cell_type,
-            ids_probe_offsets,
+            ids_norm_probes,
             ids_contrast,
         ]
         assert tc_md.shape == (
@@ -316,7 +316,7 @@ class RandomChoiceSampler(object):
         return ConditionalMinibatch(
             tc_md,
             [self.contrasts[ids_contrast],
-             self.probe_offsets[ids_probe_offsets],
+             self.norm_probes[ids_norm_probes],
              self.cell_types[ids_cell_type]],
             self.bandwidths,
             self.contrasts[ids_flat_contrast],
@@ -340,14 +340,14 @@ class NaiveRandomChoiceSampler(RandomChoiceSampler):
     def random_cells(self, num_models, probes_per_model):
         shape = (num_models, probes_per_model)
         ids_cell_type = self.random_cell_types(shape)
-        ids_probe_offsets = self.rng.choice(len(self.probe_offsets), shape)
-        return ids_cell_type, ids_probe_offsets
+        ids_norm_probes = self.rng.choice(len(self.norm_probes), shape)
+        return ids_cell_type, ids_norm_probes
 
 
 class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
 
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
-                 bandwidths, contrasts, probe_offsets,
+                 bandwidths, contrasts, norm_probes,
                  include_inhibitory_neurons,
                  num_models, probes_per_model,
                  critic_iters_init, critic_iters, lipschitz_cost,
@@ -359,7 +359,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
 
         self.bandwidths = np.asarray(bandwidths)
         self.contrasts = np.asarray(contrasts)
-        self.probe_offsets = np.asarray(probe_offsets)
+        self.norm_probes = np.asarray(norm_probes)
         self.include_inhibitory_neurons = include_inhibitory_neurons
         self.num_models = num_models
         self.probes_per_model = probes_per_model
@@ -378,7 +378,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
             data,
             bandwidths=self.bandwidths,
             contrasts=self.contrasts,
-            probe_offsets=self.probe_offsets,
+            norm_probes=self.norm_probes,
             include_inhibitory_neurons=self.include_inhibitory_neurons,
             **kwargs)
         self.dataset = self.sampler.random_minibatches(
@@ -432,7 +432,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
                 # Model:
                 zg,
                 # ConditionalProber:
-                gen_kwargs['prober_probe_offsets'],
+                gen_kwargs['prober_norm_probes'],
                 gen_kwargs['prober_model_ids'],
                 gen_kwargs['prober_cell_types'],
             )

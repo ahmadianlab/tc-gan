@@ -47,7 +47,7 @@ def test_conditional_minibatch(num_models, probes_per_model, num_bandwidths):
     assert batch.conditions.shape == (batch.batchsize, 3)
 
     gen_kwargs = SimpleNamespace(**batch.gen_kwargs)
-    assert len(gen_kwargs.prober_probe_offsets) == batch.batchsize
+    assert len(gen_kwargs.prober_norm_probes) == batch.batchsize
     assert len(gen_kwargs.prober_cell_types) == batch.batchsize
     assert len(gen_kwargs.prober_model_ids) == batch.batchsize
 
@@ -72,7 +72,7 @@ def test_conditional_minibatch_prober_contrasts(num_models, probes_per_model):
         prober.model_ids: batch.model_ids,
     })
 
-    batch_contrasts, _probe_offsets, _cell_types = batch.conditions.T
+    batch_contrasts, _norm_probes, _cell_types = batch.conditions.T
     # See:
     # * [[../cwgan.py::get_output]]
     # * [[../cwgan.py::gen_kwargs]]
@@ -129,12 +129,12 @@ def test_random_choice_sampler_cells():
     print()
     for n in range(repeat):
         print('{}-th repeat -- model: '.format(n), end='')
-        ids_cell_type, ids_probe_offsets \
+        ids_cell_type, ids_norm_probes \
             = sampler.random_cells(num_models, probes_per_model)
 
         for im in range(num_models):
             print(im, end=' ')
-            cells = set(zip(ids_cell_type[im], ids_probe_offsets[im]))
+            cells = set(zip(ids_cell_type[im], ids_norm_probes[im]))
             assert len(cells) == probes_per_model
         print()
 
@@ -158,7 +158,7 @@ def test_random_choice_sampler_e_ratio(seed):
     num_models = 10000  # >> 1
     probes_per_model = int(num_offsets * num_cell_types * 0.05)
 
-    ids_cell_type, _ids_probe_offsets \
+    ids_cell_type, _ids_norm_probes \
         = sampler.random_cells(num_models, probes_per_model)
 
     e_ratio = 1 - ids_cell_type.mean()

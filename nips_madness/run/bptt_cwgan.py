@@ -33,7 +33,7 @@ def make_parser():
         help='''Number of probes to be included in the generator output
         from a single SSN.''')
     parser.add_argument(
-        '--probe-offsets', '--sample-sites',
+        '--norm-probes', '--sample-sites',
         default=[0], type=utils.csv_line(float),
         help='''Locations (offsets) of neurons to be sampled from SSN in the
         "bandwidth" space [-1, 1].  0 means the center of the
@@ -59,7 +59,7 @@ def init_driver(
     run_config = utils.subdict_by_prefix(run_config, 'disc_')
     run_config = utils.subdict_by_prefix(run_config, 'gen_')
 
-    sample_sites = run_config['probe_offsets']
+    sample_sites = run_config['norm_probes']
     include_inhibitory_neurons = run_config['include_inhibitory_neurons']
     gan, rest = make_gan(run_config)
     driver = BPTTcWGANDriver(

@@ -8,7 +8,7 @@ from . import lasagne_param_file
 from . import ssnode
 from .recorders import LearningRecorder, GenParamRecorder, \
     DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
-    UpdateResult
+    ConditionalTuningCurveStatsRecorder, UpdateResult
 
 
 def net_isfinite(layer):
@@ -285,12 +285,23 @@ class BPTTWGANDriver(GANDriver):
                         gradient_time=info.disc_time,
                         model_info=ssnode.null_FixedPointsInfo,
                         rate_penalty=disc_info.dynamics_penalty,
+                        # For BPTTcWGANDriver:
+                        info=info,
+                        disc_info=disc_info,
                     )
                 # See: [[./recorders.py::def record.*update_result]]
 
 
 class BPTTcWGANDriver(BPTTWGANDriver):
-    """ TODO: extend BPTTWGANDriver """
+
+    def post_update(self, gen_step, update_result):
+        self.tuning_curve_recorder.record(gen_step, update_result.disc_info)
+        super(BPTTcWGANDriver, self).post_update(gen_step, update_result)
+
+    def pre_loop(self):
+        super(BPTTcWGANDriver, self).pre_loop()
+        self.tuning_curve_recorder \
+            = ConditionalTuningCurveStatsRecorder.from_driver(self)
 
 
 class MomentMatchingDriver(object):

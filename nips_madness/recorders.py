@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import itertools
 
 import lasagne
 import numpy as np
@@ -195,3 +196,52 @@ class DiscParamStatsRecorder(BaseRecorder):
     @classmethod
     def from_driver(cls, driver):
         return cls.make(driver.datastore, driver.gan.discriminator)
+
+
+class ConditionalTuningCurveStatsRecorder(BaseRecorder):
+
+    filename = "tc_stats.csv"
+
+    def __init__(self, datastore, num_bandwidths):
+        super(ConditionalTuningCurveStatsRecorder, self).__init__(datastore)
+        self.num_bandwidths = num_bandwidths
+
+        self.column_names = (
+            'gen_step',
+            'is_fake',  # 0 or 1
+            # Key/Condition; see [[./networks/cwgan.py::get_output]]:
+            'contrast',
+            'probe_offset',
+            'cell_type',
+            # Stats:
+            'count',
+        ) + tuple(map('mean_{}'.format, range(num_bandwidths))) \
+          + tuple(map('var_{}'.format, range(num_bandwidths)))
+
+    @staticmethod
+    def analyze(tuning_curves, conditions):
+        def key(i):
+            return tuple(conditions[i])
+        indices = sorted(range(len(conditions)), key=key)
+
+        for cond, group in itertools.groupby(indices, key=key):
+            tc = tuning_curves[list(group)]
+            row = list(cond)     # contrast, probe_offset, cell_type
+            row.append(len(tc))  # count
+            row.extend(tc.mean(axis=0))
+            row.extend(tc.var(axis=0))
+            yield row
+
+    def record(self, gen_step, info):
+        # `info` is the object returned by train_discriminator
+        # See: [[./networks/cwgan.py::train_discriminator]]
+
+        for is_fake, x, c in [(0, info.xd, info.cd),
+                              (1, info.xg, info.cg)]:
+            for cond_stats in self.analyze(x, c):
+                self._saverow([gen_step, is_fake] + list(cond_stats))
+
+    @classmethod
+    def from_driver(cls, driver):
+        num_bandwidths = len(driver.gan.bandwidths)
+        return cls.make(driver.datastore, num_bandwidths)

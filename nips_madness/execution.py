@@ -55,17 +55,22 @@ class DataTables(object):
 
         return self._files[name]
 
-    def saverow(self, name, row, echo=False):
+    def saverow(self, name, row, echo=False, flush=False):
         if isinstance(row, (list, tuple)):
             row = ','.join(map(str, row))
 
         file = self._get_file(name)
         file.write(row)
         file.write('\n')
-        file.flush()
+        if flush:
+            file.flush()
 
         if echo:
             print(row)
+
+    def flush_all(self):
+        for file in self._files.values():
+            file.flush()
 
     def __enter__(self):
         return self

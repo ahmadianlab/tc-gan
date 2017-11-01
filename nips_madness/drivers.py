@@ -89,6 +89,8 @@ class GANDriver(object):
                 self.datastore.path('disc_param',
                                     self.disc_param_template.format(gen_step)))
 
+        self.datastore.tables.flush_all()
+
         maybe_quit(
             self.datastore,
             JDS_fake=list(map(np.exp, [jj, dd, ss])),

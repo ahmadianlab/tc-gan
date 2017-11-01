@@ -35,9 +35,10 @@ def make_parser():
     parser.add_argument(
         '--norm-probes', '--sample-sites',
         default=[0], type=utils.csv_line(float),
-        help='''Locations (offsets) of neurons to be sampled from SSN in the
-        "bandwidth" space [-1, 1].  0 means the center of the
-        network. (default: %(default)s)''')
+        help='''"Normalized" probes, i.e., locations (offsets) of
+        neurons to be sampled from SSN in [-1, 1] space ("bandwidth
+        coordinate").  0 means the center of thenetwork.
+        (default:%(default)s)''')
 
     bptt_wgan.add_bptt_common_options(parser)
     plain_gan.add_learning_options(parser)

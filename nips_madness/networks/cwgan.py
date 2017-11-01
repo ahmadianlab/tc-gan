@@ -33,6 +33,7 @@ class ConditionalProber(BaseComponent):
     Attributes
     ----------
     norm_probes : theano.tensor.vector
+        Normalized probes.
         Array of length `.batchsize` specifying probe offset in
         ``[-1, 1]`` bandwidth coordinate.
 

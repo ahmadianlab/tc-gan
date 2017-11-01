@@ -7,7 +7,7 @@ from logging import getLogger
 from . import bptt_wgan
 from . import gan as plain_gan
 from .. import utils
-from ..drivers import GANDriver
+from ..drivers import BPTTcWGANDriver
 from ..networks.cwgan import make_gan
 from .bptt_wgan import learn
 
@@ -62,7 +62,7 @@ def init_driver(
     sample_sites = run_config['probe_offsets']
     include_inhibitory_neurons = run_config['include_inhibitory_neurons']
     gan, rest = make_gan(run_config)
-    driver = GANDriver(
+    driver = BPTTcWGANDriver(
         gan, datastore,
         iterations=iterations, quiet=quiet,
         disc_param_save_interval=disc_param_save_interval,

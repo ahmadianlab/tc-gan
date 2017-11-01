@@ -9,10 +9,9 @@ import numpy as np
 from . import gan as plain_gan
 from .. import ssnode
 from .. import utils
-from ..drivers import GANDriver
+from ..drivers import BPTTWGANDriver
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..networks.bptt_gan import make_gan, DEFAULT_PARAMS
-from ..recorders import UpdateResult
 
 logger = getLogger(__name__)
 
@@ -88,45 +87,7 @@ def learn(driver, **generate_dataset_kwargs):
         **generate_dataset_kwargs)
 
     gan.set_dataset(data)
-
-    learning_it = gan.learning()
-
-    @driver.iterate
-    def _(k):
-        # This callback function "connects" gan.learning and drive.iterate.
-        while True:
-            info = next(learning_it)
-            if info.is_discriminator:
-                driver.post_disc_update(
-                    info.gen_step,
-                    info.disc_step,
-                    info.disc_loss,
-                    info.accuracy,
-                    info.gen_time,
-                    info.disc_time,
-                    ssnode.null_FixedPointsInfo,
-                )
-                last_info = info
-            else:
-                assert info.gen_step == k
-                # Save fake and tuning curves averaged over Zs:
-                data_mean = last_info.xd.mean(axis=0).tolist()
-                gen_mean = last_info.xg.mean(axis=0).tolist()
-                driver.datastore.tables.saverow('TC_mean.csv',
-                                                gen_mean + data_mean)
-
-                # Then the generator step was just taken.  Let's
-                # return a result that GANDriver understands.
-                return UpdateResult(
-                    Gloss=info.gen_loss,
-                    Dloss=last_info.disc_loss,
-                    Daccuracy=last_info.accuracy,
-                    SSsolve_time=info.gen_time,
-                    gradient_time=info.disc_time,
-                    model_info=ssnode.null_FixedPointsInfo,
-                    rate_penalty=last_info.dynamics_penalty,
-                )
-                # See: [[../recorders.py::def record.*update_result]]
+    driver.run(gan)
 
 
 def make_parser():
@@ -276,7 +237,7 @@ def init_driver(
         include_inhibitory_neurons=include_inhibitory_neurons,
     )
     gan, rest = make_gan(run_config)
-    driver = GANDriver(
+    driver = BPTTWGANDriver(
         gan, datastore,
         iterations=iterations, quiet=quiet,
         disc_param_save_interval=disc_param_save_interval,

@@ -137,3 +137,29 @@ def test_random_choice_sampler_cells():
             cells = set(zip(ids_cell_type[im], ids_probe_offsets[im]))
             assert len(cells) == probes_per_model
         print()
+
+
+@pytest.mark.parametrize('seed', [0])
+# @pytest.mark.parametrize('seed', list(range(100)))
+def test_random_choice_sampler_e_ratio(seed):
+    truth_size = 100
+    num_bandwidths = 5
+    num_contrasts = 2
+    num_offsets = 100
+    num_cell_types = 2
+    shape = (truth_size, num_cell_types, num_offsets, num_contrasts,
+             num_bandwidths)
+    sampler = RandomChoiceSampler(
+        arangemd(shape),
+        [np.arange(num) for num in shape[1:]],
+        seed=seed,
+    )
+
+    num_models = 10000  # >> 1
+    probes_per_model = int(num_offsets * num_cell_types * 0.05)
+
+    ids_cell_type, _ids_probe_offsets \
+        = sampler.random_cells(num_models, probes_per_model)
+
+    e_ratio = 1 - ids_cell_type.mean()
+    np.testing.assert_approx_equal(e_ratio, sampler.e_ratio, significant=2)

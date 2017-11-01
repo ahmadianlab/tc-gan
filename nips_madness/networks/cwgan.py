@@ -29,6 +29,34 @@ class ConditionalProber(BaseComponent):
 
     """
     Probe `model` output with varying probe.
+
+    Attributes
+    ----------
+    probe_offsets : theano.tensor.vector
+        Array of length `.batchsize` specifying probe offset in
+        ``[-1, 1]`` bandwidth coordinate.
+
+    cell_types : theano.tensor.vector
+        Array of length `.batchsize` and type uint16, specifying cell
+        type (0 means excitatory and 1 means inhibitory).
+
+    model_ids : theano.tensor.vector
+        Array of length `.batchsize` and type uint16, specifying
+        instances of model (`.zmat` used).  Must take values between
+        0 (inclusive) and `.num_models` (exclusive).
+
+    probes : theano.tensor.var.TensorVariable
+        Array of length `.batchsize` and type uint16.
+        Same as `.probe_offsets` but in neural index.
+
+    contrasts : theano.tensor.var.TensorVariable
+        Array of length `.batchsize`.  This is a reshaped one
+        dimensional "view" of `stimulator.contrasts
+        <.BandwidthContrastStimulator.contrasts>`.
+
+    tuning_curve : theano.tensor.var.TensorVariable
+        Array of shape (`.batchsize`, `.num_tcdom`).
+
     """
 
     def __init__(self, model):
@@ -39,7 +67,7 @@ class ConditionalProber(BaseComponent):
         self.model_ids = theano.tensor.vector('model_ids', 'uint16')
         # Invariants:
         #    * length of those vectors = batchsize
-        #    * all(0 <= probe_offsets <= 1)
+        #    * all(-1 <= probe_offsets <= 1)
         #    * all(0 <= model_ids < num_models)
         #    * all(cell_types in {0, 1})
 

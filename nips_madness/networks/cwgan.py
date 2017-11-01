@@ -337,6 +337,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         assert self.probes_per_model < gen.num_neurons
 
     def set_dataset(self, data, **kwargs):
+        kwargs.setdefault('seed', self.rng)
         self.sampler = RandomChoiceSampler.from_grid_data(
             data,
             bandwidths=self.bandwidths,

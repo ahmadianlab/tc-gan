@@ -3,7 +3,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from ..cwgan import ConditionalMinibatch, ConditionalProber
+from ..cwgan import (
+    ConditionalMinibatch, ConditionalProber, RandomChoiceSampler,
+)
 from .test_conditional_prober import mock_model
 
 
@@ -22,6 +24,12 @@ def make_conditional_minibatch(num_models=2, probes_per_model=3,
     return ConditionalMinibatch(tc_md, conditions_md, bandwidths, contrasts)
 
 
+def access_all_attrs(obj):
+    """ Access all attributes of `obj`, mostly for smoke tests. """
+    for name in dir(obj):
+        getattr(obj, name)
+
+
 @pytest.mark.parametrize('num_models, probes_per_model, num_bandwidths', [
     (1, 3, 5),
     (2, 3, 5),
@@ -29,10 +37,7 @@ def make_conditional_minibatch(num_models=2, probes_per_model=3,
 def test_conditional_minibatch(num_models, probes_per_model, num_bandwidths):
     batch = make_conditional_minibatch(num_models, probes_per_model,
                                        num_bandwidths)
-
-    # Smoke tests -- all dynamical properties have to raise no error:
-    for name in dir(batch):
-        getattr(batch, name)
+    access_all_attrs(batch)
 
     assert batch.num_models == num_models
     assert batch.probes_per_model == probes_per_model
@@ -72,3 +77,28 @@ def test_conditional_minibatch_prober_contrasts(num_models, probes_per_model):
     # * [[../cwgan.py::gen_kwargs]]
 
     np.testing.assert_equal(prober_contrasts, batch_contrasts)
+
+
+def test_random_choice_sampler_shape():
+    truth_size = 100
+    num_bandwidths = 5
+    num_contrasts = 2
+    num_offsets = 6
+    num_cell_types = 2
+    shape = (truth_size, num_cell_types, num_offsets, num_contrasts,
+             num_bandwidths)
+    sampler = RandomChoiceSampler(
+        arangemd(shape),
+        [np.arange(num) for num in shape[1:]],
+    )
+
+    num_models = 8
+    probes_per_model = num_offsets * num_cell_types
+    repeat = 3
+    for _, batch in zip(range(repeat),
+                        sampler.random_minibatches(num_models,
+                                                   probes_per_model)):
+        access_all_attrs(batch)
+        assert batch.num_models == num_models
+        assert batch.probes_per_model == probes_per_model
+        assert batch.num_bandwidths == num_bandwidths

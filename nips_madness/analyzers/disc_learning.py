@@ -80,6 +80,11 @@ class DiscriminatorLog(object):
         self.learning['epoch'] = self.param_stats['epoch'] = self.epochs
 
     @property
+    def run_module(self):
+        from .loader import guess_run_module
+        return guess_run_module(self.get_info())
+
+    @property
     def disc_updates(self):
         return np.asarray(self.learning['disc_updates'])
 
@@ -87,15 +92,34 @@ class DiscriminatorLog(object):
     def epochs(self):
         return self.disc_updates_to_epoch(self.disc_updates)
 
-    def disc_updates_to_epoch(self, disc_updates):
+    @property
+    def datasize(self):
         run_config = self.get_info()['run_config']
-        truth_size = run_config['truth_size']  # data size
-        n_samples = self.batchsize
-        return disc_updates * n_samples / truth_size
+        if self.run_module == 'bptt_cwgan':
+            truth_size = run_config['truth_size']
+            try:
+                num_probes = len(run_config['norm_probes'])
+            except KeyError:
+                num_probes = len(run_config['probe_offsets'])
+            num_contrasts = len(run_config['contrasts'])
+            if run_config['include_inhibitory_neurons']:
+                coeff = (0.8 + 0.2) / (0.8 + 0.8)
+                return truth_size * num_probes * num_contrasts * coeff
+            else:
+                return truth_size * num_probes * num_contrasts
+        else:
+            return run_config['truth_size']
+
+    def disc_updates_to_epoch(self, disc_updates):
+        return disc_updates * self.batchsize / self.datasize
 
     @property
     def batchsize(self):
         run_config = self.get_info()['run_config']
+        try:
+            return run_config['num_models'] * run_config['probes_per_model']
+        except KeyError:
+            pass
         try:
             return run_config['batchsize']
         except KeyError:

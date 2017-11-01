@@ -145,7 +145,7 @@ def plot_gan_cost_and_rate_penalty(data, df=None, ax=None,
         df = data.to_dataframe()
 
     color = 'C0'
-    if data.gan_type == 'WGAN':
+    if data.is_WGAN:
         lines = ax.plot(
             df['epoch'], -df['Daccuracy'],
             label='Wasserstein distance', color=color)
@@ -184,7 +184,7 @@ def plot_learning(data, title_params=None):
                                 squeeze=False, figsize=(9, 8))
 
     plot_kwargs = dict(ax=axes[0, 0], alpha=0.8)
-    if data.gan_type == 'WGAN':
+    if data.is_WGAN:
         df['Lip. penalty'] = df['Dloss'] - df['Daccuracy']
         df.plot('epoch', ['Gloss', 'Dloss', 'Lip. penalty'], **plot_kwargs)
     else:

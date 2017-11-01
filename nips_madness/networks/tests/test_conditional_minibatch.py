@@ -102,3 +102,33 @@ def test_random_choice_sampler_shape():
         assert batch.num_models == num_models
         assert batch.probes_per_model == probes_per_model
         assert batch.num_bandwidths == num_bandwidths
+
+
+def test_random_choice_sampler_cells():
+    truth_size = 100
+    num_bandwidths = 5
+    num_contrasts = 2
+    num_offsets = 6
+    num_cell_types = 2
+    shape = (truth_size, num_cell_types, num_offsets, num_contrasts,
+             num_bandwidths)
+    sampler = RandomChoiceSampler(
+        arangemd(shape),
+        [np.arange(num) for num in shape[1:]],
+    )
+
+    num_models = 8
+    probes_per_model = num_offsets * num_cell_types
+    repeat = 3
+
+    print()
+    for n in range(repeat):
+        print('{}-th repeat -- model: '.format(n), end='')
+        ids_cell_type, ids_probe_offsets \
+            = sampler.random_cells(num_models, probes_per_model)
+
+        for im in range(num_models):
+            print(im, end=' ')
+            cells = set(zip(ids_cell_type[im], ids_probe_offsets[im]))
+            assert len(cells) == probes_per_model
+        print()

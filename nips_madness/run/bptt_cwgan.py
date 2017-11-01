@@ -29,7 +29,7 @@ def make_parser():
         '--num-models', default=15, type=int,
         help='Number of SSN to be instantiated (aka NZ).')
     parser.add_argument(
-        '--probes-per-model', default=10, type=int,
+        '--probes-per-model', default=1, type=int,
         help='''Number of probes to be included in the generator output
         from a single SSN.''')
     parser.add_argument(

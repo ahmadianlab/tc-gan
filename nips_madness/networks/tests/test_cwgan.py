@@ -3,7 +3,14 @@ import numpy as np
 from .. import cwgan
 
 
-def make_gan(**kwargs):
+def make_gan(probe_offsets=[0],
+             include_inhibitory_neurons=True,
+             **kwargs):
+    probes_per_model = len(probe_offsets)
+    if include_inhibitory_neurons:
+        probes_per_model *= 2
+    kwargs.setdefault('probes_per_model', probes_per_model)
+
     return cwgan.make_gan(dict(dict(
         J0=np.ones((2, 2)) * 0.01,
         D0=np.ones((2, 2)) * 0.01,
@@ -24,8 +31,8 @@ def make_gan(**kwargs):
         ),
         critic_iters_init=1,
         critic_iters=1,
-        probe_offsets=[0],
-        include_inhibitory_neurons=True,
+        probe_offsets=probe_offsets,
+        include_inhibitory_neurons=include_inhibitory_neurons,
         lipschitz_cost=10,
         truth_size=1,
     ), **kwargs))

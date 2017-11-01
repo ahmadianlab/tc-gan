@@ -8,7 +8,7 @@ from . import simple_discriminator
 from ..core import BaseComponent, consume_subdict
 from ..gradient_expressions.utils import sample_sites_from_stim_space_impl
 from ..utils import (
-    cached_property, theano_function, StopWatch,
+    cached_property, cartesian_product, theano_function, StopWatch,
     as_randomstate,
 )
 from .bptt_gan import (
@@ -19,7 +19,7 @@ from .ssn import TuningCurveGenerator
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
     num_models=1,
-    probes_per_model=10,
+    probes_per_model=1,
 )
 del DEFAULT_PARAMS['batchsize']
 del DEFAULT_PARAMS['sample_sites']
@@ -269,17 +269,31 @@ class RandomChoiceSampler(object):
 
         assert tuple(self.cell_types) in [(0,), (0, 1)]
 
-    def random_cell_types(self, shape):
-        if len(self.cell_types) == 2:
-            return self.rng.choice(2, shape,
-                                   p=[self.e_ratio, 1 - self.e_ratio])
-        else:
-            return np.zeros(shape, dtype='uint16')
-
     def random_cells(self, num_models, probes_per_model):
-        shape = (num_models, probes_per_model)
-        ids_cell_type = self.random_cell_types(shape)
-        ids_probe_offsets = self.rng.choice(len(self.probe_offsets), shape)
+        """
+        Choose cells in such a way that every cell is chosen at most once.
+        """
+        cellids = cartesian_product(np.arange(len(self.cell_types)),
+                                    np.arange(len(self.probe_offsets)),
+                                    dtype=int).T
+        if len(self.cell_types) == 2:
+            probs = np.zeros(len(cellids))
+            probs[:len(self.probe_offsets)] = self.e_ratio
+            probs[len(self.probe_offsets):] = 1 - self.e_ratio
+            probs /= probs.sum()
+        else:
+            probs = None
+
+        def choice():
+            return self.rng.choice(len(cellids), probes_per_model,
+                                   replace=False, p=probs)
+
+        # ids.shape: (num_models, probes_per_model, 2)
+        ids = np.asarray([cellids[choice()] for _ in range(num_models)])
+
+        ids_cell_type, ids_probe_offsets = ids.transpose((2, 0, 1))
+        assert ids_cell_type.shape == ids_probe_offsets.shape \
+            == (num_models, probes_per_model)
         return ids_cell_type, ids_probe_offsets
 
     def select_minibatch(self, num_models, probes_per_model):

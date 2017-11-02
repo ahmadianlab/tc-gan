@@ -6,6 +6,7 @@ import numpy
 import theano
 
 from . import utils
+from .utils import cached_property
 
 
 class KnownError(Exception):
@@ -85,11 +86,54 @@ class DataTables(object):
                 print('ignoring...')
 
 
+class HDF5Tables(object):
+
+    def __init__(self, h5):
+        self.h5 = h5
+
+    def create_table(self, name, dtype):
+        return self.h5.file.create_dataset(name, (0,), maxshape=(None,),
+                                           dtype=dtype)
+
+    def saverow(self, name, row, echo=False, flush=False):
+        file = self.h5.file
+        if name in file:
+            dataset = file[name]
+        else:
+            dataset = self.create_table(name, row.dtype)
+
+        dataset.resize((len(dataset) + 1,))
+        dataset[-1] = row
+
+        if flush:
+            file.flush()
+        if echo:
+            print(*row, sep=',')
+
+
+class HDF5Store(object):
+
+    def __init__(self, datastore, filename='store.hdf5'):
+        self.datastore = datastore
+        self.path = os.path.join(datastore.directory, filename)
+        self.tables = HDF5Tables(self)
+        self.flush_all = lambda: None
+
+    @cached_property
+    def file(self):
+        import h5py
+        file = self.datastore.enter_context(h5py.File(self.path))
+        self.flush_all = file.flush
+        return file
+
+
 class DataStore(object):
 
     def __init__(self, directory):
         self.directory = directory
         self.tables = DataTables(directory)
+        self.h5 = HDF5Store(self)
+        self.exit_hooks = []
 
     def path(self, *subpaths):
         newpath = os.path.join(self.directory, *subpaths)
@@ -100,8 +144,35 @@ class DataStore(object):
         with open(self.path(filename), 'w') as fp:
             json.dump(obj, fp)
 
+    def flush_all(self):
+        self.tables.flush_all()
+        self.h5.flush_all()
+
     def __repr__(self):
         return '<DataStore: {}>'.format(self.directory)
+
+    def enter_context(self, context_manager):
+        ret = context_manager.__enter__()
+        self.exit_hooks.append(context_manager.__exit__)
+        return ret
+
+    def __enter__(self):
+        self.enter_context(self.tables)
+        return self
+
+    def __exit__(self, *exc):
+        run_exit_hooks(self.exit_hooks, exc)
+
+
+def run_exit_hooks(exit_hooks, exc=(None, None, None)):
+    if not exit_hooks:
+        return
+    try:
+        exit_hooks[0](*exc)
+    finally:
+        run_exit_hooks(exit_hooks[1:], exc)
+# MAYBE: Do what contextlib.nested was doing.  More complicated.
+# See: https://github.com/python/cpython/blob/2.7/Lib/contextlib.py#L89
 
 
 def format_datastore(datastore_template, run_config):
@@ -196,6 +267,5 @@ def do_learning(learn, run_config, extra_info={}, preprocess=None,
     run_config = pre_learn(packages=packages, extra_info=extra_info,
                            preprocess=preprocess,
                            **run_config)
-    datastore = DataStore(run_config.pop('datastore'))
-    with datastore.tables:
+    with DataStore(run_config.pop('datastore')) as datastore:
         return learn(datastore=datastore, **run_config)

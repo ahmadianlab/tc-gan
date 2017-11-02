@@ -30,4 +30,4 @@ def test_single_g_step_slowtest(args, cleancwd):
         single_g_step=single_g_step,
         script_file=bptt_cwgan.__file__)
 
-    assert_logfile_exists(cleancwd, 'tc_stats.csv')
+    assert_logfile_exists(cleancwd, 'store.hdf5')

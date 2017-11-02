@@ -79,6 +79,22 @@ class BaseRecorder(object):
         return cls.make(driver.datastore)
 
 
+class HDF5Recorder(BaseRecorder):
+
+    def _saverow(self, row):
+        typed_row = np.array(tuple(row), dtype=self.dtype)
+        self.datastore.h5.tables.saverow(self.tablename,
+                                         typed_row,
+                                         echo=not self.quiet)
+
+    def write_header(self):
+        self.datastore.h5.tables.create_table(self.tablename, self.dtype)
+
+    @property
+    def column_names(self):
+        return self.dtype.names
+
+
 class LearningRecorder(BaseRecorder):
 
     filename = "learning.csv"
@@ -198,25 +214,26 @@ class DiscParamStatsRecorder(BaseRecorder):
         return cls.make(driver.datastore, driver.gan.discriminator)
 
 
-class ConditionalTuningCurveStatsRecorder(BaseRecorder):
+class ConditionalTuningCurveStatsRecorder(HDF5Recorder):
 
-    filename = "tc_stats.csv"
+    tablename = "tc_stats"
 
     def __init__(self, datastore, num_bandwidths):
         super(ConditionalTuningCurveStatsRecorder, self).__init__(datastore)
         self.num_bandwidths = num_bandwidths
 
-        self.column_names = (
-            'gen_step',
-            'is_fake',  # 0 or 1
-            # Key/Condition; see [[./networks/cwgan.py::get_output]]:
-            'contrast',
-            'norm_probe',
-            'cell_type',
-            # Stats:
-            'count',
-        ) + tuple(map('mean_{}'.format, range(num_bandwidths))) \
-          + tuple(map('var_{}'.format, range(num_bandwidths)))
+        self.dtype = np.dtype([
+            ('gen_step', 'uint32'),
+            ('is_fake', 'b'),
+            ('contrast', 'double'),
+            ('norm_probe', 'double'),
+            ('cell_type', 'uint16'),
+            ('count', 'uint32'),
+        ] + [
+            ('mean_{}'.format(i), 'double') for i in range(num_bandwidths)
+        ] + [
+            ('var_{}'.format(i), 'double') for i in range(num_bandwidths)
+        ])
 
     @staticmethod
     def analyze(tuning_curves, conditions):

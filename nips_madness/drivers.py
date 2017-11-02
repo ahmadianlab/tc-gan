@@ -89,7 +89,7 @@ class GANDriver(object):
                 self.datastore.path('disc_param',
                                     self.disc_param_template.format(gen_step)))
 
-        self.datastore.tables.flush_all()
+        self.datastore.flush_all()
 
         maybe_quit(
             self.datastore,

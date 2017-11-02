@@ -1,3 +1,4 @@
+from logging import getLogger
 import json
 import os
 
@@ -7,6 +8,8 @@ import theano
 
 from . import utils
 from .utils import cached_property
+
+logger = getLogger(__name__)
 
 
 class KnownError(Exception):
@@ -268,4 +271,5 @@ def do_learning(learn, run_config, extra_info={}, preprocess=None,
                            preprocess=preprocess,
                            **run_config)
     with DataStore(run_config.pop('datastore')) as datastore:
+        logger.info('Output directory: %s', datastore.directory)
         return learn(datastore=datastore, **run_config)

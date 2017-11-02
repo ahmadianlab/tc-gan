@@ -211,7 +211,7 @@ class ConditionalTuningCurveStatsRecorder(BaseRecorder):
             'is_fake',  # 0 or 1
             # Key/Condition; see [[./networks/cwgan.py::get_output]]:
             'contrast',
-            'probe_offset',
+            'norm_probe',
             'cell_type',
             # Stats:
             'count',
@@ -226,7 +226,7 @@ class ConditionalTuningCurveStatsRecorder(BaseRecorder):
 
         for cond, group in itertools.groupby(indices, key=key):
             tc = tuning_curves[list(group)]
-            row = list(cond)     # contrast, probe_offset, cell_type
+            row = list(cond)     # contrast, norm_probe, cell_type
             row.append(len(tc))  # count
             row.extend(tc.mean(axis=0))
             row.extend(tc.var(axis=0))

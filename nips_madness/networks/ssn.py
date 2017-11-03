@@ -575,3 +575,23 @@ class TuningCurveGenerator(BaseComponent):
         with log_timing("compiling {}._forward"
                         .format(self.__class__.__name__)):
             self._forward
+
+
+class SingleBatchTuningCurveGenerator(TuningCurveGenerator):
+    model_class = SingleBatchEulerSSNModel
+
+
+_tcg_classes = {
+    'default': TuningCurveGenerator,
+    'singlebatch': SingleBatchTuningCurveGenerator,
+}
+"""
+Mapping form ``ssn_class`` to tuning curve generator class.
+"""
+
+
+def make_tuning_curve_generator(config, *init_args, **init_kwargs):
+    config = dict(config)
+    ssn_class = config.pop('ssn_class', 'default')
+    cls = _tcg_classes[ssn_class]
+    return cls.consume_config(config, *init_args, **init_kwargs)

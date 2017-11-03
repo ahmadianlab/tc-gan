@@ -3,7 +3,7 @@ import numpy as np
 from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from .bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
-from .ssn import TuningCurveGenerator
+from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 
 
@@ -26,13 +26,14 @@ class FiniteTimeTuningCurveSampler(object):
     @classmethod
     def consume_kwargs(cls, bandwidths, contrasts, seed,
                        sample_sites, num_sites, **kwargs):
-        gen, rest = TuningCurveGenerator.consume_kwargs(
+        gen, rest = make_tuning_curve_generator(
+            kwargs,
             # Stimulator:
             num_tcdom=len(bandwidths) * len(contrasts),
             num_sites=num_sites,
             # Prober:
             probes=sample_sites_from_stim_space(sample_sites, num_sites),
-            **kwargs)
+        )
         return cls(gen, bandwidths, contrasts, seed), rest
 
     def __init__(self, gen, bandwidths, contrasts, seed):

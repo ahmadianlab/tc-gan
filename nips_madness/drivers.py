@@ -1,3 +1,4 @@
+from logging import getLogger
 import collections
 
 import lasagne
@@ -9,6 +10,8 @@ from . import ssnode
 from .recorders import LearningRecorder, GenParamRecorder, \
     DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
     ConditionalTuningCurveStatsRecorder, UpdateResult
+
+logger = getLogger(__name__)
 
 
 def net_isfinite(layer):
@@ -126,8 +129,10 @@ class GANDriver(object):
             )(update_func)
 
         self.pre_loop()
+        logger.info('%s: start iterations', self.__class__.__name__)
         for gen_step in range(self.iterations):
             self.post_update(gen_step, update_func(gen_step))
+        logger.info('%s: maximum iterations reached', self.__class__.__name__)
         self.post_loop()
 
 
@@ -362,8 +367,10 @@ class MomentMatchingDriver(object):
 
         """
         self.pre_loop()
+        logger.info('%s: start iterations', self.__class__.__name__)
         for gen_step in range(self.iterations):
             self.post_update(gen_step, update_func(gen_step))
+        logger.info('%s: maximum iterations reached', self.__class__.__name__)
         self.post_loop()
 
     def run(self, learner):

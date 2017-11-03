@@ -58,9 +58,9 @@ def ssn_forward(params, repeat, method):
 
     df = pandas.DataFrame(combinations, columns=keys)
     for i in range(len(df)):
-        times = np.asarray(watches[i].times)
-        for stat in ['mean', 'std', 'min', 'max']:
-            df.loc[i, stat] = getattr(times, stat)()
+        for stat in ['mean', 'median', 'min', 'max', 'std']:
+            df.loc[i, stat] = getattr(np, stat)(watches[i].times[1:])
+        df.loc[i, 'first'] = watches[i].times[0]
 
     # Manually detect terminal size, since passing "'display.width',
     # None" does not detect terminal size (as advertised in
@@ -89,8 +89,8 @@ def main(args=None):
         choices=('forward', 'compute_trajectories'),
         help="Method to be benchmarked.")
     parser.add_argument(
-        '--repeat', type=int, default=3,
-        help="How many times")
+        '--repeat', type=int, default=4,
+        help="Number of samples per combination of parameter.")
     parser.add_argument(
         'params', metavar='JSON',
         default=dict(ssn_impl=['default', 'mapclone']),

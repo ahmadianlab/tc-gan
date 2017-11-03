@@ -11,7 +11,7 @@ from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
     theano_function, log_timing,
 )
-from .ssn import TuningCurveGenerator
+from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 
 
@@ -312,7 +312,7 @@ def _make_gan_from_kwargs(
     probes = sample_sites_from_stim_space(sample_sites, num_sites)
     if include_inhibitory_neurons:
         probes.extend(np.array(probes) + num_sites)
-    gen, rest = TuningCurveGenerator.consume_config(
+    gen, rest = make_tuning_curve_generator(
         rest,
         # Stimulator:
         num_tcdom=len(bandwidths) * len(contrasts),

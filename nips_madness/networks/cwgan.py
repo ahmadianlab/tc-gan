@@ -113,6 +113,26 @@ class ConditionalTuningCurveGenerator(TuningCurveGenerator):
         return [self.prober.outputs[0], conditions]
 
 
+class MapCloneConditionalTuningCurveGenerator(ConditionalTuningCurveGenerator):
+    from .ssn import MapCloneEulerSSNModel as model_class
+
+
+_tcg_classes = {
+    'default': ConditionalTuningCurveGenerator,
+    'mapclone': MapCloneConditionalTuningCurveGenerator,
+}
+"""
+Mapping form ``ssn_impl`` to tuning curve generator class.
+"""
+
+
+def make_conditional_tuning_curve_generator(config, *init_args, **init_kwargs):
+    config = dict(config)
+    ssn_impl = config.pop('ssn_impl', 'default')
+    cls = _tcg_classes[ssn_impl]
+    return cls.consume_config(config, *init_args, **init_kwargs)
+
+
 class ConditionalDiscriminator(BaseComponent):
 
     def __init__(self, shape, cond_shape, loss_type,
@@ -473,7 +493,7 @@ def _make_gan_from_kwargs(
         J0, S0, D0, num_sites, bandwidths, contrasts,
         num_models, probes_per_model,
         **rest):
-    gen, rest = ConditionalTuningCurveGenerator.consume_config(
+    gen, rest = make_conditional_tuning_curve_generator(
         rest,
         batchsize=num_models * probes_per_model,
         # Stimulator:

@@ -11,7 +11,7 @@ from ..utils import (
     theano_function, log_timing, asarray,
 )
 from .bptt_gan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
-from .ssn import TuningCurveGenerator
+from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 
 
@@ -312,7 +312,7 @@ def _make_mm_from_kwargs(
     probes = sample_sites_from_stim_space(sample_sites, num_sites)
     if include_inhibitory_neurons:
         probes.extend(np.array(probes) + num_sites)
-    gen, rest = TuningCurveGenerator.consume_config(
+    gen, rest = make_tuning_curve_generator(
         rest,
         # Stimulator:
         num_tcdom=len(bandwidths) * len(contrasts),

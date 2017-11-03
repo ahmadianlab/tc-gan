@@ -7,7 +7,8 @@ import theano
 from .. import ssnode
 from ..core import BaseComponent
 from ..gradient_expressions.make_w_batch import make_W_with_x
-from ..utils import cached_property, theano_function, log_timing, asarray
+from ..utils import cached_property, theano_function, log_timing, asarray, \
+    is_theano
 
 
 def int_or_lscalr(value, name):
@@ -89,7 +90,14 @@ class BandwidthContrastStimulator(BaseComponent):
     num_neurons = property(lambda self: self.num_sites * 2)
 
 
-class EulerSSNCore(BaseComponent):
+class SingleBatchEulerSSNCore(BaseComponent):
+
+    """
+    Implementation of single Euler step for SSN.
+
+    See: `EulerSSNCore`.
+
+    """
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type):
@@ -120,6 +128,14 @@ class EulerSSNCore(BaseComponent):
         self.tau = tau
         self.eps = dt / tau
 
+        self.f = ssnode.make_io_fun(self.k, self.n, io_type=self.io_type)
+
+        self.post_init()
+
+    def post_init(self):
+        stimulator = self.stimulator
+        num_sites = stimulator.num_sites
+
         self.zmat = theano.tensor.matrix('zmat')
         self.Wt = make_W_with_x(theano.tensor.shape_padleft(self.zmat),
                                 self.J, self.D, self.S,
@@ -128,10 +144,6 @@ class EulerSSNCore(BaseComponent):
         self.Wt.name = 'Wt'
 
         self.ext = theano.tensor.matrix('ext')
-
-        self.f = ssnode.make_io_fun(self.k, self.n, io_type=self.io_type)
-
-    # MAYBE: move all the stuff in __init__ to get_output_for
 
     def get_output_for(self, r):
         f = self.f
@@ -152,13 +164,13 @@ class EulerSSNLayer(lasagne.layers.Layer):
     # http://lasagne.readthedocs.io/en/latest/user/custom_layers.html
     # http://lasagne.readthedocs.io/en/latest/modules/layers/base.html
 
-    def __init__(self, incoming, **kwargs):
+    def __init__(self, incoming, ssn, **kwargs):
         # It's a bit scary to share namespace with lasagne; so let's
         # introduce only one namespace and keep SSN-specific stuff
         # there:
-        self.ssn, rest = EulerSSNCore.consume_kwargs(**kwargs)
+        self.ssn = ssn
 
-        super(EulerSSNLayer, self).__init__(incoming, **rest)
+        super(EulerSSNLayer, self).__init__(incoming, **kwargs)
 
         self.add_param(self.ssn.J, (2, 2), name='J')
         self.add_param(self.ssn.D, (2, 2), name='D')
@@ -168,7 +180,7 @@ class EulerSSNLayer(lasagne.layers.Layer):
         return self.ssn.get_output_for(input, **kwargs)
 
 
-class EulerSSNModel(BaseComponent):
+class SingleBatchEulerSSNModel(BaseComponent):
 
     r"""
     Implementation of SSN in Theano.
@@ -188,40 +200,15 @@ class EulerSSNModel(BaseComponent):
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
 
-        # num_tcdom = "batch dimension" when using Lasagne:
-        num_neurons = self.stimulator.num_neurons
-        shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
-
-        shape_rec = (shape[0],) + shape[2:]
-        self.l_ssn = EulerSSNLayer(
-            lasagne.layers.InputLayer(shape_rec),
+        ssn = SingleBatchEulerSSNCore(
             stimulator=stimulator,
             J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
             io_type=io_type,
         )
-
-        # Since SSN is autonomous, we don't need to do anything for
-        # input and input_to_hidden layers.  So let's zero them out:
-        self.l_fake_input = lasagne.layers.InputLayer(
-            shape,
-            theano.tensor.zeros(shape),
-        )
-        self.l_zero = lasagne.layers.NonlinearityLayer(
-            lasagne.layers.InputLayer(shape_rec),
-            nonlinearity=lambda x: x * 0,
-            # ...or maybe just nonlinearity=None; check if Theano
-            # short-circuits if multiplied by zero.
-        )
-
-        self.l_rec = lasagne.layers.CustomRecurrentLayer(
-            self.l_fake_input,
-            input_to_hidden=self.l_zero,
-            hidden_to_hidden=self.l_ssn,
-            nonlinearity=None,  # let EulerSSNLayer handle the nonlinearity
-            precompute_input=False,  # True (default) is maybe better?
-            unroll_scan=unroll_scan,
-        )
-        self.unroll_scan = unroll_scan
+        # num_tcdom = "batch dimension" when using Lasagne:
+        num_neurons = self.stimulator.num_neurons
+        shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
+        self._setup_layers(ssn, shape, unroll_scan)
 
         self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
         rs = rates[:, self.skip_steps:]
@@ -239,6 +226,39 @@ class EulerSSNModel(BaseComponent):
 
         self.inputs = (self.zs,)
         self.outputs = (self.dynamics_penalty,)
+
+    def _setup_layers(self, ssn, shape, unroll_scan):
+        shape_sym = shape
+        if is_theano(shape[0]):
+            shape = (None,) + shape[1:]
+        shape_rec = (shape[0],) + shape[2:]
+        self.l_ssn = EulerSSNLayer(
+            lasagne.layers.InputLayer(shape_rec),
+            ssn,
+        )
+
+        # Since SSN is autonomous, we don't need to do anything for
+        # input and input_to_hidden layers.  So let's zero them out:
+        self.l_fake_input = lasagne.layers.InputLayer(
+            shape,
+            theano.tensor.zeros(shape_sym),
+        )
+        self.l_zero = lasagne.layers.NonlinearityLayer(
+            lasagne.layers.InputLayer(shape_rec),
+            nonlinearity=lambda x: x * 0,
+            # ...or maybe just nonlinearity=None; check if Theano
+            # short-circuits if multiplied by zero.
+        )
+
+        self.l_rec = lasagne.layers.CustomRecurrentLayer(
+            self.l_fake_input,
+            input_to_hidden=self.l_zero,
+            hidden_to_hidden=self.l_ssn,
+            nonlinearity=None,  # let EulerSSNLayer handle the nonlinearity
+            precompute_input=False,  # True (default) is maybe better?
+            unroll_scan=unroll_scan,
+        )
+        self.unroll_scan = unroll_scan
 
     zmat = property(lambda self: self.l_ssn.ssn.zmat)
     ext = property(lambda self: self.l_ssn.ssn.ext)
@@ -263,6 +283,11 @@ class EulerSSNModel(BaseComponent):
 
     @cached_property
     def all_trajectories(self):
+        """
+        Symbolic expression for all trajectories across batches and stimuli.
+
+        Array of shape (`.batchsize`, `.num_tcdom`, `.seqlen`, `.num_neurons`).
+        """
         return self._map_clone(self.trajectories)
 
     @cached_property
@@ -278,6 +303,110 @@ class EulerSSNModel(BaseComponent):
             (self.zs,) + self.stimulator.inputs,
             self.time_avg,
         )
+
+
+class EulerSSNCore(SingleBatchEulerSSNCore):
+
+    """
+    Implementation of single Euler step for SSN.
+
+    Attributes
+    ----------
+    zs : theano.tensor.tensor3
+        Array of shape (`.batchsize`, `.num_neurons`, `.num_neurons`).
+        The randomness part of the connectivity matrix.
+    Wt : theano.tensor.var.TensorVariable
+        Array of shape (`.batchsize`, `.num_neurons`, `.num_neurons`).
+        Transposed connectivity matrix; i.e., ``Wt[k].T[i, j]`` is the
+        element :math:`W_{ij}` of the connectivity matrix for the
+        ``k``-th batch.
+
+    """
+
+    def post_init(self):
+        stimulator = self.stimulator
+        num_sites = stimulator.num_sites
+
+        self.zs = theano.tensor.tensor3('zs')
+        self.Wt = make_W_with_x(
+            self.zs, self.J, self.D, self.S, num_sites,
+            stimulator.site_to_band,
+        ).swapaxes(1, 2)
+        self.Wt.name = 'Wt'
+
+        self.ext = stimulator.stimulus
+
+    def get_output_for(self, r):
+        """
+        Get computation graph representing a single Euler step.
+
+        Parameters
+        ----------
+        r : theano.tensor.tensor3
+            An array of shape (`.batchsize`, `.num_tcdom`, `.num_neurons`)
+            holding network state.
+
+        """
+        f = self.f
+        Wt = self.Wt
+        I = self.ext
+        eps = self.eps.reshape((1, 1, -1))
+        co_eps = (1 - self.eps).reshape((1, 1, -1))
+        Wr = theano.tensor.batched_dot(r, Wt)
+        r_next = co_eps * r + eps * f(Wr + I)
+        r_next = theano.tensor.patternbroadcast(r_next, r.broadcastable)
+        # patternbroadcast is required for the case num_tcdom=1.
+        r_next.name = 'r_next'
+        return r_next
+
+
+class EulerSSNModel(SingleBatchEulerSSNModel):
+
+    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
+                 io_type,
+                 unroll_scan=False,
+                 skip_steps=None, seqlen=None):
+        self.stimulator = stimulator
+        self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
+        self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+
+        num_neurons = self.stimulator.num_neurons
+        ssn = EulerSSNCore(
+            stimulator=stimulator,
+            J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
+            io_type=io_type,
+        )
+        # self.zs.shape: (batchsize, num_neurons, num_neurons)
+        self.zs = ssn.zs
+        batchsize = self.zs.shape[0]
+        shape = (batchsize,
+                 self.seqlen,
+                 self.stimulator.num_tcdom,
+                 num_neurons)
+        self._setup_layers(ssn, shape, unroll_scan)
+
+        # trajectories.shape: (batchsize, seqlen, num_tcdom, num_neurons)
+        self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
+        rs = rates[:, self.skip_steps:]
+
+        # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
+        self.time_avg = rs.mean(axis=1)
+        self.dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
+        self.dynamics_penalty.name = 'dynamics_penalty'
+
+        self.inputs = (self.zs,)
+        self.outputs = (self.dynamics_penalty,)
+
+    _map_clone = None  # must not be called for this class
+
+    @property
+    def all_trajectories(self):
+        """
+        Symbolic expression for all trajectories across batches and stimuli.
+
+        Array of shape (`.batchsize`, `.num_tcdom`, `.seqlen`, `.num_neurons`).
+        """
+        return self.trajectories.swapaxes(1, 2)
 
 
 class FixedProber(BaseComponent):

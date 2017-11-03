@@ -43,8 +43,11 @@ class ConditionalProber(BaseComponent):
 
     model_ids : theano.tensor.vector
         Array of length `.batchsize` and type uint16, specifying
-        instances of model (`.zmat` used).  Must take values between
-        0 (inclusive) and `.num_models` (exclusive).
+        instances of model; i.e., each element is an index `i` such
+        that the matrix `zs[i] <.EulerSSNCore.zs>` specifies a matrix
+        of shape (`.num_neurons`, `.num_neurons`) for the
+        "randomness/noise part" of the connectivity matrix.  Must take
+        values between 0 (inclusive) and `.num_models` (exclusive).
 
     probes : theano.tensor.var.TensorVariable
         Array of length `.batchsize` and type uint16.

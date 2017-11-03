@@ -93,7 +93,7 @@ def main(args=None):
         help="How many times")
     parser.add_argument(
         'params', metavar='JSON',
-        default=dict(ssn_class=['default', 'mapclone']),
+        default=dict(ssn_impl=['default', 'mapclone']),
         type=json.loads, nargs='?',
         help="JSON representation of key-value pairs.")
     ns = parser.parse_args(args)

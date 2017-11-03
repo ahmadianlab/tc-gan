@@ -590,12 +590,12 @@ _tcg_classes = {
     'mapclone': MapCloneTuningCurveGenerator,
 }
 """
-Mapping form ``ssn_class`` to tuning curve generator class.
+Mapping form ``ssn_impl`` to tuning curve generator class.
 """
 
 
 def make_tuning_curve_generator(config, *init_args, **init_kwargs):
     config = dict(config)
-    ssn_class = config.pop('ssn_class', 'default')
-    cls = _tcg_classes[ssn_class]
+    ssn_impl = config.pop('ssn_impl', 'default')
+    cls = _tcg_classes[ssn_impl]
     return cls.consume_config(config, *init_args, **init_kwargs)

@@ -4,6 +4,7 @@ from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from .bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
 from .ssn import TuningCurveGenerator
+from .utils import largerrecursionlimit
 
 
 class FiniteTimeTuningCurveSampler(object):
@@ -85,3 +86,9 @@ class FiniteTimeTuningCurveSampler(object):
         for contrast in self.contrasts:
             for bandwidth in self.bandwidths:
                 yield dict(contrast=contrast, bandwidth=bandwidth)
+
+    def prepare(self):
+        """ Force compile Theano functions. """
+        with largerrecursionlimit(self.gen.model.unroll_scan,
+                                  self.gen.model.seqlen):
+            self.gen.prepare()

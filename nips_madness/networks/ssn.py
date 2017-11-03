@@ -90,7 +90,7 @@ class BandwidthContrastStimulator(BaseComponent):
     num_neurons = property(lambda self: self.num_sites * 2)
 
 
-class SingleBatchEulerSSNCore(BaseComponent):
+class MapCloneEulerSSNCore(BaseComponent):
 
     """
     Implementation of single Euler step for SSN.
@@ -180,10 +180,10 @@ class EulerSSNLayer(lasagne.layers.Layer):
         return self.ssn.get_output_for(input, **kwargs)
 
 
-class SingleBatchEulerSSNModel(BaseComponent):
+class MapCloneEulerSSNModel(BaseComponent):
 
     r"""
-    Implementation of SSN in Theano.
+    Implementation of SSN in Theano (based on map & clone combo).
 
     Attributes
     ----------
@@ -200,7 +200,7 @@ class SingleBatchEulerSSNModel(BaseComponent):
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
 
-        ssn = SingleBatchEulerSSNCore(
+        ssn = MapCloneEulerSSNCore(
             stimulator=stimulator,
             J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
             io_type=io_type,
@@ -305,7 +305,7 @@ class SingleBatchEulerSSNModel(BaseComponent):
         )
 
 
-class EulerSSNCore(SingleBatchEulerSSNCore):
+class EulerSSNCore(MapCloneEulerSSNCore):
 
     """
     Implementation of single Euler step for SSN.
@@ -360,7 +360,11 @@ class EulerSSNCore(SingleBatchEulerSSNCore):
         return r_next
 
 
-class EulerSSNModel(SingleBatchEulerSSNModel):
+class EulerSSNModel(MapCloneEulerSSNModel):
+
+    """
+    Implementation of SSN in Theano (based on `batched_dot`).
+    """
 
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type,
@@ -577,13 +581,13 @@ class TuningCurveGenerator(BaseComponent):
             self._forward
 
 
-class SingleBatchTuningCurveGenerator(TuningCurveGenerator):
-    model_class = SingleBatchEulerSSNModel
+class MapCloneTuningCurveGenerator(TuningCurveGenerator):
+    model_class = MapCloneEulerSSNModel
 
 
 _tcg_classes = {
     'default': TuningCurveGenerator,
-    'singlebatch': SingleBatchTuningCurveGenerator,
+    'mapclone': MapCloneTuningCurveGenerator,
 }
 """
 Mapping form ``ssn_class`` to tuning curve generator class.

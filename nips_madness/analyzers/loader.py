@@ -108,6 +108,17 @@ class GANData(object):
             assert main.shape[1] == len(LearningRecorder.column_names)
             main_names = LearningRecorder.column_names
 
+        if len({len(main), len(gen), len(tuning)}) != 1:
+            gen_step = min(len(main), len(gen), len(tuning))
+            warnings.warn('Number of rows in learning.csv ({}),'
+                          ' generator.csv ({}) and TC_mean.csv ({})'
+                          ' are different.  Loading only ({}) rows.'
+                          .format(len(main), len(gen), len(tuning),
+                                  gen_step))
+            main = main[:gen_step]
+            gen = gen[:gen_step]
+            tuning = tuning[:gen_step]
+
         with open(os.path.join(dirname, 'info.json')) as file:
             info = json.load(file)
 

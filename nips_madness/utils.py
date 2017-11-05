@@ -46,6 +46,10 @@ def git_output(args):
 
 
 def relevant_environ(_environ=os.environ):
+    """relevant_environ() -> dict
+    Extract relevant environment variables and return as a `dict`.
+    """
+    def subenv(prefix):
         return {k: _environ[k] for k in _environ if k.startswith(prefix)}
 
     environ = {k: _environ[k] for k in [
@@ -157,7 +161,9 @@ def tolist_if_not(arr):
 
 
 def cpu_count(_environ=os.environ):
-    """ Return available number of CPUs; Slurm/PBS-aware version. """
+    """cpu_count() -> int
+    Return available number of CPUs; Slurm/PBS-aware version.
+    """
     try:
         return int(_environ['SLURM_CPUS_ON_NODE'])
     except (KeyError, ValueError):

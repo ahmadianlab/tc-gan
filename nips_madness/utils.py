@@ -25,6 +25,7 @@ def get_meta_info(packages=[]):
         python=sys.executable,
         packages={p.__name__: p.__version__ for p in packages},
         argv=sys.argv,
+        environ=relevant_environ(),
     )
 
 
@@ -42,6 +43,21 @@ def git_output(args):
         args,
         cwd=PROJECT_ROOT,
         universal_newlines=True)
+
+
+def relevant_environ(_environ=os.environ):
+        return {k: _environ[k] for k in _environ if k.startswith(prefix)}
+
+    environ = {k: _environ[k] for k in [
+        'PATH', 'LD_LIBRARY_PATH', 'LIBRARY_PATH', 'CPATH',
+        'HOST', 'USER',
+    ] if k in _environ}
+    environ.update(subenv('SLURM'))
+    environ.update(subenv('PBS'))
+    environ.update(subenv('OMP'))
+    environ.update(subenv('MKL'))
+    environ.update(subenv('THEANO'))
+    return environ
 
 
 def make_progressbar(quiet=False, **kwds):

@@ -30,6 +30,7 @@ def test_single_g_step_slowtest(args, cleancwd,
 
     info = load_json(cleancwd, 'info.json')
     assert info['extra_info']['script_file'] == script_file
+    assert 'PATH' in info['meta_info']['environ']
 
     with pytest.warns(None) as record:
         data = load_gandata(cleancwd)

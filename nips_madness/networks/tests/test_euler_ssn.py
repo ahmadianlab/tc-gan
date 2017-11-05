@@ -20,6 +20,20 @@ def make_ssn(model_config):
     return model
 
 
+def _JDS_for_test():
+    # Original SSN parameters:
+    J = np.array([[.0957, .0638], [.1197, .0479]])
+    D = np.array([[.7660, .5106], [.9575, .3830]])
+    S = np.array([[.6667, .2], [1.333, .2]]) / 8
+
+    # More stable parameters:
+    D_new = D / 2
+    J_new = J + D / 2 - D_new / 2
+    return dict(J=J_new, D=D_new, S=S)
+
+JDS = _JDS_for_test()
+
+
 @pytest.mark.parametrize('num_sites, batchsize', [
     (10, 1),
     (10, 2),
@@ -35,16 +49,6 @@ def test_compare_with_ssnode(num_sites, batchsize,
         = grid_stimulator_inputs(contrasts, bandwidths, batchsize)
     num_tcdom = stimulator_bandwidths.shape[-1]
     skip_steps = seqlen - 1
-
-    # Original SSN parameters:
-    J = np.array([[.0957, .0638], [.1197, .0479]])
-    D = np.array([[.7660, .5106], [.9575, .3830]])
-    S = np.array([[.6667, .2], [1.333, .2]]) / 8
-
-    # More stable parameters:
-    D_new = D / 2
-    J_new = J + D / 2 - D_new / 2
-    JDS = dict(J=J_new, D=D_new, S=S)
 
     model = make_ssn(dict(
         DEFAULT_PARAMS,

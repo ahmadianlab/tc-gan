@@ -195,7 +195,8 @@ class MapCloneEulerSSNModel(BaseComponent):
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type,
                  unroll_scan=False,
-                 skip_steps=None, seqlen=None):
+                 skip_steps=None, seqlen=None,
+                 include_time_avg=False):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
@@ -219,13 +220,17 @@ class MapCloneEulerSSNModel(BaseComponent):
         self.zs = theano.tensor.tensor3('zs')
         # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
         self.time_avg = self._map_clone(time_avg)
+        self.time_avg.name = 'time_avg'
         self.dynamics_penalty = self._map_clone(dynamics_penalty).mean()
         # TODO: make sure theano.clone is not bottleneck here.
         self.dynamics_penalty.name = 'dynamics_penalty'
         # TODO: find if assigning a name to an expression is a valid usecase
 
         self.inputs = (self.zs,)
-        self.outputs = (self.dynamics_penalty,)
+        if include_time_avg:
+            self.outputs = (self.dynamics_penalty, self.time_avg)
+        else:
+            self.outputs = (self.dynamics_penalty,)
 
     def _setup_layers(self, ssn, shape, unroll_scan):
         shape_sym = shape
@@ -369,7 +374,8 @@ class EulerSSNModel(MapCloneEulerSSNModel):
     def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type,
                  unroll_scan=False,
-                 skip_steps=None, seqlen=None):
+                 skip_steps=None, seqlen=None,
+                 include_time_avg=False):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
@@ -395,11 +401,15 @@ class EulerSSNModel(MapCloneEulerSSNModel):
 
         # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
         self.time_avg = rs.mean(axis=1)
+        self.time_avg.name = 'time_avg'
         self.dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
         self.dynamics_penalty.name = 'dynamics_penalty'
 
         self.inputs = (self.zs,)
-        self.outputs = (self.dynamics_penalty,)
+        if include_time_avg:
+            self.outputs = (self.dynamics_penalty, self.time_avg)
+        else:
+            self.outputs = (self.dynamics_penalty,)
 
     _map_clone = None  # must not be called for this class
 

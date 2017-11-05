@@ -278,10 +278,34 @@ class RandomChoiceSampler(object):
     def from_grid_data(cls, data, bandwidths, contrasts, norm_probes,
                        include_inhibitory_neurons,
                        **kwargs):
+        """
+        Initialize `RandomChoiceSampler`.
+
+        Parameters
+        ----------
+        data : numpy.ndarray
+            An array returned by `.subsample_neurons`.
+        bandwidths : numpy.ndarray
+            See `.ConditionalBPTTWassersteinGAN.bandwidths`.
+        contrasts : numpy.ndarray
+            See `.ConditionalBPTTWassersteinGAN.contrasts`.
+        norm_probes : numpy.ndarray
+            Numeric version of `.ConditionalProber.norm_probes`.
+        include_inhibitory_neurons : bool
+            See `.ConditionalBPTTWassersteinGAN.include_inhibitory_neurons`.
+
+        """
         cell_types = [0, 1] if include_inhibitory_neurons else [0]
-        cond_values = [cell_types, norm_probes, contrasts, bandwidths]
+
+        # This is the order of dimensions varied in subsample_neurons:
+        cond_values = [contrasts, bandwidths, cell_types, norm_probes]
         shape = (len(data),) + tuple(map(len, cond_values))
         nested = data.reshape(shape)
+
+        # Shuffle the dimension to the order that RandomChoiceSampler
+        # understands:
+        nested = nested.transpose((0, 3, 4, 1, 2))
+        cond_values = [cell_types, norm_probes, contrasts, bandwidths]
         return cls(nested, cond_values, **kwargs)
 
     def __init__(self, nested, cond_values, e_ratio,

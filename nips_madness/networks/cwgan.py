@@ -20,6 +20,7 @@ DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
     num_models=1,
     probes_per_model=1,
+    e_ratio=0.8,
 )
 del DEFAULT_PARAMS['batchsize']
 del DEFAULT_PARAMS['sample_sites']
@@ -280,7 +281,7 @@ class RandomChoiceSampler(object):
         nested = data.reshape(shape)
         return cls(nested, cond_values, **kwargs)
 
-    def __init__(self, nested, cond_values, e_ratio=0.8,
+    def __init__(self, nested, cond_values, e_ratio,
                  seed=0):
         self.nested = np.asarray(nested)
         self.cond_values = cond_values = list(map(np.asarray, cond_values))
@@ -372,7 +373,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
 
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
                  bandwidths, contrasts, norm_probes,
-                 include_inhibitory_neurons,
+                 e_ratio, include_inhibitory_neurons,
                  num_models, probes_per_model,
                  critic_iters_init, critic_iters, lipschitz_cost,
                  seed=0):
@@ -384,6 +385,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         self.bandwidths = np.asarray(bandwidths)
         self.contrasts = np.asarray(contrasts)
         self.norm_probes = np.asarray(norm_probes)
+        self.e_ratio = e_ratio
         self.include_inhibitory_neurons = include_inhibitory_neurons
         self.num_models = num_models
         self.probes_per_model = probes_per_model
@@ -403,6 +405,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
             bandwidths=self.bandwidths,
             contrasts=self.contrasts,
             norm_probes=self.norm_probes,
+            e_ratio=self.e_ratio,
             include_inhibitory_neurons=self.include_inhibitory_neurons,
             **kwargs)
         self.dataset = self.sampler.random_minibatches(

@@ -6,6 +6,7 @@ import pytest
 from ..cwgan import (
     ConditionalMinibatch, ConditionalProber,
     RandomChoiceSampler, NaiveRandomChoiceSampler,
+    DEFAULT_PARAMS,
 )
 from .test_conditional_prober import mock_model
 
@@ -92,9 +93,11 @@ def test_random_choice_sampler_shape(sampler_class):
     num_cell_types = 2
     shape = (truth_size, num_cell_types, num_offsets, num_contrasts,
              num_bandwidths)
+    e_ratio = DEFAULT_PARAMS['e_ratio']
     sampler = sampler_class(
         arangemd(shape),
         [np.arange(num) for num in shape[1:]],
+        e_ratio=e_ratio,
     )
 
     num_models = 8
@@ -117,9 +120,11 @@ def test_random_choice_sampler_cells():
     num_cell_types = 2
     shape = (truth_size, num_cell_types, num_offsets, num_contrasts,
              num_bandwidths)
+    e_ratio = DEFAULT_PARAMS['e_ratio']
     sampler = RandomChoiceSampler(
         arangemd(shape),
         [np.arange(num) for num in shape[1:]],
+        e_ratio=e_ratio,
     )
 
     num_models = 8
@@ -149,9 +154,11 @@ def test_random_choice_sampler_e_ratio(seed):
     num_cell_types = 2
     shape = (truth_size, num_cell_types, num_offsets, num_contrasts,
              num_bandwidths)
+    e_ratio = DEFAULT_PARAMS['e_ratio']
     sampler = RandomChoiceSampler(
         arangemd(shape),
         [np.arange(num) for num in shape[1:]],
+        e_ratio=e_ratio,
         seed=seed,
     )
 

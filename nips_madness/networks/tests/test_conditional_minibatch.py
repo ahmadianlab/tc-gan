@@ -168,5 +168,5 @@ def test_random_choice_sampler_e_ratio(seed):
     ids_cell_type, _ids_norm_probes \
         = sampler.random_cells(num_models, probes_per_model)
 
-    e_ratio = 1 - ids_cell_type.mean()
-    np.testing.assert_approx_equal(e_ratio, sampler.e_ratio, significant=2)
+    actual = 1 - ids_cell_type.mean()
+    np.testing.assert_approx_equal(actual, sampler.e_ratio, significant=2)

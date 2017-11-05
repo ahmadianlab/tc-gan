@@ -6,6 +6,7 @@ import theano
 
 from . import simple_discriminator
 from ..core import BaseComponent, consume_subdict
+from ..evaluator import MagicEvaluator
 from ..gradient_expressions.utils import sample_sites_from_stim_space_impl
 from ..utils import (
     cached_property, cartesian_product, theano_function, StopWatch,
@@ -95,6 +96,8 @@ class ConditionalProber(BaseComponent):
 
         self.inputs = (self.norm_probes, self.model_ids, self.cell_types)
         self.outputs = (self.tuning_curve,)
+
+        self.eval = MagicEvaluator(self)
 
 
 class ConditionalTuningCurveGenerator(TuningCurveGenerator):

@@ -398,6 +398,14 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         assert gen.batchsize == self.num_models * self.probes_per_model
         assert self.probes_per_model < gen.num_neurons
 
+    num_sites = property(lambda self: self.gen.model.num_sites)
+
+    @property
+    def sample_sites(self):
+        from ..gradient_expressions.utils import sample_sites_from_stim_space
+        return sample_sites_from_stim_space(self.norm_probes,
+                                            self.num_sites)
+
     def set_dataset(self, data, **kwargs):
         kwargs.setdefault('seed', self.rng)
         self.sampler = RandomChoiceSampler.from_grid_data(

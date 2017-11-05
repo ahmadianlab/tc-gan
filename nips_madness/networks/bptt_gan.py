@@ -184,6 +184,7 @@ class BPTTWassersteinGAN(BaseComponent):
 
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
                  bandwidths, contrasts,
+                 include_inhibitory_neurons,
                  critic_iters_init, critic_iters, lipschitz_cost,
                  seed=0):
         self.gen = gen
@@ -201,8 +202,21 @@ class BPTTWassersteinGAN(BaseComponent):
         self.stimulator_contrasts, self.stimulator_bandwidths \
             = grid_stimulator_inputs(contrasts, bandwidths, self.batchsize)
 
+        self.include_inhibitory_neurons = include_inhibitory_neurons
+        # As of writing, this variable is not required for learning.
+        # This is only used from `sample_sites` property which is only
+        # used from bptt_wgan.learn.
+
     batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)
+
+    @property
+    def sample_sites(self):
+        probes = list(self.gen.prober.probes)
+        if self.include_inhibitory_neurons:
+            return probes[:len(probes) // 2]
+        else:
+            return probes
 
     # To be compatible with GANDriver:
     loss_type = 'WD'
@@ -339,4 +353,5 @@ def _make_gan_from_kwargs(
     )
     return BPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
+        include_inhibitory_neurons=include_inhibitory_neurons,
         **rest)

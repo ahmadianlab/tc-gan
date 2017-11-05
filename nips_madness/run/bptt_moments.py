@@ -27,6 +27,8 @@ def learn(driver, **generate_dataset_kwargs):
 
     data = generate_dataset(
         driver,
+        sample_sites=mmatcher.sample_sites,
+        include_inhibitory_neurons=mmatcher.include_inhibitory_neurons,
         num_sites=ssn.num_sites,
         bandwidths=mmatcher.bandwidths,
         contrasts=mmatcher.contrasts,
@@ -151,13 +153,8 @@ def make_parser():
 def init_driver(
         datastore,
         iterations, quiet,
-        sample_sites, include_inhibitory_neurons,
         **run_config):
 
-    run_config.update(
-        sample_sites=sample_sites,
-        include_inhibitory_neurons=include_inhibitory_neurons,
-    )
     mmatcher, rest = make_moment_matcher(run_config)
     driver = MomentMatchingDriver(
         mmatcher, datastore,
@@ -166,8 +163,6 @@ def init_driver(
     )
 
     return dict(driver=driver,
-                sample_sites=sample_sites,
-                include_inhibitory_neurons=include_inhibitory_neurons,
                 **rest)
 
 

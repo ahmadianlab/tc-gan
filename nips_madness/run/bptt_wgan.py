@@ -10,7 +10,6 @@ from . import gan as plain_gan
 from .. import ssnode
 from .. import utils
 from ..drivers import BPTTWGANDriver
-from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..networks.bptt_gan import make_gan, DEFAULT_PARAMS
 
 logger = getLogger(__name__)
@@ -22,7 +21,6 @@ def generate_dataset(
         truth_size, truth_seed,
         sample_sites, include_inhibitory_neurons,
         true_ssn_options={}):
-    sample_sites = sample_sites_from_stim_space(sample_sites, num_sites)
 
     logger.info('Generating the truth...')
     with utils.log_timing('sample_tuning_curves()'):
@@ -81,6 +79,8 @@ def learn(driver, **generate_dataset_kwargs):
     ssn = gan.gen
     data = generate_dataset(
         driver,
+        sample_sites=gan.sample_sites,
+        include_inhibitory_neurons=gan.include_inhibitory_neurons,
         num_sites=ssn.num_sites,
         bandwidths=gan.bandwidths,
         contrasts=gan.contrasts,
@@ -225,17 +225,12 @@ def init_driver(
         disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         layers,
-        sample_sites, include_inhibitory_neurons,
         **run_config):
     del layers  # see [[ns\.layers]] below in main() for why
 
     run_config = utils.subdict_by_prefix(run_config, 'disc_')
     run_config = utils.subdict_by_prefix(run_config, 'gen_')
 
-    run_config.update(
-        sample_sites=sample_sites,
-        include_inhibitory_neurons=include_inhibitory_neurons,
-    )
     gan, rest = make_gan(run_config)
     driver = BPTTWGANDriver(
         gan, datastore,
@@ -247,8 +242,6 @@ def init_driver(
     )
 
     return dict(driver=driver,
-                sample_sites=sample_sites,
-                include_inhibitory_neurons=include_inhibitory_neurons,
                 **rest)
 
 

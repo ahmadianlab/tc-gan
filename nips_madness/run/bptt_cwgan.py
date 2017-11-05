@@ -60,8 +60,6 @@ def init_driver(
     run_config = utils.subdict_by_prefix(run_config, 'disc_')
     run_config = utils.subdict_by_prefix(run_config, 'gen_')
 
-    sample_sites = run_config['norm_probes']
-    include_inhibitory_neurons = run_config['include_inhibitory_neurons']
     gan, rest = make_gan(run_config)
     driver = BPTTcWGANDriver(
         gan, datastore,
@@ -73,8 +71,6 @@ def init_driver(
     )
 
     return dict(driver=driver,
-                sample_sites=sample_sites,
-                include_inhibitory_neurons=include_inhibitory_neurons,
                 **rest)
 
 

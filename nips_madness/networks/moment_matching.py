@@ -240,7 +240,9 @@ class BPTTMomentMatcher(BaseComponent):
     """
 
     def __init__(self, gen, gen_trainer, bandwidths, contrasts,
-                 lam, moment_weights_regularization, seed=0):
+                 lam, moment_weights_regularization,
+                 include_inhibitory_neurons,
+                 seed=0):
         self.gen = gen
         self.gen_trainer = gen_trainer
         self.lam = lam
@@ -253,8 +255,19 @@ class BPTTMomentMatcher(BaseComponent):
         self.stimulator_contrasts, self.stimulator_bandwidths \
             = grid_stimulator_inputs(contrasts, bandwidths, self.batchsize)
 
+        self.include_inhibitory_neurons = include_inhibitory_neurons
+        # See: BPTTWassersteinGAN
+
     batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)
+
+    @property
+    def sample_sites(self):
+        probes = list(self.gen.prober.probes)
+        if self.include_inhibitory_neurons:
+            return probes[:len(probes) // 2]
+        else:
+            return probes
 
     def get_gen_param(self):
         # To be called from MomentMatchingDriver
@@ -326,4 +339,6 @@ def _make_mm_from_kwargs(
     )
     gen_trainer, rest = MMGeneratorTrainer.consume_config(rest, gen)
     return BPTTMomentMatcher.consume_kwargs(
-        gen, gen_trainer, bandwidths, contrasts, **rest)
+        gen, gen_trainer, bandwidths, contrasts,
+        include_inhibitory_neurons=include_inhibitory_neurons,
+        **rest)

@@ -67,9 +67,9 @@ class DiscriminatorLog(object):
             self.param_stats = self.param_stats.iloc[:min_rows].copy()
 
             warnings.warn(
-                'Rows in disc_learning.csv ({}) and rows in'
+                'Number of rows in disc_learning.csv ({}) and'
                 ' disc_param_stats.csv ({}) differ.'
-                ' Resetting the shortest ({}).'
+                ' Resetting to the shortest ({}).'
                 .format(rows_learning, rows_param_stats, min_rows))
 
         assert list(self.param_stats.columns[:2]) == ['gen_step', 'disc_step']

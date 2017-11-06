@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import pytest
 
@@ -96,28 +98,63 @@ class SamplerWrapper(BaseComponent):
                 self.indices_sampler.random_minibatches(**kwargs)):
             np.testing.assert_equal(self.data_sampler.rng.get_state(),
                                     self.indices_sampler.rng.get_state())
-            indices = batch_indices.tc_md[:, 0, 0]
-            zs = self.zs[indices]
-            ssnode_fps = self.rates[indices]
-            yield batch_data, zs, ssnode_fps
+            indices = batch_indices.tc_md[:, :, 0]
+            sorted_indices = sorted(set(indices.flat))
+            padded_indices = np.zeros(batch_data.num_models, dtype=int)
+            padded_indices[:len(sorted_indices)] = sorted_indices  # [1]_
+            zs = self.zs[padded_indices]
+            ssnode_fps = self.rates[padded_indices]
+            model_ids = np.array(  # [1]_
+                list(map(sorted_indices.index, indices.flatten())),
+                dtype='uint16')
+            yield batch_data, zs, ssnode_fps, model_ids
+
+# .. [1] In order to feed zs from true dataset into generator, I need
+#    ``num_models >= truth_size`` since `RandomChoiceSampler` does not
+#    limit number of sample IDs.  See how sample IDs are squeezed into
+#    an array (`padded_indices`) of length `num_models` in
+#    `SamplerWrapper.random_minibatches`.
 
 
-@pytest.mark.parametrize('truth_size, num_models, probes_per_model', [
-    (1, 1, 1),
-    (8, 4, 2),
-])
-@pytest.mark.parametrize('include_inhibitory_neurons', [False, True])
+def params_test_compare_with_sample_tuning_curves():
+    for (
+            (truth_size, probes_per_model),
+            norm_probes,
+            include_inhibitory_neurons,
+    ) in itertools.product(
+        [(1, 1),
+         (8, 2)],
+        [[0], [0, 0.5]],
+        [False, True],
+    ):
+
+        max_probes = len(norm_probes)
+        if include_inhibitory_neurons:
+            max_probes *= 2
+        if probes_per_model > max_probes:
+            continue
+
+        yield truth_size, probes_per_model, norm_probes, \
+            include_inhibitory_neurons
+
+
+@pytest.mark.parametrize(
+    'truth_size, probes_per_model, norm_probes'
+    ', include_inhibitory_neurons',
+    list(params_test_compare_with_sample_tuning_curves()))
 def test_compare_with_sample_tuning_curves(
-        truth_size, num_models, probes_per_model,
+        truth_size, probes_per_model, norm_probes,
         include_inhibitory_neurons,
         seqlen=4000, rtol=5e-4, atol=5e-4):
     gan, rest = make_gan(
         J0=JDS['J'],
         D0=JDS['D'],
         S0=JDS['S'],
-        truth_size=1,
         truth_seed=1,
-        probes_per_model=1,
+        truth_size=truth_size,
+        num_models=truth_size,   # num_models >= truth_size reqruired [1]_
+        probes_per_model=probes_per_model,
+        norm_probes=norm_probes,
         include_inhibitory_neurons=include_inhibitory_neurons,
         seqlen=seqlen,
         skip_steps=seqlen - 1,
@@ -130,19 +167,20 @@ def test_compare_with_sample_tuning_curves(
     dataset = sampler.random_minibatches()
 
     for _ in range(1):
-        batch, zs, ssnode_fps = next(dataset)
+        batch, zs, ssnode_fps, model_ids = next(dataset)
         assert zs.shape == (gan.num_models, gen.num_neurons, gen.num_neurons)
-        gen_out = gen.forward(model_zs=zs, **batch.gen_kwargs)
+        gen_kwargs = batch.gen_kwargs
+        gen_kwargs['prober_model_ids'] = model_ids  # [1]_
+        gen_out = gen.forward(model_zs=zs, **gen_kwargs)
         xd = batch.tuning_curves          # tuning curves from dataset
         xg = gen_out.prober_tuning_curve  # tuning curves from generator
 
         batch_contrasts, _norm_probes, _cell_types = batch.conditions.T
         prober = gen.prober
-        gen_kwargs = batch.gen_kwargs
         prober_contrasts = prober.contrasts.eval({
             prober.model.stimulator.contrasts:
                 gen_kwargs['stimulator_contrasts'],
-            prober.model_ids: batch.model_ids,
+            prober.model_ids: gen_kwargs['prober_model_ids'],
         })
         np.testing.assert_equal(prober_contrasts, batch_contrasts)
 

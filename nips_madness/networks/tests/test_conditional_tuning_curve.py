@@ -102,8 +102,13 @@ class SamplerWrapper(BaseComponent):
             yield batch_data, zs, ssnode_fps
 
 
+@pytest.mark.parametrize('truth_size, num_models, probes_per_model', [
+    (1, 1, 1),
+    (8, 4, 2),
+])
 @pytest.mark.parametrize('include_inhibitory_neurons', [False, True])
 def test_compare_with_sample_tuning_curves(
+        truth_size, num_models, probes_per_model,
         include_inhibitory_neurons,
         seqlen=4000, rtol=5e-4, atol=5e-4):
     gan, rest = make_gan(

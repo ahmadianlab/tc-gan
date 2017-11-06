@@ -110,7 +110,7 @@ class ConditionalTuningCurveGenerator(TuningCurveGenerator):
     def get_output(self):
         conditions = theano.tensor.as_tensor_variable([
             self.prober.contrasts,
-            abs(self.prober.norm_probes),  # since SSN is symmetric
+            self.prober.norm_probes,
             self.prober.cell_types.astype(theano.config.floatX),
         ]).T  # shape: (batchsize, 3)
         conditions.name = 'conditions'
@@ -171,8 +171,18 @@ class ConditionalDiscriminator(BaseComponent):
 
     def get_output(self, inputs=None):
         if isinstance(inputs, list):
+            tc, condition = inputs
+            inputs = [tc, self.preprocess_condition(condition)]
             inputs = dict(zip([self.l_in, self.l_cond], inputs))
         return lasagne.layers.get_output(self.l_out, inputs=inputs)
+
+    def preprocess_condition(self, condition):
+        # Feed absolute value of norm_probes since SSN is symmetric.
+        return theano.tensor.as_tensor_variable([
+            condition[:, 0],       # contrasts
+            abs(condition[:, 1]),  # norm_probes
+            condition[:, 2],       # cell_types
+        ]).T
 
     def prepare(self):
         """ Force compile Theano functions. """

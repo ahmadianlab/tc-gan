@@ -25,6 +25,7 @@ def get_meta_info(packages=[]):
         python=sys.executable,
         packages={p.__name__: p.__version__ for p in packages},
         argv=sys.argv,
+        environ=relevant_environ(),
     )
 
 
@@ -42,6 +43,25 @@ def git_output(args):
         args,
         cwd=PROJECT_ROOT,
         universal_newlines=True)
+
+
+def relevant_environ(_environ=os.environ):
+    """relevant_environ() -> dict
+    Extract relevant environment variables and return as a `dict`.
+    """
+    def subenv(prefix):
+        return {k: _environ[k] for k in _environ if k.startswith(prefix)}
+
+    environ = {k: _environ[k] for k in [
+        'PATH', 'LD_LIBRARY_PATH', 'LIBRARY_PATH', 'CPATH',
+        'HOST', 'USER',
+    ] if k in _environ}
+    environ.update(subenv('SLURM'))
+    environ.update(subenv('PBS'))
+    environ.update(subenv('OMP'))
+    environ.update(subenv('MKL'))
+    environ.update(subenv('THEANO'))
+    return environ
 
 
 def make_progressbar(quiet=False, **kwds):
@@ -141,7 +161,9 @@ def tolist_if_not(arr):
 
 
 def cpu_count(_environ=os.environ):
-    """ Return available number of CPUs; Slurm/PBS-aware version. """
+    """cpu_count() -> int
+    Return available number of CPUs; Slurm/PBS-aware version.
+    """
     try:
         return int(_environ['SLURM_CPUS_ON_NODE'])
     except (KeyError, ValueError):
@@ -257,6 +279,13 @@ def cartesian_product(*arrays, **kwargs):
     return prod.reshape((len(arrays), -1))
 
 
+def as_randomstate(seed):
+    if hasattr(seed, 'seed'):
+        return seed  # suppose it's a RandomState instance
+    else:
+        return np.random.RandomState(seed)
+
+
 def random_minibatches(batchsize, data, strict=False, seed=0):
     num_batches = len(data) // batchsize
     if batchsize > len(data):
@@ -270,7 +299,7 @@ def random_minibatches(batchsize, data, strict=False, seed=0):
         else:
             warnings.warn(msg)
 
-    rng = np.random.RandomState(seed)
+    rng = as_randomstate(seed)
 
     def iterator():
         while True:
@@ -374,6 +403,10 @@ def load_any_file(path):
         return module.load(f)
 
 
+def is_theano(a):
+    return isinstance(a, theano.Variable)
+
+
 def get_array_module(array):
     """
     Return `numpy` or `theano.tensor` depending on `array` type.
@@ -388,6 +421,19 @@ def get_array_module(array):
         return theano.tensor
 
 
+def asarray(arrays):
+    """
+    Appropriately do `numpy.asarray` or `theano.tensor.as_tensor_variable`.
+    """
+    if is_theano(arrays):
+        return arrays
+    arrays = list(arrays)
+    if any(map(is_theano, arrays)):
+        return theano.tensor.as_tensor_variable(arrays)
+    else:
+        return np.asarray(arrays)
+
+
 def objectpath(obj):
     """
     Get an importable path of an object `obj`.
@@ -397,3 +443,14 @@ def objectpath(obj):
     'json.load'
     """
     return obj.__module__ + '.' + obj.__name__
+
+
+def report_allclose_tols(a, b, rtols, atols, **isclose_kwargs):
+    """
+    Print %mismatch of `a` and `b` with combinations of `rtols` and `atols`.
+    """
+    for rtol in rtols:
+        for atol in atols:
+            p = np.isclose(a, b, rtol=rtol, atol=atol, **isclose_kwargs).mean()
+            print('mismatch {:>7.3%} with rtol={:<4.1e} atol={:<4.1e}'
+                  .format(1 - p, rtol, atol))

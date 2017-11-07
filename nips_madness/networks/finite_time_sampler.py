@@ -2,8 +2,9 @@ import numpy as np
 
 from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
-from ..utils import cartesian_product
-from .bptt_gan import TuningCurveGenerator, DEFAULT_PARAMS
+from .bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
+from .ssn import make_tuning_curve_generator
+from .utils import largerrecursionlimit
 
 
 class FiniteTimeTuningCurveSampler(object):
@@ -25,13 +26,14 @@ class FiniteTimeTuningCurveSampler(object):
     @classmethod
     def consume_kwargs(cls, bandwidths, contrasts, seed,
                        sample_sites, num_sites, **kwargs):
-        gen, rest = TuningCurveGenerator.consume_kwargs(
+        gen, rest = make_tuning_curve_generator(
+            kwargs,
             # Stimulator:
             num_tcdom=len(bandwidths) * len(contrasts),
             num_sites=num_sites,
             # Prober:
             probes=sample_sites_from_stim_space(sample_sites, num_sites),
-            **kwargs)
+        )
         return cls(gen, bandwidths, contrasts, seed), rest
 
     def __init__(self, gen, bandwidths, contrasts, seed):
@@ -47,7 +49,7 @@ class FiniteTimeTuningCurveSampler(object):
         self.rng = np.random.RandomState(seed)
 
         self.stimulator_contrasts, self.stimulator_bandwidths \
-            = cartesian_product(contrasts, bandwidths)
+            = grid_stimulator_inputs(contrasts, bandwidths, self.batchsize)
 
     num_neurons = property(lambda self: self.num_sites * 2)
     num_sites = property(lambda self: self.gen.num_sites)
@@ -66,9 +68,9 @@ class FiniteTimeTuningCurveSampler(object):
         return out.prober_tuning_curve
 
     def compute_trajectories(self):
-        zmat = self.rng.rand(self.num_neurons, self.num_neurons)
+        zs = self.rng.rand(self.batchsize, self.num_neurons, self.num_neurons)
         trajectories = self.gen.model.compute_trajectories(
-            zmat,
+            zs,
             self.stimulator_bandwidths,
             self.stimulator_contrasts,
         )
@@ -85,3 +87,9 @@ class FiniteTimeTuningCurveSampler(object):
         for contrast in self.contrasts:
             for bandwidth in self.bandwidths:
                 yield dict(contrast=contrast, bandwidth=bandwidth)
+
+    def prepare(self):
+        """ Force compile Theano functions. """
+        with largerrecursionlimit(self.gen.model.unroll_scan,
+                                  self.gen.model.seqlen):
+            self.gen.prepare()

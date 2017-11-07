@@ -26,3 +26,4 @@ def test_single_g_step_slowtest(args, cleancwd):
 
     info = load_json(cleancwd, 'info.json')
     assert info['extra_info']['script_file'] == bptt_moments.__file__
+    assert 'PATH' in info['meta_info']['environ']

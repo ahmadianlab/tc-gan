@@ -1,5 +1,5 @@
 """
-Run SSN-BTTP GAN learning.
+Run SSN-BPTT Wasserstein GAN learning.
 """
 
 from logging import getLogger
@@ -9,10 +9,8 @@ import numpy as np
 from . import gan as plain_gan
 from .. import ssnode
 from .. import utils
-from ..drivers import GANDriver
-from ..gradient_expressions.utils import sample_sites_from_stim_space
+from ..drivers import BPTTWGANDriver
 from ..networks.bptt_gan import make_gan, DEFAULT_PARAMS
-from ..recorders import UpdateResult
 
 logger = getLogger(__name__)
 
@@ -23,7 +21,6 @@ def generate_dataset(
         truth_size, truth_seed,
         sample_sites, include_inhibitory_neurons,
         true_ssn_options={}):
-    sample_sites = sample_sites_from_stim_space(sample_sites, num_sites)
 
     logger.info('Generating the truth...')
     with utils.log_timing('sample_tuning_curves()'):
@@ -82,51 +79,15 @@ def learn(driver, **generate_dataset_kwargs):
     ssn = gan.gen
     data = generate_dataset(
         driver,
+        sample_sites=gan.sample_sites,
+        include_inhibitory_neurons=gan.include_inhibitory_neurons,
         num_sites=ssn.num_sites,
         bandwidths=gan.bandwidths,
         contrasts=gan.contrasts,
         **generate_dataset_kwargs)
 
     gan.set_dataset(data)
-
-    learning_it = gan.learning()
-
-    @driver.iterate
-    def _(k):
-        # This callback function "connects" gan.learning and drive.iterate.
-        while True:
-            info = next(learning_it)
-            if info.is_discriminator:
-                driver.post_disc_update(
-                    info.gen_step,
-                    info.disc_step,
-                    info.disc_loss,
-                    info.accuracy,
-                    info.gen_time,
-                    info.disc_time,
-                    ssnode.null_FixedPointsInfo,
-                )
-                last_info = info
-            else:
-                assert info.gen_step == k
-                # Save fake and tuning curves averaged over Zs:
-                data_mean = last_info.xd.mean(axis=0).tolist()
-                gen_mean = last_info.xg.mean(axis=0).tolist()
-                driver.datastore.tables.saverow('TC_mean.csv',
-                                                gen_mean + data_mean)
-
-                # Then the generator step was just taken.  Let's
-                # return a result that GANDriver understands.
-                return UpdateResult(
-                    Gloss=info.gen_loss,
-                    Dloss=last_info.disc_loss,
-                    Daccuracy=last_info.accuracy,
-                    SSsolve_time=info.gen_time,
-                    gradient_time=info.disc_time,
-                    model_info=ssnode.null_FixedPointsInfo,
-                    rate_penalty=last_info.dynamics_penalty,
-                )
-                # See: [[../recorders.py::def record.*update_result]]
+    driver.run(gan)
 
 
 def make_parser():
@@ -140,6 +101,25 @@ def make_parser():
         formatter_class=CustomFormatter,
         description=__doc__)
 
+    parser.add_argument(
+        '--batchsize', '--n_samples', default=15, type=eval,
+        help='''Number of samples to draw from G each step
+        (aka NZ, minibatch size). (default: %(default)s)''')
+    parser.add_argument(
+        '--sample-sites', default=[0], type=utils.csv_line(float),
+        help='''Locations (offsets) of neurons to be sampled from SSN in the
+        "bandwidth" space [-1, 1].  0 means the center of the
+        network. (default: %(default)s)''')
+
+    add_bptt_common_options(parser)
+    plain_gan.add_learning_options(parser)
+    parser.set_defaults(
+        datastore_template='logfiles/BPTT_WGAN_{layers_str}',
+    )
+    return parser
+
+
+def add_bptt_common_options(parser):
     # Dataset
     parser.add_argument(
         '--truth_size', default=1000, type=int,
@@ -163,21 +143,12 @@ def make_parser():
 
     # Generator
     parser.add_argument(
-        '--batchsize', '--n_samples', default=15, type=eval,
-        help='''Number of samples to draw from G each step
-        (aka NZ, minibatch size). (default: %(default)s)''')
-    parser.add_argument(
         '--seqlen', default=DEFAULT_PARAMS['seqlen'], type=int,
         help='Total time steps for SSN.')
     parser.add_argument(
         '--skip-steps', default=DEFAULT_PARAMS['skip_steps'], type=int,
         help='''First time steps to be excluded from tuning curve and
         dynamics penalty calculations.''')
-    parser.add_argument(
-        '--sample-sites', default=[0], type=utils.csv_line(float),
-        help='''Locations (offsets) of neurons to be sampled from SSN in the
-        "bandwidth" space [-1, 1].  0 means the center of the
-        network. (default: %(default)s)''')
     parser.add_argument(
         '--contrasts', '--contrast',
         default=[20],
@@ -196,13 +167,18 @@ def make_parser():
     for name in 'JDS':
         parser.add_argument(
             '--gen-{}-min'.format(name),
-            default=1e-3, type=eval,
+            default=1e-3, type=float,
             help='''Lower limit of the parameter {}.
             '''.format(name))
         parser.add_argument(
             '--gen-{}-max'.format(name),
-            default=10, type=eval,
+            default=10, type=float,
             help='''Upper limit of the parameter {}.
+            '''.format(name))
+        parser.add_argument(
+            '--{}0'.format(name),
+            default=0.01, type=eval,
+            help='''Initial value the parameter {} of the generator.
             '''.format(name))
 
     # Generator trainer
@@ -242,12 +218,6 @@ def make_parser():
         default=5, type=int,
         help='Critic iterations (default: %(default)s)')
 
-    plain_gan.add_learning_options(parser)
-    parser.set_defaults(
-        datastore_template='logfiles/BPTT_GAN_{layers_str}',
-    )
-    return parser
-
 
 def init_driver(
         datastore,
@@ -255,19 +225,14 @@ def init_driver(
         disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         layers,
-        sample_sites, include_inhibitory_neurons,
         **run_config):
     del layers  # see [[ns\.layers]] below in main() for why
 
     run_config = utils.subdict_by_prefix(run_config, 'disc_')
     run_config = utils.subdict_by_prefix(run_config, 'gen_')
 
-    run_config.update(
-        sample_sites=sample_sites,
-        include_inhibitory_neurons=include_inhibitory_neurons,
-    )
     gan, rest = make_gan(run_config)
-    driver = GANDriver(
+    driver = BPTTWGANDriver(
         gan, datastore,
         iterations=iterations, quiet=quiet,
         disc_param_save_interval=disc_param_save_interval,
@@ -277,8 +242,6 @@ def init_driver(
     )
 
     return dict(driver=driver,
-                sample_sites=sample_sites,
-                include_inhibitory_neurons=include_inhibitory_neurons,
                 **rest)
 
 

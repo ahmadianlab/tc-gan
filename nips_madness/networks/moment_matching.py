@@ -7,11 +7,11 @@ import theano
 from ..core import BaseComponent
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..utils import (
-    cached_property, cartesian_product, StopWatch,
-    theano_function, log_timing,
+    cached_property, StopWatch,
+    theano_function, log_timing, asarray,
 )
-from .bptt_gan import DEFAULT_PARAMS, BaseTrainer
-from .ssn import TuningCurveGenerator
+from .bptt_gan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
+from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 
 
@@ -30,10 +30,6 @@ def sample_moments(samples):
         An array of shape ``(2, channels)``.
 
     """
-    if isinstance(samples, np.ndarray):
-        asarray = np.asarray
-    else:
-        asarray = theano.tensor.as_tensor_variable
     return asarray([samples.mean(axis=0), samples.var(axis=0)])
 
 
@@ -234,17 +230,19 @@ class BPTTMomentMatcher(BaseComponent):
 
     stimulator_bandwidths
     stimulator_contrasts : numpy.ndarray
-        Vectors of length ``len(bandwidths) * len(contrasts)``.  These
-        are the actual numerical arrays to be substituted to
+        A matrix of shape ``(batchsize, len(bandwidths) * len(contrasts))``.
+        These are the actual numerical arrays to be substituted to
         `.BandwidthContrastStimulator.bandwidths` and
         `.BandwidthContrastStimulator.contrasts`.  They are
         constructed from `bandwidths` and `contrasts` using
-        `.cartesian_product`.
+        `.grid_stimulator_inputs`.
 
     """
 
     def __init__(self, gen, gen_trainer, bandwidths, contrasts,
-                 lam, moment_weights_regularization, seed=0):
+                 lam, moment_weights_regularization,
+                 include_inhibitory_neurons,
+                 seed=0):
         self.gen = gen
         self.gen_trainer = gen_trainer
         self.lam = lam
@@ -255,10 +253,21 @@ class BPTTMomentMatcher(BaseComponent):
         self.bandwidths = bandwidths
         self.contrasts = contrasts
         self.stimulator_contrasts, self.stimulator_bandwidths \
-            = cartesian_product(contrasts, bandwidths)
+            = grid_stimulator_inputs(contrasts, bandwidths, self.batchsize)
 
-    batchsize = property(lambda self: self.gen.model.batchsize)
+        self.include_inhibitory_neurons = include_inhibitory_neurons
+        # See: BPTTWassersteinGAN
+
+    batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)
+
+    @property
+    def sample_sites(self):
+        probes = list(self.gen.prober.probes)
+        if self.include_inhibitory_neurons:
+            return probes[:len(probes) // 2]
+        else:
+            return probes
 
     def get_gen_param(self):
         # To be called from MomentMatchingDriver
@@ -316,7 +325,7 @@ def _make_mm_from_kwargs(
     probes = sample_sites_from_stim_space(sample_sites, num_sites)
     if include_inhibitory_neurons:
         probes.extend(np.array(probes) + num_sites)
-    gen, rest = TuningCurveGenerator.consume_config(
+    gen, rest = make_tuning_curve_generator(
         rest,
         # Stimulator:
         num_tcdom=len(bandwidths) * len(contrasts),
@@ -330,4 +339,6 @@ def _make_mm_from_kwargs(
     )
     gen_trainer, rest = MMGeneratorTrainer.consume_config(rest, gen)
     return BPTTMomentMatcher.consume_kwargs(
-        gen, gen_trainer, bandwidths, contrasts, **rest)
+        gen, gen_trainer, bandwidths, contrasts,
+        include_inhibitory_neurons=include_inhibitory_neurons,
+        **rest)

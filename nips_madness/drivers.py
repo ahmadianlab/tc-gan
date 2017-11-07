@@ -1,3 +1,4 @@
+from logging import getLogger
 import collections
 
 import lasagne
@@ -7,7 +8,10 @@ from . import execution
 from . import lasagne_param_file
 from . import ssnode
 from .recorders import LearningRecorder, GenParamRecorder, \
-    DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder
+    DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
+    ConditionalTuningCurveStatsRecorder, UpdateResult
+
+logger = getLogger(__name__)
 
 
 def net_isfinite(layer):
@@ -88,6 +92,8 @@ class GANDriver(object):
                 self.datastore.path('disc_param',
                                     self.disc_param_template.format(gen_step)))
 
+        self.datastore.flush_all()
+
         maybe_quit(
             self.datastore,
             JDS_fake=list(map(np.exp, [jj, dd, ss])),
@@ -123,8 +129,10 @@ class GANDriver(object):
             )(update_func)
 
         self.pre_loop()
+        logger.info('%s: start iterations', self.__class__.__name__)
         for gen_step in range(self.iterations):
             self.post_update(gen_step, update_func(gen_step))
+        logger.info('%s: maximum iterations reached', self.__class__.__name__)
         self.post_loop()
 
 
@@ -243,6 +251,66 @@ class WGANDiscLossLimiter(object):
         return cls(driver.datastore)
 
 
+class BPTTWGANDriver(GANDriver):
+    # TODO: don't rely on GANDriver
+
+    def run(self, gan):
+        learning_it = gan.learning()
+
+        @self.iterate
+        def update_func(k):
+            # This callback function "connects" gan.learning and drive.iterate.
+            while True:
+                info = next(learning_it)
+                if info.is_discriminator:
+                    self.post_disc_update(
+                        info.gen_step,
+                        info.disc_step,
+                        info.disc_loss,
+                        info.accuracy,
+                        info.gen_time,
+                        info.disc_time,
+                        ssnode.null_FixedPointsInfo,
+                    )
+                    disc_info = info
+                else:
+                    assert info.gen_step == k
+                    # Save fake and tuning curves averaged over Zs:
+                    data_mean = disc_info.xd.mean(axis=0).tolist()
+                    gen_mean = disc_info.xg.mean(axis=0).tolist()
+                    self.datastore.tables.saverow('TC_mean.csv',
+                                                  gen_mean + data_mean)
+
+                    # If not info.is_discriminator, then the generator
+                    # step was just taken.  Let's return a result that
+                    # GANDriver understands.
+                    return UpdateResult(
+                        Gloss=info.gen_loss,
+                        Dloss=disc_info.disc_loss,
+                        Daccuracy=disc_info.accuracy,
+                        SSsolve_time=info.gen_time,
+                        gradient_time=info.disc_time,
+                        model_info=ssnode.null_FixedPointsInfo,
+                        rate_penalty=disc_info.dynamics_penalty,
+                        # For BPTTcWGANDriver:
+                        info=info,
+                        disc_info=disc_info,
+                    )
+                # See: [[./recorders.py::def record.*update_result]]
+
+
+class BPTTcWGANDriver(BPTTWGANDriver):
+
+    def post_update(self, gen_step, update_result):
+        self.tuning_curve_recorder.record(gen_step, update_result.disc_info)
+        super(BPTTcWGANDriver, self).post_update(gen_step, update_result)
+
+    def pre_loop(self):
+        super(BPTTcWGANDriver, self).pre_loop()
+        self.tuning_curve_recorder \
+            = ConditionalTuningCurveStatsRecorder.from_driver(self)
+
+
 class MomentMatchingDriver(object):
 
     # TODO: refactor out common code with GANDriver
@@ -299,8 +367,10 @@ class MomentMatchingDriver(object):
 
         """
         self.pre_loop()
+        logger.info('%s: start iterations', self.__class__.__name__)
         for gen_step in range(self.iterations):
             self.post_update(gen_step, update_func(gen_step))
+        logger.info('%s: maximum iterations reached', self.__class__.__name__)
         self.post_loop()
 
     def run(self, learner):

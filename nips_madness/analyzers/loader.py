@@ -108,6 +108,17 @@ class GANData(object):
             assert main.shape[1] == len(LearningRecorder.column_names)
             main_names = LearningRecorder.column_names
 
+        if len({len(main), len(gen), len(tuning)}) != 1:
+            gen_step = min(len(main), len(gen), len(tuning))
+            warnings.warn('Number of rows in learning.csv ({}),'
+                          ' generator.csv ({}) and TC_mean.csv ({})'
+                          ' are different.  Loading only ({}) rows.'
+                          .format(len(main), len(gen), len(tuning),
+                                  gen_step))
+            main = main[:gen_step]
+            gen = gen[:gen_step]
+            tuning = tuning[:gen_step]
+
         with open(os.path.join(dirname, 'info.json')) as file:
             info = json.load(file)
 
@@ -233,11 +244,13 @@ class GANData(object):
 
     @property
     def model_tuning(self):
-        return self.tuning[:, :self.n_bandwidths_viz]
+        mid = self.tuning.shape[1] // 2
+        return self.tuning[:, :mid]
 
     @property
     def true_tuning(self):
-        return self.tuning[:, self.n_bandwidths_viz:self.n_bandwidths_viz*2]
+        mid = self.tuning.shape[1] // 2
+        return self.tuning[:, mid:]
 
     @property
     def bandwidths(self):
@@ -283,14 +296,30 @@ class GANData(object):
     def epochs(self):
         return self.gen_step_to_epoch(self.main[:, 0])
 
+    @property
+    def datasize(self):
+        run_config = self.info['run_config']
+        if self.run_module == 'bptt_cwgan':
+            truth_size = run_config['truth_size']
+            try:
+                num_probes = len(run_config['norm_probes'])
+            except KeyError:
+                num_probes = len(run_config['probe_offsets'])
+            num_contrasts = len(run_config['contrasts'])
+            if run_config['include_inhibitory_neurons']:
+                coeff = (0.8 + 0.2) / (0.8 + 0.8)
+                return truth_size * num_probes * num_contrasts * coeff
+            else:
+                return truth_size * num_probes * num_contrasts
+        else:
+            return run_config['truth_size']
+
     def gen_step_to_epoch(self, gen_step):
-        truth_size = self.info['run_config']['truth_size']  # data size
-        n_samples = self.batchsize
         disc_updates = self.gen_step_to_disc_updates(gen_step)
-        return disc_updates * n_samples / truth_size
+        return disc_updates * self.batchsize / self.datasize
 
     def gen_step_to_disc_updates(self, gen_step):
-        if self.gan_type == 'WGAN':
+        if self.is_WGAN:
             WGAN_n_critic0 = self.critic_iters_init
             WGAN_n_critic = self.critic_iters
             return WGAN_n_critic0 + WGAN_n_critic * gen_step
@@ -301,7 +330,7 @@ class GANData(object):
         return self.disc_updates_to_gen_step(self.epoch_to_disc_updates(epoch))
 
     def disc_updates_to_gen_step(self, disc_updates):
-        if self.gan_type == 'WGAN':
+        if self.is_WGAN:
             WGAN_n_critic0 = self.critic_iters_init
             WGAN_n_critic = self.critic_iters
             return (disc_updates - WGAN_n_critic0) / WGAN_n_critic
@@ -309,13 +338,15 @@ class GANData(object):
             return disc_updates - 1
 
     def epoch_to_disc_updates(self, epoch):
-        truth_size = self.info['run_config']['truth_size']  # data size
-        n_samples = self.batchsize
-        return epoch * truth_size / n_samples
+        return epoch * self.datasize / self.batchsize
 
     @property
     def batchsize(self):
         run_config = self.info['run_config']
+        try:
+            return run_config['num_models'] * run_config['probes_per_model']
+        except KeyError:
+            pass
         try:
             return run_config['batchsize']
         except KeyError:
@@ -338,11 +369,17 @@ class GANData(object):
             return run_config.get('WGAN_n_critic0', 50)
 
     @property
+    def is_WGAN(self):
+        return self.gan_type in ('cWGAN', 'WGAN')
+
+    @property
     def gan_type(self):
         try:
             loss = self.info['run_config']['loss']
         except KeyError:
-            if self.run_module == 'bptt_wgan':
+            if self.run_module == 'bptt_cwgan':
+                return 'cWGAN'
+            elif self.run_module == 'bptt_wgan':
                 loss = 'WD'
             else:
                 raise

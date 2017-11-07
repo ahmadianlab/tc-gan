@@ -32,6 +32,7 @@ def test_smoke_slowtest(args, cleancwd):
 
     info = load_json(cleancwd, 'info.json')
     assert info['extra_info']['script_file'] == cgan.__file__
+    assert 'PATH' in info['meta_info']['environ']
 
 
 @old_gan

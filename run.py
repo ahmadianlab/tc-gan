@@ -106,7 +106,8 @@ def main(args=None):
         help='''Logging format. For example, to include logger name,
         use '%(asctime)s %(levelname)s %(name)s %(message)s'.
         See:
-        https://docs.python.org/3/library/logging.html#logrecord-attributes''')
+        https://docs.python.org/3/library/logging.html#logrecord-attributes'''
+        .replace('%', '%%'))
     parser.add_argument(
         '--log-datefmt',
         default='%Y-%m-%d %H:%M:%S',

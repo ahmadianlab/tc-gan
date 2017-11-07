@@ -38,6 +38,7 @@ def learn(
         offsets,
         J0, D0, S0,
         timetest, convtest, testDW, DRtest,
+        true_ssn_options={},
         **make_func_kwargs):
 
     gan.track_offset_identity = track_offset_identity
@@ -115,7 +116,8 @@ def learn(
             offset=[CON[1]],
             N=n_sites,
             track_offset_identity=track_offset_identity,
-            **dict(ssn_params, io_type=true_IO_type))
+            **dict(ssn_params, io_type=true_IO_type,
+                   **true_ssn_options))
         
         data.append(DAT)
     print("DONE")

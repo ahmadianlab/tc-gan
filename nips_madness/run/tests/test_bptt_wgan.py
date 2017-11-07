@@ -22,12 +22,15 @@ def single_g_step(args):
     ['--sample-sites', '0, 0.5'],
     ['--include-inhibitory-neurons'],
 ])
-def test_single_g_step_slowtest(args, cleancwd):
+def test_single_g_step_slowtest(args, cleancwd,
+                                single_g_step=single_g_step,
+                                script_file=bptt_wgan.__file__):
     single_g_step(args)
     assert cleancwd.join('logfiles').check()
 
     info = load_json(cleancwd, 'info.json')
-    assert info['extra_info']['script_file'] == bptt_wgan.__file__
+    assert info['extra_info']['script_file'] == script_file
+    assert 'PATH' in info['meta_info']['environ']
 
     with pytest.warns(None) as record:
         data = load_gandata(cleancwd)

@@ -1,5 +1,6 @@
 from matplotlib import pyplot
 
+from ..utils import log_timing
 from ..networks.finite_time_sampler import FiniteTimeTuningCurveSampler
 
 
@@ -10,7 +11,9 @@ def plot_tunings(tc, sampler):
 
 def plot_theano_euler_tunings(**sampler_config):
     sampler = FiniteTimeTuningCurveSampler.from_dict(sampler_config)
-    out = sampler.forward(full_output=True)
+    sampler.prepare()
+    with log_timing("sampler.forward()"):
+        out = sampler.forward(full_output=True)
     tc = out.prober_tuning_curve
     plot_tunings(tc, sampler)
     pyplot.show()

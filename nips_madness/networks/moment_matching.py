@@ -14,6 +14,78 @@ from .bptt_gan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
 from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 
+DEFAULT_PARAMS = dict(
+    DEFAULT_PARAMS,
+    moment_weight_type='mean',
+)
+
+MOMENT_WEIGHT_TYPES = ('mean', 'ew_mean', 'ew_relative')
+r"""
+Ways in which moments and variances are weighted.
+
+Assigning one of the following key (`str`) to `.moment_weight_type`
+specifies how :math:`w` in equation :eq:`MMGeneratorTrainer-moment-loss`
+is calculated.
+
+mean
+    Total (unconditional) mean.
+
+    .. math::
+       :label: MM-mean-loss
+
+       \mathtt{mean}_{d \in D} \left(
+           \left(
+               \frac{m_d - \mu_d}{\mathtt{mean}_{d \in D} \mu_d}
+           \right)^2 +
+           \lambda \left(
+               \frac{s_d - \sigma_d}{(\mathtt{mean}_{d \in D} \mu_d)^2}
+           \right)^2
+       \right)
+
+ew_mean
+    Element-wise mean.
+
+    .. math::
+       :label: MM-ew_mean-loss
+
+       \mathtt{mean}_{d \in D} \left(
+           \left(
+               \frac{m_d - \mu_d}{\mu_d + \epsilon}
+           \right)^2 +
+           \lambda \left(
+               \frac{s_d - \sigma_d}{(\mu_d + \epsilon)^2}
+           \right)^2
+       \right)
+
+ew_relative
+    Element-wise relative.
+
+    .. math::
+       :label: MM-ew_relative-loss
+
+       \mathtt{mean}_{d \in D} \left(
+           \left(
+               \frac{m_d - \mu_d}{\mu_d + \epsilon}
+           \right)^2 +
+           \lambda \left(
+               \frac{s_d - \sigma_d}{\sigma_d + \epsilon}
+           \right)^2
+       \right)
+
+where
+
+* :math:`m, s, \mu, \sigma` are arrays of data sample means/variance
+  and generator sample means/variance in a minibatch, as defined in
+  :eq:`MMGeneratorTrainer-moment-loss`.
+
+* :math:`\lambda` = `.lam` is the weight of the errors from the
+  variances relative to the means.
+
+* :math:`\epsilon` = `.moment_weights_regularization` is a reguralizer
+  to avoid division by very small numbers.
+
+"""
+
 
 def sample_moments(samples):
     """
@@ -171,32 +243,9 @@ class BPTTMomentMatcher(BaseComponent):
 
     It works by minimizing the loss function :math:`L = L_0 + L_p`
     (see :eq:`MMGeneratorTrainer-loss`) where :math:`L_p` is the
-    penalization of the dynamics and :math:`L_0` is the "pure" moment
-    matching loss function defined by
-
-    .. math::
-       :label: BPTTMomentMatcher-loss
-
-       \mathtt{mean}_{d \in D} \left(
-           \left(
-               \frac{m_d - \mu_d}{\mu_d + \epsilon}
-           \right)^2 +
-           \lambda \left(
-               \frac{s_d - \sigma_d}{(\mu_d + \epsilon)^2}
-           \right)^2
-       \right)
-
-    where
-
-    * :math:`m, s, \mu, \sigma` are arrays of data sample
-      means/variance and generator sample means/variance in a
-      minibatch, as defined in :eq:`MMGeneratorTrainer-moment-loss`.
-
-    * :math:`\lambda` = `lam` is the weight of the errors from the
-      variances relative to the means.
-
-    * :math:`\epsilon` = `moment_weights_regularization`
-      is a reguralizer to avoid division by very small numbers.
+    penalization of the dynamics and :math:`L_0` is one of the "pure"
+    moment matching loss function noted in `MOMENT_WEIGHT_TYPES`,
+    depending on the value of `.moment_weight_type`.
 
     Attributes
     ----------
@@ -207,10 +256,15 @@ class BPTTMomentMatcher(BaseComponent):
         Generator trainer.
 
     lam : float
-        :math:`\lambda` in :eq:`BPTTMomentMatcher-loss`
+        :math:`\lambda` in Equations :eq:`MM-mean-loss`,
+        :eq:`MM-ew_mean-loss` and :eq:`MM-ew_relative-loss`.
 
     moment_weights_regularization : float
-        :math:`\epsilon` in :eq:`BPTTMomentMatcher-loss`
+        :math:`\epsilon` in Equations :eq:`MM-ew_mean-loss` and
+        :eq:`MM-ew_relative-loss`.
+
+    moment_weight_type : {'total_mean', 'relative_mean', 'relative'}
+        How `moment_weights` are calculated. See: `MOMENT_WEIGHT_TYPES`.
 
     moment_weights : numpy.ndarray
         Numerical array to be "substituted" into
@@ -242,11 +296,13 @@ class BPTTMomentMatcher(BaseComponent):
     def __init__(self, gen, gen_trainer, bandwidths, contrasts,
                  lam, moment_weights_regularization,
                  include_inhibitory_neurons,
+                 moment_weight_type,
                  seed=0):
         self.gen = gen
         self.gen_trainer = gen_trainer
         self.lam = lam
         self.moment_weights_regularization = moment_weights_regularization
+        self.moment_weight_type = moment_weight_type
 
         self.rng = np.random.RandomState(seed)
 
@@ -280,9 +336,24 @@ class BPTTMomentMatcher(BaseComponent):
     def set_dataset(self, data):
         """ Calculate `data_moments` (means & variances) from `data`. """
         self.data_moments = sample_moments(data)
-        r0 = self.data_moments[0]  # sample mean
-        den = r0 + self.moment_weights_regularization
-        self.moment_weights = np.array([1 / den**2, self.lam / den**4])
+
+        # Calculate self.moment_weights:
+        eps = self.moment_weights_regularization
+        num = np.broadcast_to([[1], [self.lam]], self.data_moments.shape)
+        assert self.moment_weight_type in MOMENT_WEIGHT_TYPES
+        if self.moment_weight_type == 'mean':
+            den = data.mean()
+            self.moment_weights = num / np.array([[den**2], [den**4]])
+        elif self.moment_weight_type == 'ew_mean':
+            r0 = self.data_moments[0]  # sample mean
+            den = r0 + eps
+            self.moment_weights = num / np.array([den**2, den**4])
+        elif self.moment_weight_type == 'ew_relative':
+            den = (self.data_moments + eps) ** 2
+            self.moment_weights = num / den
+        else:
+            raise ValueError('Unknown moment_weight_type = {}'
+                             .format(self.moment_weight_type))
 
     def prepare(self):
         """ Force compile Theano functions. """

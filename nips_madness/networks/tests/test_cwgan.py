@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from .. import cwgan
 
@@ -45,8 +46,12 @@ def fake_data(gan, truth_size):
     return gan.rng.randn(truth_size, ncols)
 
 
-def test_smoke_cgan():
-    gan, rest = make_gan()
+@pytest.mark.parametrize('config', [
+    {},
+    dict(hide_cell_type=True),
+])
+def test_smoke_cgan(config):
+    gan, rest = make_gan(**config)
     data = fake_data(gan, rest['truth_size'])
     gan.set_dataset(data)
     learning_it = gan.learning()
@@ -56,3 +61,8 @@ def test_smoke_cgan():
 
     info = next(learning_it)
     assert not info.is_discriminator
+
+
+def test_hide_cell_type():
+    gan, _rest = make_gan(hide_cell_type=True)
+    assert isinstance(gan.disc, cwgan.CellTypeBlindDiscriminator)

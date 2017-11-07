@@ -22,6 +22,7 @@ DEFAULT_PARAMS = dict(
     num_models=1,
     probes_per_model=1,
     e_ratio=0.8,
+    hide_cell_type=False,
 )
 del DEFAULT_PARAMS['batchsize']
 del DEFAULT_PARAMS['sample_sites']
@@ -187,6 +188,19 @@ class ConditionalDiscriminator(BaseComponent):
     def prepare(self):
         """ Force compile Theano functions. """
         self.accuracy
+
+
+class CellTypeBlindDiscriminator(ConditionalDiscriminator):
+
+    def preprocess_condition(self, condition):
+        condition = super(CellTypeBlindDiscriminator, self) \
+            .preprocess_condition(condition)
+        # Feed absolute value of norm_probes since SSN is symmetric.
+        return theano.tensor.as_tensor_variable([
+            condition[:, 0],
+            condition[:, 1],
+            theano.tensor.zeros_like(condition[:, 2])  # cell_types
+        ]).T
 
 
 class ConditionalCriticTrainer(BaseTrainer):
@@ -540,6 +554,7 @@ def make_gan(config):
 def _make_gan_from_kwargs(
         J0, S0, D0, num_sites, bandwidths, contrasts,
         num_models, probes_per_model,
+        hide_cell_type,
         **rest):
     gen, rest = make_conditional_tuning_curve_generator(
         rest,
@@ -553,7 +568,9 @@ def _make_gan_from_kwargs(
         S=S0,
     )
     disc, rest = consume_subdict(
-        ConditionalDiscriminator, 'disc', rest,
+        (CellTypeBlindDiscriminator if hide_cell_type else
+         ConditionalDiscriminator),
+        'disc', rest,
         shape=gen.output_shape,
         cond_shape=gen.cond_shape,
         loss_type='WD',

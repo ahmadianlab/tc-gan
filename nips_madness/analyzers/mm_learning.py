@@ -12,7 +12,7 @@ def plot_loss(data, ax=None):
         _, ax = pyplot.subplots()
 
     ax.plot(data.epochs,
-            data.log.learning.data[:, 1],
+            data.learning[:, 1],
             label='loss')
     ax.set_yscale('log')
 

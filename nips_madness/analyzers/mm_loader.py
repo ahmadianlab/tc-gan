@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 import json
+import warnings
 
 import numpy as np
 
@@ -26,11 +27,31 @@ class MomentMatchingData(object):
 
     @property
     def total_steps(self):
-        return len(self.log.learning.data)
+        return min(
+            len(self.log.learning.data),
+            len(self.log.generator.data),
+            len(self.log.gen_moments.data),
+        )
+
+    def __make_data_getter(name):
+        @property
+        def getter(self):
+            data = getattr(self.log, name).data
+            if len(data) > self.total_steps:
+                warnings.warn('Only using first {} rows from {}.csv'
+                              ' since it is longer than others.'
+                              .format(self.total_steps, name))
+
+            return data[:self.total_steps]
+        return getter
+
+    learning = __make_data_getter('learning')
+    generator = __make_data_getter('generator')
+    gen_moments_raw = __make_data_getter('gen_moments')
 
     @property
     def epochs(self):
-        return self.step_to_epoch(self.log.learning.data[:, 0])
+        return self.step_to_epoch(self.learning[:, 0])
 
     def step_to_epoch(self, step):
         truth_size = self.info['run_config']['truth_size']  # data size
@@ -58,13 +79,13 @@ class MomentMatchingData(object):
 
     @cached_property
     def gen_matrices(self):
-        gen = self.log.generator.data
+        gen = self.generator
         J, D, S = gen[:, 1:].reshape((-1, 3, 2, 2)).swapaxes(0, 1)
         return SimpleNamespace(J=J, D=D, S=S)
 
     @cached_property
     def gen_moments(self):
-        data = self.log.gen_moments.data
+        data = self.gen_moments_raw
         return data.reshape((len(data), 2, -1))
 
     default_spec_keys = ('lam', 'learning_rate')

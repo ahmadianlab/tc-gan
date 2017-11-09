@@ -101,13 +101,18 @@ def make_parser():
     for name in 'JDS':
         parser.add_argument(
             '--{}-min'.format(name),
-            default=1e-3, type=eval,
+            default=1e-3, type=float,
             help='''Lower limit of the parameter {}.
             '''.format(name))
         parser.add_argument(
             '--{}-max'.format(name),
-            default=10, type=eval,
+            default=10, type=float,
             help='''Upper limit of the parameter {}.
+            '''.format(name))
+        parser.add_argument(
+            '--{}0'.format(name),
+            default=0.01, type=eval,
+            help='''Initial value the parameter {} of the generator.
             '''.format(name))
 
     # Generator trainer

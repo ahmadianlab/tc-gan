@@ -1,3 +1,25 @@
+"""
+Generative Adversarial Network for fitting tuning curve generator.
+
+This module implements Wasserstein GAN (`BPTTWassersteinGAN`) to fit
+`TuningCurveGenerator`.  It is composed of the following components:
+
+- `BPTTWassersteinGAN`
+
+  - `.TuningCurveGenerator`: generator
+  - `UnConditionalDiscriminator`: discriminator
+  - `GeneratorTrainer`: generator-trainer
+  - `CriticTrainer`: discriminator (critic)-trainer
+
+Generator and Discriminator only define the symbolic expression of the
+forward-pass and gradients (backward-pass) are calculated in their
+trainer.
+
+`BPTTWassersteinGAN` is responsible for bundling them together,
+managing numeric data, and looping through the learning argorithm.
+
+"""
+
 from types import SimpleNamespace
 import itertools
 

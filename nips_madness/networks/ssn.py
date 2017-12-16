@@ -1,3 +1,39 @@
+"""
+Tuning curve generator based on SSN.
+
+This module implements tuning curve generator (`TuningCurveGenerator`)
+based on SSN (`EulerSSNModel`).  For a high-level overview, see
+:ref:`general-construction`.
+
+The (default) tuning curve generator is composed of the following
+components:
+
+- `TuningCurveGenerator`
+
+  - `BandwidthContrastStimulator` (:term:`stimulator`)
+  - `EulerSSNModel` (:term:`fixed-point solver`)
+  - `FixedProber` (:term:`prober`)
+
+`TuningCurveGenerator` is designed in a way that each component is
+pluggable.  See, e.g., `.ConditionalTuningCurveGenerator`.
+
+`EulerSSNModel` is further composed of its sub-components
+`EulerSSNCore` and `EulerSSNLayer`.  This additional complexity is for
+safely using `lasagne.layers.CustomRecurrentLayer` so that its
+`unroll_scan` option can be used to boost computation throughput.
+
+This module also include `MapCloneEulerSSNModel` (and
+`MapCloneEulerSSNCore`) which is the old version of `EulerSSNModel`
+(and `EulerSSNCore`) implemented in a different strategy (i.e.,
+combination of `theano.map` and `theano.clone`).  It seems that
+non-MapClone version is faster but no extensive benchmark has been
+done.  Let's keep those implementation at the moment.
+
+For the usage of `TuningCurveGenerator`, see: `.BPTTWassersteinGAN`,
+and `.BPTTMomentMatcher`.
+
+"""
+
 import collections
 
 import lasagne

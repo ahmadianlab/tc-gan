@@ -20,13 +20,14 @@ where
 
 - :math:`S` is the (finite) points in the :term:`tuning curve
   domain` sampled during the experiment.
-- :math:`I: S \times C \to X` is the input-constructing function where
-  :math:`C` is the set of :term:`cGAN-conditions` and :math:`X` (=
-  :math:`\mathbb R^{2N}`) is the input space of the SSN.
-- :math:`F: Z \times X \to Y` is the fixed-point "solver" of the SSN
-  given a noise variable :math:`z \in Z` and an input in :math:`X`.
-  It returns a fixed point [#]_ in the state space :math:`Y` (=
-  :math:`\mathbb R^{2N}`) of the SSN.
+- :math:`I: S \times C \to X` is the input-constructing function
+  (:term:`stimulator`) where :math:`C` is the set of
+  :term:`cGAN-conditions` and :math:`X` (= :math:`\mathbb R^{2N}`) is
+  the input space of the SSN.
+- :math:`F: Z \times X \to Y` is the :term:`fixed-point "solver"
+  <fixed-point solver>` of the SSN given a noise variable :math:`z \in
+  Z` and an input in :math:`X`.  It returns a fixed point [#]_ in the
+  state space :math:`Y` (= :math:`\mathbb R^{2N}`) of the SSN.
 - :math:`P: Y^S \times C \to \mathrm{dom}(D)` is the :term:`probe
   function` which converts entire SSN states across different tuning
   curve conditions :math:`s \in S` to a (lower dimensional) tuning

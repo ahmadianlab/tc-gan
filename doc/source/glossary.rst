@@ -36,8 +36,17 @@
 
      See: :ref:`general-construction`
 
-   probe function
+   stimulator
+
+     See: :ref:`general-construction`
+
+   fixed-point solver
+
+     See: :ref:`general-construction`
+
+   prober
    probe
+   probe function
    subsample
 
      See: :ref:`general-construction`

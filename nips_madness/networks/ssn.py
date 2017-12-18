@@ -315,6 +315,9 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
             self.time_avg,
         )
 
+    def get_all_params(self):
+        return [self.J, self.D, self.S]
+
 
 class MapCloneEulerSSNModel(AbstractEulerSSNModel):
 
@@ -639,8 +642,9 @@ class TuningCurveGenerator(BaseComponent):
         assert not kwargs
         return self.OutType(*self._forward(*values))
 
+    @property
     def get_all_params(self):
-        return [self.model.J, self.model.D, self.model.S]
+        return self.model.get_all_params
 
     def get_output(self, **kwargs):
         if not kwargs:

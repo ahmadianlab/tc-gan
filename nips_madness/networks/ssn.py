@@ -34,6 +34,7 @@ and `.BPTTMomentMatcher`.
 
 """
 
+import abc
 import collections
 
 import lasagne
@@ -216,10 +217,10 @@ class EulerSSNLayer(lasagne.layers.Layer):
         return self.ssn.get_output_for(input, **kwargs)
 
 
-class MapCloneEulerSSNModel(BaseComponent):
+class AbstractEulerSSNModel(BaseComponent, abc.ABC):
 
     r"""
-    Implementation of SSN in Theano (based on map & clone combo).
+    Abstract base class of SSN.
 
     Attributes
     ----------
@@ -228,45 +229,9 @@ class MapCloneEulerSSNModel(BaseComponent):
 
     """
 
-    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
-                 io_type,
-                 unroll_scan=False,
-                 skip_steps=None, seqlen=None,
-                 include_time_avg=False):
-        self.stimulator = stimulator
-        self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
-        self.seqlen = int_or_lscalr(seqlen, 'seqlen')
-
-        ssn = MapCloneEulerSSNCore(
-            stimulator=stimulator,
-            J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
-            io_type=io_type,
-        )
-        # num_tcdom = "batch dimension" when using Lasagne:
-        num_neurons = self.stimulator.num_neurons
-        shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
-        self._setup_layers(ssn, shape, unroll_scan)
-
-        self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
-        rs = rates[:, self.skip_steps:]
-        time_avg = rs.mean(axis=1)  # shape: (num_tcdom, num_neurons)
-        dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
-
-        # self.zs.shape: (batchsize, num_neurons, num_neurons)
-        self.zs = theano.tensor.tensor3('zs')
-        # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
-        self.time_avg = self._map_clone(time_avg)
-        self.time_avg.name = 'time_avg'
-        self.dynamics_penalty = self._map_clone(dynamics_penalty).mean()
-        # TODO: make sure theano.clone is not bottleneck here.
-        self.dynamics_penalty.name = 'dynamics_penalty'
-        # TODO: find if assigning a name to an expression is a valid usecase
-
-        self.inputs = (self.zs,)
-        if include_time_avg:
-            self.outputs = (self.dynamics_penalty, self.time_avg)
-        else:
-            self.outputs = (self.dynamics_penalty,)
+    @abc.abstractmethod
+    def __init__(self):
+        pass
 
     def _setup_layers(self, ssn, shape, unroll_scan):
         shape_sym = shape
@@ -313,6 +278,67 @@ class MapCloneEulerSSNModel(BaseComponent):
     num_sites = property(lambda self: self.stimulator.num_sites)
     num_neurons = property(lambda self: self.stimulator.num_neurons)
 
+    @cached_property
+    def compute_trajectories(self):
+        return theano_function(
+            (self.zs,) + self.stimulator.inputs,
+            self.all_trajectories,
+        )
+
+    @cached_property
+    def compute_time_avg(self):
+        return theano_function(
+            (self.zs,) + self.stimulator.inputs,
+            self.time_avg,
+        )
+
+
+class MapCloneEulerSSNModel(AbstractEulerSSNModel):
+
+    """
+    Implementation of SSN in Theano (based on map & clone combo).
+    """
+
+    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
+                 io_type,
+                 unroll_scan=False,
+                 skip_steps=None, seqlen=None,
+                 include_time_avg=False):
+        self.stimulator = stimulator
+        self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
+        self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+
+        ssn = MapCloneEulerSSNCore(
+            stimulator=stimulator,
+            J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
+            io_type=io_type,
+        )
+        # num_tcdom = "batch dimension" when using Lasagne:
+        num_neurons = self.stimulator.num_neurons
+        shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
+        self._setup_layers(ssn, shape, unroll_scan)
+
+        self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
+        rs = rates[:, self.skip_steps:]
+        time_avg = rs.mean(axis=1)  # shape: (num_tcdom, num_neurons)
+        dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
+
+        # self.zs.shape: (batchsize, num_neurons, num_neurons)
+        self.zs = theano.tensor.tensor3('zs')
+        # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
+        self.time_avg = self._map_clone(time_avg)
+        self.time_avg.name = 'time_avg'
+        self.dynamics_penalty = self._map_clone(dynamics_penalty).mean()
+        # TODO: make sure theano.clone is not bottleneck here.
+        self.dynamics_penalty.name = 'dynamics_penalty'
+        # TODO: find if assigning a name to an expression is a valid usecase
+
+        self.inputs = (self.zs,)
+        if include_time_avg:
+            self.outputs = (self.dynamics_penalty, self.time_avg)
+        else:
+            self.outputs = (self.dynamics_penalty,)
+
     def _map_clone(self, expr):
         return theano.map(
             lambda z, I: theano.clone(expr, {
@@ -330,20 +356,6 @@ class MapCloneEulerSSNModel(BaseComponent):
         Array of shape (`.batchsize`, `.num_tcdom`, `.seqlen`, `.num_neurons`).
         """
         return self._map_clone(self.trajectories)
-
-    @cached_property
-    def compute_trajectories(self):
-        return theano_function(
-            (self.zs,) + self.stimulator.inputs,
-            self.all_trajectories,
-        )
-
-    @cached_property
-    def compute_time_avg(self):
-        return theano_function(
-            (self.zs,) + self.stimulator.inputs,
-            self.time_avg,
-        )
 
 
 class EulerSSNCore(MapCloneEulerSSNCore):
@@ -401,7 +413,7 @@ class EulerSSNCore(MapCloneEulerSSNCore):
         return r_next
 
 
-class EulerSSNModel(MapCloneEulerSSNModel):
+class EulerSSNModel(AbstractEulerSSNModel):
 
     """
     Implementation of SSN in Theano (based on `batched_dot`).
@@ -446,8 +458,6 @@ class EulerSSNModel(MapCloneEulerSSNModel):
             self.outputs = (self.dynamics_penalty, self.time_avg)
         else:
             self.outputs = (self.dynamics_penalty,)
-
-    _map_clone = None  # must not be called for this class
 
     @property
     def all_trajectories(self):

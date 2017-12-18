@@ -136,7 +136,7 @@ class AbstractEulerSSNCore(BaseComponent, abc.ABC):
 
     """
 
-    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
+    def __init__(self, stimulator, ext, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type):
 
         J = np.asarray(J, dtype=theano.config.floatX)
@@ -145,6 +145,7 @@ class AbstractEulerSSNCore(BaseComponent, abc.ABC):
         assert J.shape == D.shape == S.shape == (2, 2)
 
         self.stimulator = stimulator
+        self.ext = ext
         self.J = theano.shared(J, name='J')
         self.D = theano.shared(D, name='D')
         self.S = theano.shared(S, name='S')
@@ -202,8 +203,6 @@ class MapCloneEulerSSNCore(AbstractEulerSSNCore):
                                 num_sites,
                                 stimulator.site_to_band)[0].T
         self.Wt.name = 'Wt'
-
-        self.ext = theano.tensor.matrix('ext')
 
     def get_output_for(self, r):
         f = self.f
@@ -289,8 +288,6 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
         )
         self.unroll_scan = unroll_scan
 
-    zmat = property(lambda self: self.l_ssn.ssn.zmat)
-    ext = property(lambda self: self.l_ssn.ssn.ext)
     dt = property(lambda self: self.l_ssn.ssn.dt)
     io_type = property(lambda self: self.l_ssn.ssn.io_type)
     J = property(lambda self: self.l_ssn.ssn.J)
@@ -334,8 +331,9 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
 
+        self.ext = theano.tensor.matrix('ext')
         ssn = MapCloneEulerSSNCore(
-            stimulator=stimulator,
+            stimulator=stimulator, ext=self.ext,
             J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
             io_type=io_type,
         )
@@ -364,6 +362,8 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
             self.outputs = (self.dynamics_penalty, self.time_avg)
         else:
             self.outputs = (self.dynamics_penalty,)
+
+    zmat = property(lambda self: self.l_ssn.ssn.zmat)
 
     def _map_clone(self, expr):
         return theano.map(
@@ -413,8 +413,6 @@ class EulerSSNCore(AbstractEulerSSNCore):
         ).swapaxes(1, 2)
         self.Wt.name = 'Wt'
 
-        self.ext = stimulator.stimulus
-
     def get_output_for(self, r):
         """
         Get computation graph representing a single Euler step.
@@ -456,7 +454,7 @@ class EulerSSNModel(AbstractEulerSSNModel):
 
         num_neurons = self.stimulator.num_neurons
         ssn = EulerSSNCore(
-            stimulator=stimulator,
+            stimulator=stimulator, ext=stimulator.stimulus,
             J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
             io_type=io_type,
         )

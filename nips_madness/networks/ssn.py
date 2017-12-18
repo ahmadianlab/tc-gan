@@ -127,10 +127,10 @@ class BandwidthContrastStimulator(BaseComponent):
     num_neurons = property(lambda self: self.num_sites * 2)
 
 
-class MapCloneEulerSSNCore(BaseComponent):
+class AbstractEulerSSNCore(BaseComponent, abc.ABC):
 
     """
-    Implementation of single Euler step for SSN.
+    Abstract base class for implementing single Euler step for SSN.
 
     See: `EulerSSNCore`.
 
@@ -168,6 +168,29 @@ class MapCloneEulerSSNCore(BaseComponent):
         self.f = ssnode.make_io_fun(self.k, self.n, io_type=self.io_type)
 
         self.post_init()
+
+    @abc.abstractmethod
+    def post_init(self):
+        """ Called at the end of `__init__`. """
+
+    @abc.abstractmethod
+    def get_output_for(self, r):
+        """
+        Calculate next Euler step output of given input `r`.
+
+        Called via `.EulerSSNLayer.get_output_for`.
+        See also: `lasagne.layers.Layer.get_output_for`
+        """
+
+
+class MapCloneEulerSSNCore(AbstractEulerSSNCore):
+
+    """
+    Implementation of single Euler step for SSN.
+
+    See: `EulerSSNCore`.
+
+    """
 
     def post_init(self):
         stimulator = self.stimulator
@@ -358,7 +381,7 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
         return self._map_clone(self.trajectories)
 
 
-class EulerSSNCore(MapCloneEulerSSNCore):
+class EulerSSNCore(AbstractEulerSSNCore):
 
     """
     Implementation of single Euler step for SSN.

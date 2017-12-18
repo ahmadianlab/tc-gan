@@ -45,7 +45,7 @@ from .. import ssnode
 from ..core import BaseComponent
 from ..gradient_expressions.make_w_batch import make_W_with_x
 from ..utils import cached_property, theano_function, log_timing, asarray, \
-    is_theano
+    is_theano, get_array_module
 
 
 def int_or_lscalr(value, name):
@@ -57,6 +57,14 @@ def int_or_lscalr(value, name):
         return theano.tensor.lscalar(name)
     else:
         return value
+
+
+def neu_array(self, pop_array, pops=2):
+    pop_array = asarray(pop_array)
+    xp = get_array_module(pop_array)
+    num_sites = self.num_sites
+    return xp.concatenate([xp.broadcast_to(pop_array[i], (num_sites,))
+                           for i in range(pops)])
 
 
 class BandwidthContrastStimulator(BaseComponent):
@@ -503,6 +511,61 @@ class EulerSSNModel(AbstractEulerSSNModel):
         return self.trajectories.swapaxes(1, 2)
 
 
+class HeteroInpuptWrapper(BaseComponent):
+    """
+    Stimulator wrapper.
+    """
+
+    def __init__(self, stimulator, Ab, Ad):
+        self.stimulator = stimulator
+
+        Ab = np.asarray(Ab, dtype=theano.config.floatX)
+        Ad = np.asarray(Ad, dtype=theano.config.floatX)
+        assert Ab.shape == Ad.shape == (2,)
+
+        self.Ab = theano.shared(Ab, name='Ab')
+        self.Ad = theano.shared(Ad, name='Ad')
+        ab = neu_array(stimulator, Ab).reshape((1, -1))
+        ad = neu_array(stimulator, Ad).reshape((1, -1))
+
+        # self.zs.shape: (batchsize, num_neurons)
+        self.zs_in = theano.tensor.matrix('zs_in')
+        self.amplification = amp = ab + ad * self.zs_in
+
+        self.stimulus = amp * self.stimulator.stimulus
+
+    def get_all_params(self):
+        return [self.Ab, self.Ad]
+
+    def __getattr__(self, name):
+        """ Trun ``self.XXX`` into ``self.stimulator.XXX``. """
+        try:
+            super(HeteroInpuptWrapper, self).__getattr__(name)
+        except AttributeError:
+            return getattr(self.stimulator, name)
+
+
+class HeteroInEulerSSNModel(EulerSSNModel):
+    """
+    SSN with heterogeneous (random) input.
+    """
+
+    input_wrapper_class = HeteroInpuptWrapper
+
+    @classmethod
+    def consume_kwargs(cls, stimulator, **kwargs):
+        stimulator, kwargs = cls.input_wrapper_class.consume_kwargs(
+            stimulator=stimulator,
+            **kwargs)
+        return super(HeteroInEulerSSNModel, cls).consume_kwargs(
+            stimulator=stimulator,
+            **kwargs)
+
+    def get_all_params(self):
+        params = super(HeteroInEulerSSNModel, self).get_all_params()
+        return params + self.stimulator.get_all_params()
+
+
 class FixedProber(BaseComponent):
 
     """
@@ -663,6 +726,7 @@ class TuningCurveGenerator(BaseComponent):
 _ssn_classes = {
     ('default', 'default'): EulerSSNModel,
     ('mapclone', 'default'): MapCloneEulerSSNModel,
+    ('default', 'heteroin'): HeteroInEulerSSNModel,
 }
 """
 Mapping form ``(ssn_impl, ssn_type)`` to SSN model class.

@@ -312,7 +312,7 @@ class BPTTWassersteinGAN(BaseComponent):
     def train_generator(self, info):
         with self.gen_train_watch:
             info.gen_loss = self.gen_trainer.train(
-                rng=self.rng.rand,
+                rng=self.rng,
                 stimulator_bandwidths=self.stimulator_bandwidths,
                 stimulator_contrasts=self.stimulator_contrasts,
             )

@@ -486,21 +486,9 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         return info
 
     def train_generator(self, info, batch):
-        num_models = batch.num_models
-        zg = self.rng.rand(num_models, self.num_neurons, self.num_neurons)
         gen_kwargs = batch.gen_kwargs
         with self.gen_train_watch:
-            info.gen_loss = self.gen_trainer.train(
-                # Stimulator:
-                gen_kwargs['stimulator_bandwidths'],
-                gen_kwargs['stimulator_contrasts'],
-                # Model:
-                zg,
-                # ConditionalProber:
-                gen_kwargs['prober_norm_probes'],
-                gen_kwargs['prober_model_ids'],
-                gen_kwargs['prober_cell_types'],
-            )
+            info.gen_loss = self.gen_trainer.train(rng=self.rng, **gen_kwargs)
 
         info.gen_forward_time = self.gen_forward_watch.sum()
         info.gen_time = self.gen_train_watch.sum() + info.gen_forward_time

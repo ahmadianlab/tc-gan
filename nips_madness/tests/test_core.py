@@ -37,7 +37,7 @@ def test_consume_config_not_consumed():
 
 def test_consume_subdict_subrest():
     obj, rest = consume_subdict(
-        SimpleComponent, 'subkey',
+        SimpleComponent.consume_kwargs, 'subkey',
         dict(subkey=dict(alpha=1, beta=2, delta=4), alpha=10, beta=20))
     assert obj.alpha == 1
     assert obj.beta == 2
@@ -46,7 +46,7 @@ def test_consume_subdict_subrest():
 
 def test_consume_subdict_remove_empty_subdict():
     obj, rest = consume_subdict(
-        SimpleComponent, 'subkey',
+        SimpleComponent.consume_kwargs, 'subkey',
         dict(subkey=dict(alpha=1, beta=2), alpha=10, beta=20))
     assert obj.alpha == 1
     assert obj.beta == 2
@@ -55,7 +55,7 @@ def test_consume_subdict_remove_empty_subdict():
 
 def test_consume_subdict_missing_subdict():
     obj, rest = consume_subdict(
-        SimpleComponent, 'subkey',
+        SimpleComponent.consume_kwargs, 'subkey',
         dict(alpha=10, beta=20),
         alpha=1, beta=2)
     assert obj.alpha == 1

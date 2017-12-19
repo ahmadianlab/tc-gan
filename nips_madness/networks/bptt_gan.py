@@ -370,16 +370,16 @@ def _make_gan_from_kwargs(
         probes=probes,
     )
     disc, rest = consume_subdict(
-        UnConditionalDiscriminator, 'disc', rest,
+        UnConditionalDiscriminator.consume_kwargs, 'disc', rest,
         shape=gen.output_shape,
         loss_type='WD',
     )
     gen_trainer, rest = consume_subdict(
-        GeneratorTrainer, 'gen', rest,
+        GeneratorTrainer.consume_kwargs, 'gen', rest,
         gen, disc,
     )
     disc_trainer, rest = consume_subdict(
-        CriticTrainer, 'disc', rest,
+        CriticTrainer.consume_kwargs, 'disc', rest,
         disc,
     )
     return BPTTWassersteinGAN.consume_kwargs(

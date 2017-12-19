@@ -151,18 +151,17 @@ def consume_config(emitter, config, *args, **kwargs):
     return obj, rest
 
 
-def consume_subdict(cls, key, dct, *args, **kwargs):
+def consume_subdict(emitter, key, dct, *args, **kwargs):
     """
-    Instantiate `cls` using ``dct[key]`` and return the rest.
+    Return ``emitter(*args, **dct[key], **kwargs)`` with unused part of `dct`.
 
     The sub-dictionary ``dct[key]`` may not exist (assumed be an empty
     dictionary if so) and it is removed if all contents in
     ``dct[key]`` are consumed.  Thus, it is safe to call this function
-    with the same `key` and different `cls` multiple times.
+    with the same `key` and different `emitter` multiple times.
 
     """
     rest = dict(dct)
-    emitter = cls.consume_kwargs
     obj, subrest = consume_config(emitter, rest.pop(key, {}), *args, **kwargs)
     if subrest:
         rest[key] = subrest

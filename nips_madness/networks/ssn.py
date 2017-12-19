@@ -322,8 +322,18 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
     Implementation of SSN in Theano (based on map & clone combo).
     """
 
-    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
-                 io_type,
+    @classmethod
+    def consume_kwargs(cls, stimulator, **kwargs):
+        ssn, kwargs = MapCloneEulerSSNCore.consume_kwargs(
+            stimulator=stimulator,
+            ext=theano.tensor.matrix('ext'),
+            **kwargs)
+        return super(MapCloneEulerSSNModel, cls).consume_kwargs(
+            stimulator=stimulator,
+            ssn=ssn,
+            **kwargs)
+
+    def __init__(self, stimulator, ssn,
                  unroll_scan=False,
                  skip_steps=None, seqlen=None,
                  include_time_avg=False):
@@ -331,12 +341,7 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
 
-        self.ext = theano.tensor.matrix('ext')
-        ssn = MapCloneEulerSSNCore(
-            stimulator=stimulator, ext=self.ext,
-            J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
-            io_type=io_type,
-        )
+        self.ext = ssn.ext
         # num_tcdom = "batch dimension" when using Lasagne:
         num_neurons = self.stimulator.num_neurons
         shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
@@ -443,8 +448,18 @@ class EulerSSNModel(AbstractEulerSSNModel):
     Implementation of SSN in Theano (based on `batched_dot`).
     """
 
-    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
-                 io_type,
+    @classmethod
+    def consume_kwargs(cls, stimulator, **kwargs):
+        ssn, kwargs = EulerSSNCore.consume_kwargs(
+            stimulator=stimulator,
+            ext=stimulator.stimulus,
+            **kwargs)
+        return super(EulerSSNModel, cls).consume_kwargs(
+            stimulator=stimulator,
+            ssn=ssn,
+            **kwargs)
+
+    def __init__(self, stimulator, ssn,
                  unroll_scan=False,
                  skip_steps=None, seqlen=None,
                  include_time_avg=False):
@@ -453,11 +468,6 @@ class EulerSSNModel(AbstractEulerSSNModel):
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
 
         num_neurons = self.stimulator.num_neurons
-        ssn = EulerSSNCore(
-            stimulator=stimulator, ext=stimulator.stimulus,
-            J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
-            io_type=io_type,
-        )
         # self.zs.shape: (batchsize, num_neurons, num_neurons)
         self.zs = ssn.zs
         batchsize = self.zs.shape[0]

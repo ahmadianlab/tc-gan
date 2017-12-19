@@ -764,8 +764,9 @@ class TuningCurveGenerator(BaseComponent):
         return self.OutType(*self._forward(*values))
 
     def gen_noise(self, rng, **kwargs):
+        model_noise = self.model.gen_noise(rng, **kwargs)
         return {
-            'model_' + k: v for k, v in self.model.gen_noise(rng, **kwargs)
+            'model_' + k: v for k, v in model_noise.items()
         }
         # .keys() is ['model_zs'] for EulerSSNModel
         # .keys() is ['model_zs', 'model_zs_in'] for HeteroInEulerSSNModel

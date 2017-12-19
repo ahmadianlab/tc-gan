@@ -754,14 +754,14 @@ class TuningCurveGenerator(BaseComponent):
                 self.prober.outputs)
 
     @cached_property
-    def _forward(self):
+    def forward_impl(self):
         return theano_function(self.inputs, self.outputs)
 
     def forward(self, rng=None, **kwargs):
         kwargs = maybe_mixin_noise(self, rng, kwargs)
         values = [kwargs.pop(k) for k in self._input_names]
         assert not kwargs
-        return self.OutType(*self._forward(*values))
+        return self.OutType(*self.forward_impl(*values))
 
     def gen_noise(self, rng, **kwargs):
         model_noise = self.model.gen_noise(rng, **kwargs)
@@ -788,9 +788,9 @@ class TuningCurveGenerator(BaseComponent):
 
     def prepare(self):
         """ Force compile Theano functions. """
-        with log_timing("compiling {}._forward"
+        with log_timing("compiling {}.forward_impl"
                         .format(self.__class__.__name__)):
-            self._forward
+            self.forward_impl
 
 
 _ssn_classes = {

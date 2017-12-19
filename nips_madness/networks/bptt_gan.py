@@ -33,7 +33,7 @@ from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
     theano_function, log_timing,
 )
-from .ssn import make_tuning_curve_generator
+from .ssn import make_tuning_curve_generator, maybe_mixin_noise
 from .utils import largerrecursionlimit
 
 
@@ -133,14 +133,17 @@ class BaseTrainer(BaseComponent):
             return self.updater(self.loss, self.target.get_all_params())
 
     @cached_property
-    def train(self):
-        with log_timing("compiling {}.train".format(self.__class__.__name__)):
+    def train_impl(self):
+        with log_timing("compiling {}.train_impl"
+                        .format(self.__class__.__name__)):
             return theano_function(self.inputs, self.loss,
                                    updates=self.get_updates())
 
+    train = property(lambda self: self.train_impl)
+
     def prepare(self):
         """ Force compile Theano functions. """
-        self.train
+        self.train_impl
 
 
 class CriticTrainer(BaseTrainer):
@@ -196,6 +199,12 @@ class GeneratorTrainer(BaseTrainer):
 
     def get_updates(self):
         return self.clip_JDS(super(GeneratorTrainer, self).get_updates())
+
+    def train(self, rng=None, **kwargs):
+        kwargs = maybe_mixin_noise(self.gen, rng, kwargs)
+        values = [kwargs.pop(k) for k in self.gen._input_names]
+        assert not kwargs
+        return self.train_impl(*values)
 
 
 def grid_stimulator_inputs(contrasts, bandwidths, batchsize):
@@ -273,7 +282,7 @@ class BPTTWassersteinGAN(BaseComponent):
 
     def gen_forward(self, zs):
         return self.gen.forward(
-            model_zs=zs,
+            rng=self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,
             stimulator_contrasts=self.stimulator_contrasts,
         )
@@ -281,9 +290,8 @@ class BPTTWassersteinGAN(BaseComponent):
     def train_discriminator(self, info):
         xd = self.next_minibatch()
         eps = self.rng.rand(self.batchsize).reshape((-1, 1))
-        zg = self.rng.rand(self.batchsize, self.num_neurons, self.num_neurons)
         with self.gen_forward_watch:
-            gen_out = self.gen_forward(zg)
+            gen_out = self.gen_forward()
         xg = gen_out.prober_tuning_curve
         xp = eps * xd + (1 - eps) * xg
         with self.disc_train_watch:
@@ -302,12 +310,11 @@ class BPTTWassersteinGAN(BaseComponent):
         return info
 
     def train_generator(self, info):
-        zg = self.rng.rand(self.batchsize, self.num_neurons, self.num_neurons)
         with self.gen_train_watch:
             info.gen_loss = self.gen_trainer.train(
-                self.stimulator_bandwidths,
-                self.stimulator_contrasts,
-                zg,
+                rng=self.rng.rand,
+                stimulator_bandwidths=self.stimulator_bandwidths,
+                stimulator_contrasts=self.stimulator_contrasts,
             )
 
         info.gen_forward_time = self.gen_forward_watch.sum()

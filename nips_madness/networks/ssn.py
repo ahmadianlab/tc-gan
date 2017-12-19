@@ -724,6 +724,7 @@ class TuningCurveGenerator(BaseComponent):
                                    self.prober.outputs])
         self.OutType = collections.namedtuple('OutType', out_names)
 
+        # TODO: make _input_names public
         self._input_names = collect_names(
             ['stimulator_', 'model_', 'prober_'],
             [self.stimulator.inputs,

@@ -185,12 +185,16 @@ class GeneratorTrainer(BaseTrainer):
         self.S_min = S_min
         self.S_max = S_max
         self.updater = updater
+        self.post_init()
 
+    def post_init(self):
+        gen = self.gen
+        disc = self.disc
         self.loss = - disc.get_output(gen.get_output()).mean()
         self.loss += self.dynamics_cost * gen.model.dynamics_penalty
         self.inputs = gen.inputs
 
-    def clip_JDS(self, updates):
+    def clip_params(self, updates):
         for var in self.gen.get_all_params():
             p_min = getattr(self, var.name + '_min')
             p_max = getattr(self, var.name + '_max')
@@ -198,13 +202,44 @@ class GeneratorTrainer(BaseTrainer):
         return updates
 
     def get_updates(self):
-        return self.clip_JDS(super(GeneratorTrainer, self).get_updates())
+        return self.clip_params(super(GeneratorTrainer, self).get_updates())
 
     def train(self, rng=None, **kwargs):
         kwargs = maybe_mixin_noise(self.gen, rng, kwargs)
         values = [kwargs.pop(k) for k in self.gen._input_names]
         assert not kwargs
         return self.train_impl(*values)
+
+
+class HeteroInGeneratorTrainer(GeneratorTrainer):
+
+    def __init__(self, gen, disc, dynamics_cost,
+                 J_min, J_max, D_min, D_max, S_min, S_max,
+                 Ab_min, Ab_max, Ad_min, Ad_max,
+                 updater):
+        self.target = self.gen = gen
+        self.disc = disc
+        self.dynamics_cost = dynamics_cost
+        self.J_min = J_min
+        self.J_max = J_max
+        self.D_min = D_min
+        self.D_max = D_max
+        self.S_min = S_min
+        self.S_max = S_max
+        self.Ab_min = Ab_min
+        self.Ab_max = Ab_max
+        self.Ad_min = Ad_min
+        self.Ad_max = Ad_max
+        self.updater = updater
+        self.post_init()
+
+
+def emit_generator_trainer(gen, *args, **kwargs):
+    if hasattr(gen.model.stimulator, 'Ab'):
+        trainer_class = HeteroInGeneratorTrainer
+    else:
+        trainer_class = GeneratorTrainer
+    return trainer_class.consume_kwargs(gen, *args, **kwargs)
 
 
 def grid_stimulator_inputs(contrasts, bandwidths, batchsize):
@@ -375,7 +410,7 @@ def _make_gan_from_kwargs(
         loss_type='WD',
     )
     gen_trainer, rest = consume_subdict(
-        GeneratorTrainer.consume_kwargs, 'gen', rest,
+        emit_generator_trainer, 'gen', rest,
         gen, disc,
     )
     disc_trainer, rest = consume_subdict(

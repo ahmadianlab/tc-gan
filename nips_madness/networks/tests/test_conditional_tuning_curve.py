@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from ... import ssnode
-from ...core import BaseComponent
+from ...core import BaseComponent, consume_config
 from ...utils import report_allclose_tols
 from ..cwgan import RandomChoiceSampler
 from .test_cwgan import make_gan
@@ -161,8 +161,10 @@ def test_compare_with_sample_tuning_curves(
         include_time_avg=True,
     )
     gen = gan.gen
-    sampler, rest = SamplerWrapper.consume_config(
-        rest, gan, RandomChoiceSampler,
+    sampler, rest = consume_config(
+        SamplerWrapper.consume_kwargs,
+        rest, gan,
+        sampler_class=RandomChoiceSampler,
     )
     dataset = sampler.random_minibatches()
 

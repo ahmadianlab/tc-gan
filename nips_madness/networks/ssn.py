@@ -42,7 +42,7 @@ import numpy as np
 import theano
 
 from .. import ssnode
-from ..core import BaseComponent
+from ..core import BaseComponent, consume_config
 from ..gradient_expressions.make_w_batch import make_W_with_x
 from ..utils import cached_property, theano_function, log_timing, asarray, \
     is_theano, get_array_module
@@ -811,7 +811,7 @@ assert set(ssn_type_choices) == set(k for _, k in _ssn_classes)
 
 def emit_ssn(*args, ssn_impl='default', ssn_type='default', **kwargs):
     cls = _ssn_classes[ssn_impl, ssn_type]
-    return cls.consume_config(kwargs, *args)
+    return cls.consume_kwargs(*args, **kwargs)
 
 
 def emit_tuning_curve_generator(
@@ -832,7 +832,4 @@ def emit_tuning_curve_generator(
 
 
 def make_tuning_curve_generator(config, **kwargs):
-    # TODO: implement BaseComponent.consume_config as a function and
-    # use it here.
-    assert not set(config) & set(kwargs)
-    return emit_tuning_curve_generator(**dict(config, **kwargs))
+    return consume_config(emit_tuning_curve_generator, config, **kwargs)

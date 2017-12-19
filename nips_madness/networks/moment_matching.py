@@ -408,7 +408,7 @@ def _make_mm_from_kwargs(
         # Prober:
         probes=probes,
     )
-    gen_trainer, rest = MMGeneratorTrainer.consume_config(rest, gen)
+    gen_trainer, rest = MMGeneratorTrainer.consume_kwargs(gen, **rest)
     return BPTTMomentMatcher.consume_kwargs(
         gen, gen_trainer, bandwidths, contrasts,
         include_inhibitory_neurons=include_inhibitory_neurons,

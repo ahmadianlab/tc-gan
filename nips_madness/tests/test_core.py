@@ -1,6 +1,6 @@
 import pytest
 
-from ..core import BaseComponent, consume_subdict
+from ..core import BaseComponent, consume_config, consume_subdict
 
 
 class SimpleComponent(BaseComponent):
@@ -25,13 +25,14 @@ def test_consume_kwargs_with_posargs():
 
 def test_consume_config_multi_value_error():
     with pytest.raises(ValueError):
-        obj, rest = SimpleComponent.consume_config(dict(alpha=1), alpha=2)
+        obj, rest = consume_config(SimpleComponent.consume_kwargs,
+                                   dict(alpha=1), alpha=2)
 
 
 def test_consume_config_not_consumed():
     with pytest.raises(ValueError):
-        obj, rest = SimpleComponent.consume_config(dict(alpha=1),
-                                                   beta=2, delta=4)
+        obj, rest = consume_config(SimpleComponent.consume_kwargs,
+                                   dict(alpha=1), beta=2, delta=4)
 
 
 def test_consume_subdict_subrest():

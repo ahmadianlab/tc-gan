@@ -280,7 +280,7 @@ class BPTTWassersteinGAN(BaseComponent):
         self.disc.prepare()
         self.disc_trainer.prepare()
 
-    def gen_forward(self, zs):
+    def gen_forward(self):
         return self.gen.forward(
             rng=self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,

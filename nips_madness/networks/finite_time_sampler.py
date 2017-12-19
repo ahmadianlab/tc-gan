@@ -25,9 +25,10 @@ class FiniteTimeTuningCurveSampler(object):
 
     @classmethod
     def consume_kwargs(cls, bandwidths, contrasts, seed,
-                       sample_sites, num_sites, **kwargs):
+                       sample_sites, num_sites, consume_union=True, **kwargs):
         gen, rest = make_tuning_curve_generator(
             kwargs,
+            consume_union=consume_union,
             # Stimulator:
             num_tcdom=len(bandwidths) * len(contrasts),
             num_sites=num_sites,
@@ -57,11 +58,9 @@ class FiniteTimeTuningCurveSampler(object):
 
     def forward(self, full_output=False):
         out = self.gen.forward(
+            self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,
             stimulator_contrasts=self.stimulator_contrasts,
-            model_zs=self.rng.rand(self.batchsize,
-                                   self.num_neurons,
-                                   self.num_neurons),
         )
         if full_output:
             return out

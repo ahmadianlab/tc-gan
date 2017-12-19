@@ -2,6 +2,7 @@ from matplotlib import pyplot
 
 from ..utils import log_timing
 from ..networks.finite_time_sampler import FiniteTimeTuningCurveSampler
+from ..networks.ssn import ssn_impl_choices, ssn_type_choices
 
 
 def plot_trajectory(trajectories, sampler):
@@ -55,6 +56,13 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=CustomFormatter,
         description=__doc__)
+
+    parser.add_argument(
+        '--ssn-impl', default=ssn_impl_choices[0], choices=ssn_impl_choices,
+        help="SSN implementation.")
+    parser.add_argument(
+        '--ssn-type', default=ssn_type_choices[0], choices=ssn_type_choices,
+        help="SSN type.")
 
     for key in sorted(DEFAULT_PARAMS):
         val = DEFAULT_PARAMS[key]

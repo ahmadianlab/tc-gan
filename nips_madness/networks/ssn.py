@@ -323,6 +323,11 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     def get_all_params(self):
         return [self.J, self.D, self.S]
 
+    def gen_noise(self, rng, batchsize, num_neurons, **_):
+        return dict(
+            zs=rng.rand(batchsize, num_neurons, num_neurons)
+        )
+
 
 class MapCloneEulerSSNModel(AbstractEulerSSNModel):
 
@@ -543,6 +548,11 @@ class HeteroInpuptWrapper(BaseComponent):
     def get_all_params(self):
         return [self.Ab, self.Ad]
 
+    def gen_noise(self, rng, batchsize, num_neurons, **_):
+        return dict(
+            in_zs=rng.rand(batchsize, num_neurons),
+        )
+
     def __getattr__(self, name):
         """ Trun ``self.XXX`` into ``self.stimulator.XXX``. """
         try:
@@ -574,6 +584,11 @@ class HeteroInEulerSSNModel(EulerSSNModel):
     def get_all_params(self):
         params = super(HeteroInEulerSSNModel, self).get_all_params()
         return params + self.stimulator.get_all_params()
+
+    def gen_noise(self, rng, **kwargs):
+        noise = super(HeteroInEulerSSNModel, self).gen_noise(rng, **kwargs)
+        noise.update(self.stimulator.gen_noise())
+        return noise
 
 
 class FixedProber(BaseComponent):
@@ -706,10 +721,29 @@ class TuningCurveGenerator(BaseComponent):
     def _forward(self):
         return theano_function(self.inputs, self.outputs)
 
-    def forward(self, **kwargs):
+    def forward(self, rng=None, **kwargs):
+        if rng:
+            noise = self.gen_noise(rng)
+            if set(noise) & set(kwargs):
+                raise ValueError("keys {} and 'rng' cannot be specified"
+                                 " simultaneously"
+                                 .format(sorted(noise)))
+            kwargs.update(noise)
+
         values = [kwargs.pop(k) for k in self._input_names]
         assert not kwargs
         return self.OutType(*self._forward(*values))
+
+    def gen_noise(self, rng):
+        sizeinfo = dict(
+            batchsize=self.batchsize,
+            num_neurons=self.num_neurons,
+        )
+        return {
+            'model_' + k: v for k, v in self.model.gen_noise(rng, **sizeinfo)
+        }
+        # .keys() is ['model_zs'] for EulerSSNModel
+        # .keys() is ['model_zs', 'model_in_zs'] for HeteroInEulerSSNModel
 
     @property
     def get_all_params(self):
@@ -742,6 +776,11 @@ _ssn_classes = {
 Mapping form ``(ssn_impl, ssn_type)`` to SSN model class.
 """
 
+ssn_impl_choices = ('default', 'mapclone')
+ssn_type_choices = ('default', 'heteroin')
+assert set(ssn_impl_choices) == set(k for k, _ in _ssn_classes)
+assert set(ssn_type_choices) == set(k for _, k in _ssn_classes)
+
 
 def emit_ssn(*args, ssn_impl='default', ssn_type='default', **kwargs):
     cls = _ssn_classes[ssn_impl, ssn_type]
@@ -753,11 +792,16 @@ def emit_tuning_curve_generator(
         emit_model=emit_ssn,
         emit_prober=FixedProber.consume_kwargs,
         emit_tcg=TuningCurveGenerator.consume_kwargs,
+        consume_union=False,
         **kwargs):
     stimulator, kwargs = emit_stimulator(**kwargs)
     model, kwargs = emit_model(stimulator=stimulator, **kwargs)
     prober, kwargs = emit_prober(model=model, **kwargs)
-    return emit_tcg(stimulator, model, prober, **kwargs)
+    tgc, kwargs = emit_tcg(stimulator, model, prober, **kwargs)
+    if consume_union:
+        for key in ['Ab', 'Ad']:
+            kwargs.pop(key, None)
+    return tgc, kwargs
 
 
 def make_tuning_curve_generator(config, **kwargs):

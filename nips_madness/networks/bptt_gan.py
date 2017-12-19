@@ -54,6 +54,8 @@ DEFAULT_PARAMS = dict(
     seqlen=1200,
     batchsize=1,
     skip_steps=1000,
+    Ab=[1, 1],
+    Ad=[0, 0],
 )
 
 

@@ -582,7 +582,7 @@ class HeteroInpuptWrapper(BaseComponent):
         batchsize, _num_tcdom = stimulator_bandwidths.shape
         num_neurons = self.num_neurons
         return dict(
-            in_zs=rng.rand(batchsize, num_neurons),
+            zs_in=rng.rand(batchsize, num_neurons),
         )
 
     def __getattr__(self, name):
@@ -764,7 +764,7 @@ class TuningCurveGenerator(BaseComponent):
             'model_' + k: v for k, v in self.model.gen_noise(rng, **kwargs)
         }
         # .keys() is ['model_zs'] for EulerSSNModel
-        # .keys() is ['model_zs', 'model_in_zs'] for HeteroInEulerSSNModel
+        # .keys() is ['model_zs', 'model_zs_in'] for HeteroInEulerSSNModel
 
     @property
     def get_all_params(self):

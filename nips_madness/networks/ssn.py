@@ -351,7 +351,9 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     def get_all_params(self):
         return [self.J, self.D, self.S]
 
-    def gen_noise(self, rng, batchsize, num_neurons, **_):
+    def gen_noise(self, rng, stimulator_bandwidths, **_):
+        batchsize, _num_tcdom = stimulator_bandwidths.shape
+        num_neurons = self.num_neurons
         return dict(
             zs=rng.rand(batchsize, num_neurons, num_neurons)
         )
@@ -576,7 +578,9 @@ class HeteroInpuptWrapper(BaseComponent):
     def get_all_params(self):
         return [self.Ab, self.Ad]
 
-    def gen_noise(self, rng, batchsize, num_neurons, **_):
+    def gen_noise(self, rng, stimulator_bandwidths, **_):
+        batchsize, _num_tcdom = stimulator_bandwidths.shape
+        num_neurons = self.num_neurons
         return dict(
             in_zs=rng.rand(batchsize, num_neurons),
         )
@@ -755,13 +759,9 @@ class TuningCurveGenerator(BaseComponent):
         assert not kwargs
         return self.OutType(*self._forward(*values))
 
-    def gen_noise(self, rng):
-        sizeinfo = dict(
-            batchsize=self.batchsize,
-            num_neurons=self.num_neurons,
-        )
+    def gen_noise(self, rng, **kwargs):
         return {
-            'model_' + k: v for k, v in self.model.gen_noise(rng, **sizeinfo)
+            'model_' + k: v for k, v in self.model.gen_noise(rng, **kwargs)
         }
         # .keys() is ['model_zs'] for EulerSSNModel
         # .keys() is ['model_zs', 'model_in_zs'] for HeteroInEulerSSNModel

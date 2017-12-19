@@ -615,7 +615,7 @@ class HeteroInEulerSSNModel(EulerSSNModel):
 
     def gen_noise(self, rng, **kwargs):
         noise = super(HeteroInEulerSSNModel, self).gen_noise(rng, **kwargs)
-        noise.update(self.stimulator.gen_noise())
+        noise.update(self.stimulator.gen_noise(rng, **kwargs))
         return noise
 
 

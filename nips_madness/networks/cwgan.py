@@ -450,19 +450,17 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
             self.num_models, self.probes_per_model,
         )
 
-    def gen_forward(self, zs, batch):
-        return self.gen.forward(model_zs=zs, **batch.gen_kwargs)
+    def gen_forward(self, batch):
+        return self.gen.forward(rng=self.rng, **batch.gen_kwargs)
 
     def train_discriminator(self, info):
         batch = self.next_minibatch()  # ConditionalMinibatch
         xd = batch.tuning_curves
         cd = batch.conditions
-        num_models = batch.num_models
         batchsize = batch.batchsize
         eps = self.rng.rand(batchsize, 1)
-        zg = self.rng.rand(num_models, self.num_neurons, self.num_neurons)
         with self.gen_forward_watch:
-            gen_out = self.gen_forward(zg, batch)
+            gen_out = self.gen_forward(batch)
         xg = gen_out.prober_tuning_curve
         xp = eps * xd + (1 - eps) * xg
         cg = cp = cd

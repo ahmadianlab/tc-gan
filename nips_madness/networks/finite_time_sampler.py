@@ -67,11 +67,10 @@ class FiniteTimeTuningCurveSampler(object):
         return out.prober_tuning_curve
 
     def compute_trajectories(self):
-        zs = self.rng.rand(self.batchsize, self.num_neurons, self.num_neurons)
         trajectories = self.gen.model.compute_trajectories(
-            zs,
-            self.stimulator_bandwidths,
-            self.stimulator_contrasts,
+            rng=self.rng,
+            stimulator_bandwidths=self.stimulator_bandwidths,
+            stimulator_contrasts=self.stimulator_contrasts,
         )
         return trajectories
 

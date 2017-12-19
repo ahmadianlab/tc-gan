@@ -67,6 +67,17 @@ def neu_array(self, pop_array, pops=2):
                            for i in range(pops)])
 
 
+def maybe_mixin_noise(self, rng=None, kwargs={}):
+    if rng:
+        noise = self.gen_noise(rng, **kwargs)
+        if set(noise) & set(kwargs):
+            raise ValueError("keys {} and 'rng' cannot be specified"
+                             " simultaneously"
+                             .format(sorted(noise)))
+        kwargs.update(noise)
+    return kwargs
+
+
 class BandwidthContrastStimulator(BaseComponent):
     r"""
     Stimulator for varying bandwidths and contrasts.
@@ -306,19 +317,36 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     num_sites = property(lambda self: self.stimulator.num_sites)
     num_neurons = property(lambda self: self.stimulator.num_neurons)
 
+    @property
+    def _input_names(self):
+        return collect_names(['', 'stimulator_'],
+                             [self.inputs, self.stimulator.inputs])
+
     @cached_property
-    def compute_trajectories(self):
+    def compute_trajectories_impl(self):
         return theano_function(
             self.inputs + self.stimulator.inputs,
             self.all_trajectories,
         )
 
+    def compute_trajectories(self, rng=None, **kwargs):
+        kwargs = maybe_mixin_noise(self, rng, kwargs)
+        values = [kwargs.pop(k) for k in self._input_names]
+        assert not kwargs
+        return self.compute_trajectories_impl(*values)
+
     @cached_property
-    def compute_time_avg(self):
+    def compute_time_avg_impl(self):
         return theano_function(
             self.inputs + self.stimulator.inputs,
             self.time_avg,
         )
+
+    def compute_time_avg(self, rng=None, **kwargs):
+        kwargs = maybe_mixin_noise(self, rng, kwargs)
+        values = [kwargs.pop(k) for k in self._input_names]
+        assert not kwargs
+        return self.compute_time_avg_impl(*values)
 
     def get_all_params(self):
         return [self.J, self.D, self.S]
@@ -722,14 +750,7 @@ class TuningCurveGenerator(BaseComponent):
         return theano_function(self.inputs, self.outputs)
 
     def forward(self, rng=None, **kwargs):
-        if rng:
-            noise = self.gen_noise(rng)
-            if set(noise) & set(kwargs):
-                raise ValueError("keys {} and 'rng' cannot be specified"
-                                 " simultaneously"
-                                 .format(sorted(noise)))
-            kwargs.update(noise)
-
+        kwargs = maybe_mixin_noise(self, rng, kwargs)
         values = [kwargs.pop(k) for k in self._input_names]
         assert not kwargs
         return self.OutType(*self._forward(*values))

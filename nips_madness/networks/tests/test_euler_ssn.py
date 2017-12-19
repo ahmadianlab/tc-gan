@@ -73,7 +73,9 @@ def test_compare_with_ssnode(num_sites, batchsize,
 
     # time_avg.shape: (batchsize, num_tcdom, 2N)
     time_avg = model.compute_time_avg(
-        zs, stimulator_bandwidths, stimulator_contrasts)
+        zs=zs,
+        stimulator_bandwidths=stimulator_bandwidths,
+        stimulator_contrasts=stimulator_contrasts)
 
     report_allclose_tols(time_avg, ssnode_fps,
                          rtols=[1e-2, 1e-3, 5e-4, 1e-4],

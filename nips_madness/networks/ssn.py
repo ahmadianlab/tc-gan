@@ -588,18 +588,6 @@ def collect_names(prefixes, var_lists):
 
 class TuningCurveGenerator(BaseComponent):
 
-    stimulator_class = BandwidthContrastStimulator
-    model_class = EulerSSNModel
-    prober_class = FixedProber
-
-    @classmethod
-    def consume_kwargs(cls, **kwargs):
-        stimulator, rest = cls.stimulator_class.consume_kwargs(**kwargs)
-        model, rest = cls.model_class.consume_kwargs(stimulator, **rest)
-        prober, rest = cls.prober_class.consume_kwargs(model, **rest)
-        return super(TuningCurveGenerator, cls).consume_kwargs(
-            stimulator, model, prober, **rest)
-
     def __init__(self, stimulator, model, prober, batchsize):
         self.stimulator = stimulator
         self.model = model
@@ -672,21 +660,34 @@ class TuningCurveGenerator(BaseComponent):
             self._forward
 
 
-class MapCloneTuningCurveGenerator(TuningCurveGenerator):
-    model_class = MapCloneEulerSSNModel
-
-
-_tcg_classes = {
-    'default': TuningCurveGenerator,
-    'mapclone': MapCloneTuningCurveGenerator,
+_ssn_classes = {
+    ('default', 'default'): EulerSSNModel,
+    ('mapclone', 'default'): MapCloneEulerSSNModel,
 }
 """
-Mapping form ``ssn_impl`` to tuning curve generator class.
+Mapping form ``(ssn_impl, ssn_type)`` to SSN model class.
 """
 
 
-def make_tuning_curve_generator(config, *init_args, **init_kwargs):
-    config = dict(config)
-    ssn_impl = config.pop('ssn_impl', 'default')
-    cls = _tcg_classes[ssn_impl]
-    return cls.consume_config(config, *init_args, **init_kwargs)
+def emit_ssn(*args, ssn_impl='default', ssn_type='default', **kwargs):
+    cls = _ssn_classes[ssn_impl, ssn_type]
+    return cls.consume_config(kwargs, *args)
+
+
+def emit_tuning_curve_generator(
+        emit_stimulator=BandwidthContrastStimulator.consume_kwargs,
+        emit_model=emit_ssn,
+        emit_prober=FixedProber.consume_kwargs,
+        emit_tcg=TuningCurveGenerator.consume_kwargs,
+        **kwargs):
+    stimulator, kwargs = emit_stimulator(**kwargs)
+    model, kwargs = emit_model(stimulator=stimulator, **kwargs)
+    prober, kwargs = emit_prober(model=model, **kwargs)
+    return emit_tcg(stimulator, model, prober, **kwargs)
+
+
+def make_tuning_curve_generator(config, **kwargs):
+    # TODO: implement BaseComponent.consume_config as a function and
+    # use it here.
+    assert not set(config) & set(kwargs)
+    return emit_tuning_curve_generator(**dict(config, **kwargs))

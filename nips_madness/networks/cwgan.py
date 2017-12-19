@@ -15,7 +15,7 @@ from ..utils import (
 from .bptt_gan import (
     BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, GeneratorTrainer,
 )
-from .ssn import TuningCurveGenerator
+from .ssn import TuningCurveGenerator, emit_tuning_curve_generator
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -102,7 +102,6 @@ class ConditionalProber(BaseComponent):
 
 
 class ConditionalTuningCurveGenerator(TuningCurveGenerator):
-    prober_class = ConditionalProber
 
     output_shape = property(lambda self: (self.batchsize, self.num_tcdom))
     cond_shape = property(lambda self: (self.batchsize, 3))
@@ -116,26 +115,6 @@ class ConditionalTuningCurveGenerator(TuningCurveGenerator):
         ]).T  # shape: (batchsize, 3)
         conditions.name = 'conditions'
         return [self.prober.outputs[0], conditions]
-
-
-class MapCloneConditionalTuningCurveGenerator(ConditionalTuningCurveGenerator):
-    from .ssn import MapCloneEulerSSNModel as model_class
-
-
-_tcg_classes = {
-    'default': ConditionalTuningCurveGenerator,
-    'mapclone': MapCloneConditionalTuningCurveGenerator,
-}
-"""
-Mapping form ``ssn_impl`` to tuning curve generator class.
-"""
-
-
-def make_conditional_tuning_curve_generator(config, *init_args, **init_kwargs):
-    config = dict(config)
-    ssn_impl = config.pop('ssn_impl', 'default')
-    cls = _tcg_classes[ssn_impl]
-    return cls.consume_config(config, *init_args, **init_kwargs)
 
 
 class ConditionalDiscriminator(BaseComponent):
@@ -556,8 +535,7 @@ def _make_gan_from_kwargs(
         num_models, probes_per_model,
         hide_cell_type,
         **rest):
-    gen, rest = make_conditional_tuning_curve_generator(
-        rest,
+    gen, rest = emit_tuning_curve_generator(
         batchsize=num_models * probes_per_model,
         # Stimulator:
         num_tcdom=len(bandwidths),
@@ -566,7 +544,10 @@ def _make_gan_from_kwargs(
         J=J0,
         D=D0,
         S=S0,
-    )
+        # Use conditional generator:
+        emit_prober=ConditionalProber.consume_kwargs,
+        emit_tcg=ConditionalTuningCurveGenerator.consume_kwargs,
+        **rest)
     disc, rest = consume_subdict(
         (CellTypeBlindDiscriminator if hide_cell_type else
          ConditionalDiscriminator),

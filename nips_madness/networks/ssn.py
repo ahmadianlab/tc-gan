@@ -566,12 +566,16 @@ class HeteroInpuptWrapper(BaseComponent):
 
         self.Ab = theano.shared(Ab, name='Ab')
         self.Ad = theano.shared(Ad, name='Ad')
-        ab = neu_array(stimulator, Ab).reshape((1, -1))
-        ad = neu_array(stimulator, Ad).reshape((1, -1))
 
-        # self.zs.shape: (batchsize, num_neurons)
+        # self.zs_in.shape: (batchsize, num_neurons)
         self.zs_in = theano.tensor.matrix('zs_in')
-        self.amplification = amp = ab + ad * self.zs_in
+
+        # self.amplification, ab, ad, zs: arrays broadcastable to:
+        #     (batchsize, num_tcdom, num_neurons)
+        ab = neu_array(stimulator, Ab).reshape((1, 1, -1))
+        ad = neu_array(stimulator, Ad).reshape((1, 1, -1))
+        zs = self.zs_in.reshape((self.zs_in.shape[0], 1, self.zs_in.shape[1]))
+        self.amplification = amp = ab + ad * zs
 
         self.stimulus = amp * self.stimulator.stimulus
 

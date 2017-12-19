@@ -309,14 +309,14 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     @cached_property
     def compute_trajectories(self):
         return theano_function(
-            (self.zs,) + self.stimulator.inputs,
+            self.inputs + self.stimulator.inputs,
             self.all_trajectories,
         )
 
     @cached_property
     def compute_time_avg(self):
         return theano_function(
-            (self.zs,) + self.stimulator.inputs,
+            self.inputs + self.stimulator.inputs,
             self.time_avg,
         )
 
@@ -474,6 +474,7 @@ class EulerSSNModel(AbstractEulerSSNModel):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+        self.include_time_avg = include_time_avg
 
         num_neurons = self.stimulator.num_neurons
         # self.zs.shape: (batchsize, num_neurons, num_neurons)
@@ -495,11 +496,16 @@ class EulerSSNModel(AbstractEulerSSNModel):
         self.dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
         self.dynamics_penalty.name = 'dynamics_penalty'
 
-        self.inputs = (self.zs,)
-        if include_time_avg:
-            self.outputs = (self.dynamics_penalty, self.time_avg)
+    @property
+    def inputs(self):
+        return (self.zs,)
+
+    @property
+    def outputs(self):
+        if self.include_time_avg:
+            return (self.dynamics_penalty, self.time_avg)
         else:
-            self.outputs = (self.dynamics_penalty,)
+            return (self.dynamics_penalty,)
 
     @property
     def all_trajectories(self):
@@ -560,6 +566,10 @@ class HeteroInEulerSSNModel(EulerSSNModel):
         return super(HeteroInEulerSSNModel, cls).consume_kwargs(
             stimulator=stimulator,
             **kwargs)
+
+    @property
+    def inputs(self):
+        return (self.zs, self.stimulator.zs_in)
 
     def get_all_params(self):
         params = super(HeteroInEulerSSNModel, self).get_all_params()

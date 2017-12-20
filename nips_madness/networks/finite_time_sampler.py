@@ -2,14 +2,13 @@ import numpy as np
 
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from .wgan import DEFAULT_PARAMS, grid_stimulator_inputs
-from .ssn import make_tuning_curve_generator, HeteroInputWrapper
+from .ssn import make_tuning_curve_generator
 from .tests import test_euler_ssn
 from .utils import largerrecursionlimit
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
     V=0.1,
-    dist_in=HeteroInputWrapper.dist_in_choices[0],
     seed=0,
     **test_euler_ssn.JDS
 )
@@ -94,7 +93,7 @@ class FiniteTimeTuningCurveSampler(object):
 
 
 def add_arguments(parser, exclude=()):
-    from .ssn import ssn_impl_choices, ssn_type_choices
+    from .ssn import ssn_impl_choices, ssn_type_choices, HeteroInputWrapper
 
     parser.add_argument(
         '--ssn-impl', default=ssn_impl_choices[0], choices=ssn_impl_choices,
@@ -102,6 +101,12 @@ def add_arguments(parser, exclude=()):
     parser.add_argument(
         '--ssn-type', default=ssn_type_choices[0], choices=ssn_type_choices,
         help="SSN type.")
+    parser.add_argument(
+        '--dist-in',
+        default=HeteroInputWrapper.dist_in_choices[0],
+        choices=HeteroInputWrapper.dist_in_choices,
+        help='''Input heterogeneity distribution type. Relevant only
+        when --ssn-type=heteroin''')
 
     for key in sorted(DEFAULT_PARAMS):
         if key in exclude:

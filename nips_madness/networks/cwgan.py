@@ -12,7 +12,7 @@ from ..utils import (
     cached_property, cartesian_product, theano_function, StopWatch,
     as_randomstate,
 )
-from .bptt_gan import (
+from .wgan import (
     BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, emit_generator_trainer,
 )
 from .ssn import TuningCurveGenerator, make_tuning_curve_generator

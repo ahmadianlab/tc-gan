@@ -10,7 +10,7 @@ from . import gan as plain_gan
 from .. import ssnode
 from .. import utils
 from ..drivers import BPTTWGANDriver
-from ..networks.bptt_gan import make_gan, DEFAULT_PARAMS
+from ..networks.wgan import make_gan, DEFAULT_PARAMS
 
 logger = getLogger(__name__)
 

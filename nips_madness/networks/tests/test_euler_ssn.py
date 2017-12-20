@@ -4,7 +4,7 @@ import pytest
 
 from ... import ssnode
 from ...utils import report_allclose_tols
-from ..bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
+from ..wgan import DEFAULT_PARAMS, grid_stimulator_inputs
 from ..ssn import BandwidthContrastStimulator, EulerSSNModel
 
 

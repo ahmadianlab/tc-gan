@@ -10,7 +10,7 @@ from ..utils import (
     cached_property, StopWatch,
     theano_function, log_timing, asarray,
 )
-from .bptt_gan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
+from .wgan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
 from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 

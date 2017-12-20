@@ -2,7 +2,7 @@ import numpy as np
 
 from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
-from .bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
+from .wgan import DEFAULT_PARAMS, grid_stimulator_inputs
 from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 

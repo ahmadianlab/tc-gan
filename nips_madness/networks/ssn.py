@@ -583,7 +583,7 @@ class EulerSSNModel(AbstractEulerSSNModel):
         return self.trajectories.swapaxes(1, 2)
 
 
-class HeteroInpuptWrapper(BaseComponent):
+class HeteroInputWrapper(BaseComponent):
     """
     Stimulator wrapper.
     """
@@ -630,7 +630,7 @@ class HeteroInpuptWrapper(BaseComponent):
     def __getattr__(self, name):
         """ Trun ``self.XXX`` into ``self.stimulator.XXX``. """
         try:
-            super(HeteroInpuptWrapper, self).__getattr__(name)
+            super(HeteroInputWrapper, self).__getattr__(name)
         except AttributeError:
             return getattr(self.stimulator, name)
 
@@ -640,7 +640,7 @@ class HeteroInEulerSSNModel(EulerSSNModel):
     SSN with heterogeneous (random) input.
     """
 
-    input_wrapper_class = HeteroInpuptWrapper
+    input_wrapper_class = HeteroInputWrapper
 
     @classmethod
     def consume_kwargs(cls, stimulator, **kwargs):

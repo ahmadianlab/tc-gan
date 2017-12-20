@@ -2,14 +2,14 @@ import numpy as np
 
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from .wgan import DEFAULT_PARAMS, grid_stimulator_inputs
-from .ssn import make_tuning_curve_generator, HeteroInpuptWrapper
+from .ssn import make_tuning_curve_generator, HeteroInputWrapper
 from .tests import test_euler_ssn
 from .utils import largerrecursionlimit
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
     V=0.1,
-    dist_in=HeteroInpuptWrapper.dist_in_choices[0],
+    dist_in=HeteroInputWrapper.dist_in_choices[0],
     seed=0,
     **test_euler_ssn.JDS
 )

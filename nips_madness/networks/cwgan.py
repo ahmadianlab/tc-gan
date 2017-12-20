@@ -13,7 +13,7 @@ from ..utils import (
     as_randomstate,
 )
 from .bptt_gan import (
-    BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, GeneratorTrainer,
+    BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, emit_generator_trainer,
 )
 from .ssn import TuningCurveGenerator, emit_tuning_curve_generator
 
@@ -545,7 +545,7 @@ def _make_gan_from_kwargs(
         loss_type='WD',
     )
     gen_trainer, rest = consume_subdict(
-        GeneratorTrainer.consume_kwargs, 'gen', rest,
+        emit_generator_trainer, 'gen', rest,
         gen, disc,
     )
     disc_trainer, rest = consume_subdict(

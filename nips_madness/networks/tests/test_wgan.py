@@ -29,7 +29,7 @@ TEST_PARAMS = dict(
 )
 
 
-def make_gan(**kwargs):
+def emit_gan(**kwargs):
     config = dict(
         TEST_PARAMS,
         **kwargs)
@@ -37,7 +37,7 @@ def make_gan(**kwargs):
 
 
 def test_wgan_heteroin():
-    gan, _rest = make_gan(ssn_type='heteroin')
+    gan, _rest = emit_gan(ssn_type='heteroin')
     # Those attributes must exist:
     gan.gen.model.stimulator.V
     gan.gen_trainer.V_min

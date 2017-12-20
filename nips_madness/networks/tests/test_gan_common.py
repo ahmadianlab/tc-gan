@@ -4,8 +4,8 @@ from . import test_wgan
 from . import test_cwgan
 
 factory = dict(
-    wgan=test_wgan.make_gan,
-    cwgan=test_cwgan.make_gan,
+    wgan=test_wgan.emit_gan,
+    cwgan=test_cwgan.emit_gan,
 )
 
 

@@ -4,7 +4,7 @@ import numpy as np
 import theano
 
 from ..cwgan import ConditionalProber
-from .test_cwgan import make_gan
+from .test_cwgan import emit_gan
 
 
 def mock_model():
@@ -32,7 +32,7 @@ def test_conditional_probes():
 
 
 def test_conditional_probes_compare_with_sample_sites():
-    gan, _ = make_gan()
+    gan, _ = emit_gan()
     norm_probes = gan.norm_probes
     cell_types = np.zeros_like(norm_probes)
     probes = gan.gen.prober.eval.probes(

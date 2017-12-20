@@ -7,7 +7,7 @@ from ... import ssnode
 from ...core import BaseComponent, consume_config
 from ...utils import report_allclose_tols
 from ..cwgan import RandomChoiceSampler
-from .test_cwgan import make_gan
+from .test_cwgan import emit_gan
 from .test_euler_ssn import JDS
 
 
@@ -146,7 +146,7 @@ def test_compare_with_sample_tuning_curves(
         truth_size, probes_per_model, norm_probes,
         include_inhibitory_neurons,
         seqlen=4000, rtol=5e-4, atol=5e-4):
-    gan, rest = make_gan(
+    gan, rest = emit_gan(
         J0=JDS['J'],
         D0=JDS['D'],
         S0=JDS['S'],

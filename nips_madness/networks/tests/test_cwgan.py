@@ -4,7 +4,7 @@ from .. import cwgan
 from .test_wgan import TEST_PARAMS
 
 
-def make_gan(norm_probes=[0],
+def emit_gan(norm_probes=[0],
              **kwargs):
     config = dict(
         TEST_PARAMS,
@@ -34,7 +34,7 @@ def fake_data(gan, truth_size):
     dict(ssn_type='heteroin'),
 ])
 def test_smoke_cgan(config):
-    gan, rest = make_gan(**config)
+    gan, rest = emit_gan(**config)
     data = fake_data(gan, rest['truth_size'])
     gan.set_dataset(data)
     learning_it = gan.learning()
@@ -47,12 +47,12 @@ def test_smoke_cgan(config):
 
 
 def test_hide_cell_type():
-    gan, _rest = make_gan(hide_cell_type=True)
+    gan, _rest = emit_gan(hide_cell_type=True)
     assert isinstance(gan.disc, cwgan.CellTypeBlindDiscriminator)
 
 
 def test_cwgan_heteroin():
-    gan, _rest = make_gan(ssn_type='heteroin')
+    gan, _rest = emit_gan(ssn_type='heteroin')
     # Those attributes must exist:
     gan.gen.model.stimulator.V
     gan.gen_trainer.V_min

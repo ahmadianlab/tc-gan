@@ -215,8 +215,8 @@ class HeteroInGeneratorTrainer(GeneratorTrainer):
 
     def __init__(self, gen, disc, dynamics_cost,
                  J_min, J_max, D_min, D_max, S_min, S_max,
-                 Ab_min, Ab_max, Ad_min, Ad_max,
-                 updater):
+                 updater,
+                 Ab_min=0, Ab_max=1, Ad_min=0, Ad_max=1):
         self.target = self.gen = gen
         self.disc = disc
         self.dynamics_cost = dynamics_cost

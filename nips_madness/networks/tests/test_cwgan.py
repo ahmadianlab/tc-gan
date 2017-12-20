@@ -49,6 +49,7 @@ def fake_data(gan, truth_size):
 @pytest.mark.parametrize('config', [
     {},
     dict(hide_cell_type=True),
+    dict(ssn_type='heteroin'),
 ])
 def test_smoke_cgan(config):
     gan, rest = make_gan(**config)
@@ -66,3 +67,14 @@ def test_smoke_cgan(config):
 def test_hide_cell_type():
     gan, _rest = make_gan(hide_cell_type=True)
     assert isinstance(gan.disc, cwgan.CellTypeBlindDiscriminator)
+
+
+def test_cwgan_heteroin():
+    gan, _rest = make_gan(ssn_type='heteroin')
+    # Those attributes must exist:
+    gan.gen.model.stimulator.Ab
+    gan.gen.model.stimulator.Ad
+    gan.gen_trainer.Ab_min
+    gan.gen_trainer.Ab_max
+    gan.gen_trainer.Ad_min
+    gan.gen_trainer.Ad_max

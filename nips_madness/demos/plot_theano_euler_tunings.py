@@ -21,6 +21,7 @@ def plot_theano_euler_tunings(**sampler_config):
 
 def main(args=None):
     import argparse
+    from ..networks.finite_time_sampler import add_arguments
 
     class CustomFormatter(argparse.RawDescriptionHelpFormatter,
                           argparse.ArgumentDefaultsHelpFormatter):
@@ -28,7 +29,8 @@ def main(args=None):
     parser = argparse.ArgumentParser(
         formatter_class=CustomFormatter,
         description=__doc__)
-    parser.add_argument('--batchsize', default=10, type=int)
+    add_arguments(parser)
+    parser.set_defaults(batchsize=10)
     ns = parser.parse_args(args)
     plot_theano_euler_tunings(**vars(ns))
 

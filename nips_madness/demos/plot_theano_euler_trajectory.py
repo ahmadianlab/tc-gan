@@ -2,7 +2,6 @@ from matplotlib import pyplot
 
 from ..utils import log_timing
 from ..networks.finite_time_sampler import FiniteTimeTuningCurveSampler
-from ..networks.ssn import ssn_impl_choices, ssn_type_choices
 
 
 def plot_trajectory(trajectories, sampler):
@@ -48,7 +47,7 @@ def plot_theano_euler_trajectory(**sampler_config):
 
 def main(args=None):
     import argparse
-    from ..networks.finite_time_sampler import DEFAULT_PARAMS
+    from ..networks.finite_time_sampler import add_arguments
 
     class CustomFormatter(argparse.RawDescriptionHelpFormatter,
                           argparse.ArgumentDefaultsHelpFormatter):
@@ -57,22 +56,7 @@ def main(args=None):
         formatter_class=CustomFormatter,
         description=__doc__)
 
-    parser.add_argument(
-        '--ssn-impl', default=ssn_impl_choices[0], choices=ssn_impl_choices,
-        help="SSN implementation.")
-    parser.add_argument(
-        '--ssn-type', default=ssn_type_choices[0], choices=ssn_type_choices,
-        help="SSN type.")
-
-    for key in sorted(DEFAULT_PARAMS):
-        val = DEFAULT_PARAMS[key]
-        if isinstance(val, (str, float, int)):
-            argtype = type(val)
-        else:
-            argtype = eval
-        parser.add_argument(
-            '--{}'.format(key), type=argtype, default=val,
-            help='for SSN')
+    add_arguments(parser, exclude=['batchsize'])
 
     ns = parser.parse_args(args)
     plot_theano_euler_trajectory(**vars(ns))

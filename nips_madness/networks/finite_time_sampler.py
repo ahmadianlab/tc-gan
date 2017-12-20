@@ -6,21 +6,21 @@ from .wgan import DEFAULT_PARAMS, grid_stimulator_inputs
 from .ssn import make_tuning_curve_generator
 from .utils import largerrecursionlimit
 
+DEFAULT_PARAMS = dict(
+    DEFAULT_PARAMS,
+    J=ssnode.DEFAULT_PARAMS['J'],
+    D=ssnode.DEFAULT_PARAMS['D'],
+    S=ssnode.DEFAULT_PARAMS['S'],
+    V=0.1,
+    seed=0,
+)
+
 
 class FiniteTimeTuningCurveSampler(object):
 
     @classmethod
     def from_dict(cls, dct):
-        default = dict(
-            DEFAULT_PARAMS,
-            J=ssnode.DEFAULT_PARAMS['J'],
-            D=ssnode.DEFAULT_PARAMS['D'],
-            S=ssnode.DEFAULT_PARAMS['S'],
-            V=0.1,
-            seed=0,
-        )
-
-        self, rest = cls.consume_kwargs(**dict(default, **dct))
+        self, rest = cls.consume_kwargs(**dict(DEFAULT_PARAMS, **dct))
         assert not rest
         return self
 
@@ -92,3 +92,27 @@ class FiniteTimeTuningCurveSampler(object):
         with largerrecursionlimit(self.gen.model.unroll_scan,
                                   self.gen.model.seqlen):
             self.gen.prepare()
+
+
+def add_arguments(parser, exclude=()):
+    from .ssn import ssn_impl_choices, ssn_type_choices
+
+    parser.add_argument(
+        '--ssn-impl', default=ssn_impl_choices[0], choices=ssn_impl_choices,
+        help="SSN implementation.")
+    parser.add_argument(
+        '--ssn-type', default=ssn_type_choices[0], choices=ssn_type_choices,
+        help="SSN type.")
+
+    for key in sorted(DEFAULT_PARAMS):
+        if key in exclude:
+            continue
+
+        val = DEFAULT_PARAMS[key]
+        if isinstance(val, (str, float, int)):
+            argtype = type(val)
+        else:
+            argtype = eval
+        parser.add_argument(
+            '--{}'.format(key), type=argtype, default=val,
+            help='SSN parameter')

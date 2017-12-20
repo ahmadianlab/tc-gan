@@ -15,7 +15,7 @@ from ..utils import (
 from .bptt_gan import (
     BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, emit_generator_trainer,
 )
-from .ssn import TuningCurveGenerator, emit_tuning_curve_generator
+from .ssn import TuningCurveGenerator, make_tuning_curve_generator
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -522,7 +522,8 @@ def _make_gan_from_kwargs(
         hide_cell_type,
         consume_union=True,
         **rest):
-    gen, rest = emit_tuning_curve_generator(
+    gen, rest = make_tuning_curve_generator(
+        rest,
         consume_union=consume_union,
         batchsize=num_models * probes_per_model,
         # Stimulator:
@@ -535,7 +536,7 @@ def _make_gan_from_kwargs(
         # Use conditional generator:
         emit_prober=ConditionalProber.consume_kwargs,
         emit_tcg=ConditionalTuningCurveGenerator.consume_kwargs,
-        **rest)
+    )
     disc, rest = consume_subdict(
         (CellTypeBlindDiscriminator if hide_cell_type else
          ConditionalDiscriminator).consume_kwargs,

@@ -8,7 +8,7 @@ from .utils import largerrecursionlimit
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
-    V=0.1,
+    V=[0.3, 0],
     seed=0,
     **test_euler_ssn.JDS
 )

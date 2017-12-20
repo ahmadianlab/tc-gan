@@ -16,6 +16,7 @@ class FiniteTimeTuningCurveSampler(object):
             J=ssnode.DEFAULT_PARAMS['J'],
             D=ssnode.DEFAULT_PARAMS['D'],
             S=ssnode.DEFAULT_PARAMS['S'],
+            V=0.1,
             seed=0,
         )
 

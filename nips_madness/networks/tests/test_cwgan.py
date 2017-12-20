@@ -72,9 +72,6 @@ def test_hide_cell_type():
 def test_cwgan_heteroin():
     gan, _rest = make_gan(ssn_type='heteroin')
     # Those attributes must exist:
-    gan.gen.model.stimulator.Ab
-    gan.gen.model.stimulator.Ad
-    gan.gen_trainer.Ab_min
-    gan.gen_trainer.Ab_max
-    gan.gen_trainer.Ad_min
-    gan.gen_trainer.Ad_max
+    gan.gen.model.stimulator.V
+    gan.gen_trainer.V_min
+    gan.gen_trainer.V_max

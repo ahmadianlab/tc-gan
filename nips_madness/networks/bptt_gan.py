@@ -54,8 +54,6 @@ DEFAULT_PARAMS = dict(
     seqlen=1200,
     batchsize=1,
     skip_steps=1000,
-    Ab=[1, 1],
-    Ad=[0, 0],
 )
 
 
@@ -216,7 +214,7 @@ class HeteroInGeneratorTrainer(GeneratorTrainer):
     def __init__(self, gen, disc, dynamics_cost,
                  J_min, J_max, D_min, D_max, S_min, S_max,
                  updater,
-                 Ab_min=0, Ab_max=1, Ad_min=0, Ad_max=1):
+                 V_min=0, V_max=1):
         self.target = self.gen = gen
         self.disc = disc
         self.dynamics_cost = dynamics_cost
@@ -226,16 +224,14 @@ class HeteroInGeneratorTrainer(GeneratorTrainer):
         self.D_max = D_max
         self.S_min = S_min
         self.S_max = S_max
-        self.Ab_min = Ab_min
-        self.Ab_max = Ab_max
-        self.Ad_min = Ad_min
-        self.Ad_max = Ad_max
+        self.V_min = V_min
+        self.V_max = V_max
         self.updater = updater
         self.post_init()
 
 
 def emit_generator_trainer(gen, *args, **kwargs):
-    if hasattr(gen.model.stimulator, 'Ab'):
+    if hasattr(gen.model.stimulator, 'V'):
         trainer_class = HeteroInGeneratorTrainer
     else:
         trainer_class = GeneratorTrainer
@@ -393,6 +389,8 @@ def _make_gan_from_kwargs(
     probes = sample_sites_from_stim_space(sample_sites, num_sites)
     if include_inhibitory_neurons:
         probes.extend(np.array(probes) + num_sites)
+    if 'V0' in rest:
+        rest['V'] = rest.pop('V0')
     gen, rest = make_tuning_curve_generator(
         rest,
         consume_union=consume_union,
@@ -420,7 +418,7 @@ def _make_gan_from_kwargs(
         disc,
     )
     if consume_union:
-        for key in ['Ab_min', 'Ab_max', 'Ad_min', 'Ad_max']:
+        for key in ['V_min', 'V_max']:
             rest.pop(key, None)
     return BPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,

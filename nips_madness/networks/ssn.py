@@ -562,36 +562,32 @@ class HeteroInpuptWrapper(BaseComponent):
     Stimulator wrapper.
     """
 
-    def __init__(self, stimulator, Ab, Ad):
+    def __init__(self, stimulator, V=0):
         self.stimulator = stimulator
 
-        Ab = np.asarray(Ab, dtype=theano.config.floatX)
-        Ad = np.asarray(Ad, dtype=theano.config.floatX)
-        assert Ab.shape == Ad.shape == (2,)
-
-        self.Ab = theano.shared(Ab, name='Ab')
-        self.Ad = theano.shared(Ad, name='Ad')
+        V = np.asarray(V, dtype=theano.config.floatX)
+        V = np.broadcast_to(V, 2)
+        self.V = theano.shared(V, name='V')
 
         # self.zs_in.shape: (batchsize, num_neurons)
         self.zs_in = theano.tensor.matrix('zs_in')
 
-        # self.amplification, ab, ad, zs: arrays broadcastable to:
+        # self.amplification, vs, zs: arrays broadcastable to:
         #     (batchsize, num_tcdom, num_neurons)
-        ab = neu_array(stimulator, Ab).reshape((1, 1, -1))
-        ad = neu_array(stimulator, Ad).reshape((1, 1, -1))
+        vs = neu_array(stimulator, self.V).reshape((1, 1, -1))
         zs = self.zs_in.reshape((self.zs_in.shape[0], 1, self.zs_in.shape[1]))
-        self.amplification = amp = ab + ad * zs
+        self.amplification = amp = 1 + vs * zs
 
         self.stimulus = amp * self.stimulator.stimulus
 
     def get_all_params(self):
-        return [self.Ab, self.Ad]
+        return [self.V]
 
     def gen_noise(self, rng, stimulator_bandwidths, **_):
         batchsize, _num_tcdom = stimulator_bandwidths.shape
         num_neurons = self.num_neurons
         return dict(
-            zs_in=rng.rand(batchsize, num_neurons),
+            zs_in=rng.rand(batchsize, num_neurons) * 2 - 1,
         )
 
     def __getattr__(self, name):
@@ -831,7 +827,7 @@ def emit_tuning_curve_generator(
     prober, kwargs = emit_prober(model=model, **kwargs)
     tgc, kwargs = emit_tcg(stimulator, model, prober, **kwargs)
     if consume_union:
-        for key in ['Ab', 'Ad']:
+        for key in ['V']:
             kwargs.pop(key, None)
     return tgc, kwargs
 

@@ -522,6 +522,8 @@ def _make_gan_from_kwargs(
         hide_cell_type,
         consume_union=True,
         **rest):
+    if 'V0' in rest:
+        rest['V'] = rest.pop('V0')
     gen, rest = make_tuning_curve_generator(
         rest,
         consume_union=consume_union,
@@ -554,7 +556,7 @@ def _make_gan_from_kwargs(
         disc,
     )
     if consume_union:
-        for key in ['Ab_min', 'Ab_max', 'Ad_min', 'Ad_max']:
+        for key in ['V_min', 'V_max']:
             rest.pop(key, None)
     return ConditionalBPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,

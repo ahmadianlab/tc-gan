@@ -63,7 +63,7 @@ def neu_array(self, pop_array, pops=2):
     pop_array = asarray(pop_array)
     xp = get_array_module(pop_array)
     num_sites = self.num_sites
-    return xp.concatenate([xp.broadcast_to(pop_array[i], (num_sites,))
+    return xp.concatenate([xp.tile(pop_array[i], num_sites)
                            for i in range(pops)])
 
 
@@ -613,6 +613,12 @@ class HeteroInEulerSSNModel(EulerSSNModel):
         return super(HeteroInEulerSSNModel, cls).consume_kwargs(
             stimulator=stimulator,
             **kwargs)
+
+    def _setup_layers(self, *args, **kwargs):
+        super(HeteroInEulerSSNModel, self)._setup_layers(*args, **kwargs)
+
+        # TODO: Calling add_param in _setup_layers is a hack. Fix it.
+        self.l_ssn.add_param(self.stimulator.V, (2,), name='V')
 
     @property
     def inputs(self):

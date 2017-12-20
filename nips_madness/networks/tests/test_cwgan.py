@@ -1,42 +1,24 @@
-import numpy as np
 import pytest
 
 from .. import cwgan
+from .test_wgan import TEST_PARAMS
 
 
 def make_gan(norm_probes=[0],
-             include_inhibitory_neurons=True,
              **kwargs):
-    probes_per_model = len(norm_probes)
-    if include_inhibitory_neurons:
-        probes_per_model *= 2
-    kwargs.setdefault('probes_per_model', probes_per_model)
-
-    return cwgan.make_gan(dict(dict(
-        J0=np.ones((2, 2)) * 0.01,
-        D0=np.ones((2, 2)) * 0.01,
-        S0=np.ones((2, 2)) * 0.01,
-        gen=dict(
-            J_min=1e-3,
-            J_max=10,
-            D_min=1e-3,
-            D_max=10,
-            S_min=1e-3,
-            S_max=10,
-            dynamics_cost=1,
-        ),
-        disc=dict(
-            layers=[],
-            normalization='none',
-            nonlinearity='rectify',
-        ),
-        critic_iters_init=1,
-        critic_iters=1,
+    config = dict(
+        TEST_PARAMS,
         norm_probes=norm_probes,
-        include_inhibitory_neurons=include_inhibitory_neurons,
-        lipschitz_cost=10,
-        truth_size=1,
-    ), **kwargs))
+        **kwargs)
+    del kwargs
+    include_inhibitory_neurons = config['include_inhibitory_neurons']
+    if 'probes_per_model' not in config:
+        probes_per_model = len(norm_probes)
+        if include_inhibitory_neurons:
+            probes_per_model *= 2
+        config['probes_per_model'] = probes_per_model
+
+    return cwgan.make_gan(config)
 
 
 def fake_data(gan, truth_size):

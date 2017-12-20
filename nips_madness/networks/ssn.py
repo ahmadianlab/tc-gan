@@ -824,7 +824,7 @@ def emit_tuning_curve_generator(
         emit_model=emit_ssn,
         emit_prober=FixedProber.consume_kwargs,
         emit_tcg=TuningCurveGenerator.consume_kwargs,
-        consume_union=True,    # TODO: flip it to True
+        consume_union=True,    # TODO: flip it
         **kwargs):
     stimulator, kwargs = emit_stimulator(**kwargs)
     model, kwargs = emit_model(stimulator=stimulator, **kwargs)

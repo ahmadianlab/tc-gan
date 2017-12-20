@@ -145,6 +145,9 @@ class BandwidthContrastStimulator(BaseComponent):
 
     num_neurons = property(lambda self: self.num_sites * 2)
 
+    def get_all_params(self):
+        return []
+
 
 class AbstractEulerSSNCore(BaseComponent, abc.ABC):
 
@@ -202,6 +205,10 @@ class AbstractEulerSSNCore(BaseComponent, abc.ABC):
         See also: `lasagne.layers.Layer.get_output_for`
         """
 
+    def get_all_params(self):
+        params = self.stimulator.get_all_params()
+        return params + [self.J, self.D, self.S]
+
 
 class MapCloneEulerSSNCore(AbstractEulerSSNCore):
 
@@ -250,9 +257,9 @@ class EulerSSNLayer(lasagne.layers.Layer):
 
         super(EulerSSNLayer, self).__init__(incoming, **kwargs)
 
-        self.add_param(self.ssn.J, (2, 2), name='J')
-        self.add_param(self.ssn.D, (2, 2), name='D')
-        self.add_param(self.ssn.S, (2, 2), name='S')
+        for param in ssn.get_all_params():
+            shape = param.get_value().shape
+            self.add_param(param, shape)
 
     def get_output_for(self, input, **kwargs):
         return self.ssn.get_output_for(input, **kwargs)
@@ -312,6 +319,7 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     J = property(lambda self: self.l_ssn.ssn.J)
     D = property(lambda self: self.l_ssn.ssn.D)
     S = property(lambda self: self.l_ssn.ssn.S)
+    get_all_params = property(lambda self: self.l_ssn.ssn.get_all_params)
 
     num_tcdom = property(lambda self: self.stimulator.num_tcdom)
     num_sites = property(lambda self: self.stimulator.num_sites)
@@ -347,9 +355,6 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
         values = [kwargs.pop(k) for k in self._input_names]
         assert not kwargs
         return self.compute_time_avg_impl(*values)
-
-    def get_all_params(self):
-        return [self.J, self.D, self.S]
 
     def gen_noise(self, rng, stimulator_bandwidths, **_):
         batchsize, _num_tcdom = stimulator_bandwidths.shape
@@ -581,7 +586,8 @@ class HeteroInpuptWrapper(BaseComponent):
         self.stimulus = amp * self.stimulator.stimulus
 
     def get_all_params(self):
-        return [self.V]
+        params = self.stimulator.get_all_params()
+        return params + [self.V]
 
     def gen_noise(self, rng, stimulator_bandwidths, **_):
         batchsize, _num_tcdom = stimulator_bandwidths.shape
@@ -614,19 +620,9 @@ class HeteroInEulerSSNModel(EulerSSNModel):
             stimulator=stimulator,
             **kwargs)
 
-    def _setup_layers(self, *args, **kwargs):
-        super(HeteroInEulerSSNModel, self)._setup_layers(*args, **kwargs)
-
-        # TODO: Calling add_param in _setup_layers is a hack. Fix it.
-        self.l_ssn.add_param(self.stimulator.V, (2,), name='V')
-
     @property
     def inputs(self):
         return (self.zs, self.stimulator.zs_in)
-
-    def get_all_params(self):
-        params = super(HeteroInEulerSSNModel, self).get_all_params()
-        return params + self.stimulator.get_all_params()
 
     def gen_noise(self, rng, **kwargs):
         noise = super(HeteroInEulerSSNModel, self).gen_noise(rng, **kwargs)

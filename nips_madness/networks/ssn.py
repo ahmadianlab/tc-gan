@@ -122,9 +122,11 @@ class BandwidthContrastStimulator(BaseComponent):
         Number of points in :term:`tuning curve domain` (TC dom).
 
     bandwidths : theano.vector.matrix
+        shape: ``(batchsize, num_tcdom)``;
         :math:`s` in :eq:`BandwidthContrastStimulator-input`
 
     contrasts : theano.vector.matrix
+        shape: ``(batchsize, num_tcdom)``;
         :math:`A` in :eq:`BandwidthContrastStimulator-input`
 
     smoothness : float
@@ -148,6 +150,8 @@ class BandwidthContrastStimulator(BaseComponent):
             from theano.tensor import exp
             return 1 / (1 + exp(-x / smoothness))
 
+        # x, b, c stim: arrays broadcastable to:
+        #     (batchsize, num_tcdom, num_sites)
         x = self.site_to_band.reshape((1, 1, -1))
         b = theano.tensor.shape_padright(self.bandwidths)
         c = theano.tensor.shape_padright(self.contrasts)

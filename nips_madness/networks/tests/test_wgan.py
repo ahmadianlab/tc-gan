@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from .. import wgan
 
@@ -34,6 +35,29 @@ def emit_gan(**kwargs):
         TEST_PARAMS,
         **kwargs)
     return wgan.make_gan(config)
+
+
+def fake_data(gan, truth_size):
+    ncols = len(gan.bandwidths) * len(gan.contrasts) * len(gan.sample_sites)
+    if gan.include_inhibitory_neurons:
+        ncols *= 2
+    return gan.rng.randn(truth_size, ncols)
+
+
+@pytest.mark.parametrize('config', [
+    dict(ssn_type='heteroin'),
+])
+def test_smoke_wgan(config):
+    gan, rest = emit_gan(**config)
+    data = fake_data(gan, rest['truth_size'])
+    gan.set_dataset(data)
+    learning_it = gan.learning()
+
+    info = next(learning_it)
+    assert info.is_discriminator
+
+    info = next(learning_it)
+    assert not info.is_discriminator
 
 
 def test_wgan_heteroin():

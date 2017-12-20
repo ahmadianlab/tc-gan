@@ -588,8 +588,13 @@ class HeteroInpuptWrapper(BaseComponent):
     Stimulator wrapper.
     """
 
-    def __init__(self, stimulator, V=0):
+    dist_in_choices = ('bernoulli', 'uniform')
+
+    def __init__(self, stimulator, V=0, dist_in=dist_in_choices[0]):
         self.stimulator = stimulator
+
+        self.dist_in = dist_in
+        assert dist_in in self.dist_in_choices
 
         V = np.asarray(V, dtype=theano.config.floatX)
         V = np.broadcast_to(V, 2)
@@ -613,9 +618,14 @@ class HeteroInpuptWrapper(BaseComponent):
     def gen_noise(self, rng, stimulator_bandwidths, **_):
         batchsize, _num_tcdom = stimulator_bandwidths.shape
         num_neurons = self.num_neurons
-        return dict(
-            zs_in=rng.rand(batchsize, num_neurons) * 2 - 1,
-        )
+        shape = (batchsize, num_neurons)
+        if self.dist_in == 'bernoulli':
+            zs_in = rng.choice(2, shape) * 2 - 1
+        elif self.dist_in == 'uniform':
+            zs_in = rng.rand(*shape) * 2 - 1
+        else:
+            raise ValueError('Unknown dist_in: {}'.format(self.dist_in))
+        return dict(zs_in=zs_in)
 
     def __getattr__(self, name):
         """ Trun ``self.XXX`` into ``self.stimulator.XXX``. """
@@ -850,7 +860,7 @@ def emit_tuning_curve_generator(
     prober, kwargs = emit_prober(model=model, **kwargs)
     tgc, kwargs = emit_tcg(stimulator, model, prober, **kwargs)
     if consume_union:
-        for key in ['V']:
+        for key in ['V', 'dist_in']:
             kwargs.pop(key, None)
     return tgc, kwargs
 

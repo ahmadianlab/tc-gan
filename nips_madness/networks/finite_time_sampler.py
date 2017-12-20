@@ -1,18 +1,16 @@
 import numpy as np
 
-from .. import ssnode
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from .wgan import DEFAULT_PARAMS, grid_stimulator_inputs
 from .ssn import make_tuning_curve_generator
+from .tests import test_euler_ssn
 from .utils import largerrecursionlimit
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
-    J=ssnode.DEFAULT_PARAMS['J'],
-    D=ssnode.DEFAULT_PARAMS['D'],
-    S=ssnode.DEFAULT_PARAMS['S'],
     V=0.1,
     seed=0,
+    **test_euler_ssn.JDS
 )
 
 

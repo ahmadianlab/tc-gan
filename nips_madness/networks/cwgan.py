@@ -520,8 +520,10 @@ def _make_gan_from_kwargs(
         J0, S0, D0, num_sites, bandwidths, contrasts,
         num_models, probes_per_model,
         hide_cell_type,
+        consume_union=True,
         **rest):
     gen, rest = emit_tuning_curve_generator(
+        consume_union=consume_union,
         batchsize=num_models * probes_per_model,
         # Stimulator:
         num_tcdom=len(bandwidths),
@@ -550,6 +552,9 @@ def _make_gan_from_kwargs(
         ConditionalCriticTrainer.consume_kwargs, 'disc', rest,
         disc,
     )
+    if consume_union:
+        for key in ['Ab_min', 'Ab_max', 'Ad_min', 'Ad_max']:
+            rest.pop(key, None)
     return ConditionalBPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
         num_models=num_models, probes_per_model=probes_per_model,

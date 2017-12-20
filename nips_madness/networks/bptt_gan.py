@@ -388,12 +388,14 @@ def make_gan(config):
 def _make_gan_from_kwargs(
         J0, S0, D0, num_sites, bandwidths, contrasts, sample_sites,
         include_inhibitory_neurons,
+        consume_union=True,
         **rest):
     probes = sample_sites_from_stim_space(sample_sites, num_sites)
     if include_inhibitory_neurons:
         probes.extend(np.array(probes) + num_sites)
     gen, rest = make_tuning_curve_generator(
         rest,
+        consume_union=consume_union,
         # Stimulator:
         num_tcdom=len(bandwidths) * len(contrasts),
         num_sites=num_sites,
@@ -417,6 +419,9 @@ def _make_gan_from_kwargs(
         CriticTrainer.consume_kwargs, 'disc', rest,
         disc,
     )
+    if consume_union:
+        for key in ['Ab_min', 'Ab_max', 'Ad_min', 'Ad_max']:
+            rest.pop(key, None)
     return BPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
         include_inhibitory_neurons=include_inhibitory_neurons,

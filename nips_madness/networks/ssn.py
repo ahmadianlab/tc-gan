@@ -59,10 +59,27 @@ def int_or_lscalr(value, name):
         return value
 
 
-def neu_array(self, pop_array, pops=2):
+def neu_array(pop_array, num_sites, pops=None):
+    """
+    Tile each element of `pop_array` for `num_sites` times.
+
+    >>> neu_array([0, 1], 2)
+    array([0, 0, 1, 1])
+
+    It works with Theano array too, provided the third argument `pops`
+    is provided:
+
+    >>> pa = theano.tensor.vector('x', dtype='int16')
+    >>> na = neu_array(pa, 2, 3)
+    >>> na.eval({pa: np.array([0, 1, 2], dtype=pa.dtype)})
+    array([0, 0, 1, 1, 2, 2], dtype=int16)
+
+    """
     pop_array = asarray(pop_array)
+    if not is_theano(pop_array):
+        pops = pop_array.shape[0]
     xp = get_array_module(pop_array)
-    num_sites = self.num_sites
+
     return xp.concatenate([xp.tile(pop_array[i], num_sites)
                            for i in range(pops)])
 
@@ -579,7 +596,7 @@ class HeteroInpuptWrapper(BaseComponent):
 
         # self.amplification, vs, zs: arrays broadcastable to:
         #     (batchsize, num_tcdom, num_neurons)
-        vs = neu_array(stimulator, self.V).reshape((1, 1, -1))
+        vs = neu_array(self.V, stimulator.num_sites, 2).reshape((1, 1, -1))
         zs = self.zs_in.reshape((self.zs_in.shape[0], 1, self.zs_in.shape[1]))
         self.amplification = amp = 1 + vs * zs
 

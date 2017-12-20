@@ -118,5 +118,6 @@ def add_arguments(parser, exclude=()):
         else:
             argtype = eval
         parser.add_argument(
-            '--{}'.format(key), type=argtype, default=val,
+            '--{}'.format(key.replace('_', '-')),
+            type=argtype, default=val,
             help='SSN parameter')

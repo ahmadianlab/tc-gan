@@ -837,4 +837,7 @@ def emit_tuning_curve_generator(
 
 
 def make_tuning_curve_generator(config, **kwargs):
+    """make_tuning_curve_generator(config: dict, **kwargs) -> (TCG, dict)
+    Return a tuple of a tuning curve generator and an unused part of `config`.
+    """
     return consume_config(emit_tuning_curve_generator, config, **kwargs)

@@ -379,7 +379,7 @@ class BPTTWassersteinGAN(BaseComponent):
 
 
 def make_gan(config):
-    """
+    """make_gan(config: dict) -> (GAN, dict)
     Initialize a GAN given `config` and return unconsumed part of `config`.
     """
     return _make_gan_from_kwargs(**dict(DEFAULT_PARAMS, **config))

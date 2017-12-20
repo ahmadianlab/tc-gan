@@ -386,6 +386,9 @@ class BPTTMomentMatcher(BaseComponent):
 
 
 def make_moment_matcher(config):
+    """make_moment_matcher(config: dict) -> (MM, dict)
+    Initialize an MM given `config` and return unconsumed part of `config`.
+    """
     return _make_mm_from_kwargs(**dict(DEFAULT_PARAMS, **config))
 
 

@@ -375,6 +375,11 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
             stimulator=stimulator,
             ssn=ssn,
             **kwargs)
+    # Setting ext=theano.tensor.matrix('ext') here is not very clean.
+    # Ideally, it should be implemented in MapCloneEulerSSNCore.
+    # However, since AbstractEulerSSNCore.__init__ is not short and
+    # its call signature has to be modified if ext were to be defined
+    # in MapCloneEulerSSNCore.  This is why ext is created here.
 
     def __init__(self, stimulator, ssn,
                  unroll_scan=False,

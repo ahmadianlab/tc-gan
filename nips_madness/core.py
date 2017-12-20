@@ -1,3 +1,33 @@
+"""
+A module to help building complex objects based on composable components.
+
+It is based on the concept of :term:`emitter` function:
+
+.. glossary::
+
+   emitter
+
+     A callable that takes *arbitrary* keyword arguments and return a
+     tuple of an object and unused subset of the keyword arguments.
+     Example:
+
+     >>> def emit_alpha(alpha, **kwargs):
+     ...     return alpha + 1, kwargs
+     >>> kwargs = dict(alpha=1, beta=2)
+     >>> obj, rest = emit_alpha(**kwargs)
+     >>> rest
+     {'beta': 2}
+
+     Typically, such callable is a function with name
+     ``emit_<something>`` or a `classmethod` with name
+     ``<class_name>.consume_kwargs`` which emits an instance of the
+     class ``<class_name>``.  For example, see: `.emit_ssn`,
+     `BaseComponent.consume_kwargs`.
+
+See `BaseComponent` usage for why it helps composing elements.
+
+"""
+
 import inspect
 
 
@@ -122,12 +152,30 @@ def consume_config(emitter, config, *args, **kwargs):
 
     It is conceptually equivalent to::
 
-      cls.consume_kwargs(*args, **dict(config, **kwargs))
+      emitter(*args, **dict(config, **kwargs))
 
     However, it does following extra checks:
 
     * Make sure `config` and `kwargs` do NOT contain any shared keys.
     * Make sure `kwargs` is used by `emitter`.
+
+    Parameters
+    ----------
+    emitter : callable
+        An :term:`emitter`.
+    config : dict
+        A dictionary which may contain keyword arguments for `emitter`.
+    args
+        Positional arguments for `emitter`.
+    kwargs
+        Keyword arguments for `emitter`.
+
+    Returns
+    -------
+    obj
+        Returned value of `emitter`.
+    rest : dict
+        Unused subset of `config`.
 
     """
     common = set(config) & set(kwargs)
@@ -159,6 +207,27 @@ def consume_subdict(emitter, key, dct, *args, **kwargs):
     dictionary if so) and it is removed if all contents in
     ``dct[key]`` are consumed.  Thus, it is safe to call this function
     with the same `key` and different `emitter` multiple times.
+
+    Parameters
+    ----------
+    emitter : callable
+        An :term:`emitter`.
+    key
+        A key to be used for looking up `dct`.
+    dct : dict
+        ``dct[key]`` may exist and may contain keyword arguments for
+        `emitter`.
+    args
+        Positional arguments for `emitter`.
+    kwargs
+        Keyword arguments for `emitter`.
+
+    Returns
+    -------
+    obj
+        Returned value of `emitter`.
+    rest : dict
+        Unused subset of `dct`.
 
     """
     rest = dict(dct)

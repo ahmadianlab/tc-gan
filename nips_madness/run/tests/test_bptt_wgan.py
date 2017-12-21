@@ -34,6 +34,10 @@ def test_single_g_step_slowtest(args, cleancwd,
     assert info['extra_info']['script_file'] == script_file
     assert 'PATH' in info['meta_info']['environ']
 
+    if info['run_config'].get('ssn_type') == 'heteroin':
+        # Skip load_gandata test, since it's not implemented yet.  # FIXME
+        return
+
     with pytest.warns(None) as record:
         data = load_gandata(cleancwd)
     assert len(record) == 0

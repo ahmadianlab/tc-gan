@@ -8,6 +8,7 @@ from . import execution
 from . import lasagne_param_file
 from . import ssnode
 from .recorders import LearningRecorder, GenParamRecorder, \
+    FlexGenParamRecorder, \
     DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
     ConditionalTuningCurveStatsRecorder, UpdateResult
 
@@ -35,6 +36,9 @@ class GANDriver(object):
 
     """
 
+    def make_generator_recorder(self):
+        return GenParamRecorder.from_driver(self)
+
     def __init__(self, gan, datastore, **kwargs):
         self.gan = gan
         self.datastore = datastore
@@ -42,7 +46,7 @@ class GANDriver(object):
 
     def pre_loop(self):
         self.learning_recorder = LearningRecorder.from_driver(self)
-        self.generator_recorder = GenParamRecorder.from_driver(self)
+        self.generator_recorder = self.make_generator_recorder()
         self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
         self.disclearning_recorder = DiscLearningRecorder.from_driver(self)
         self.rejection_limiter = SSNRejectionLimiter.from_driver(self)
@@ -253,6 +257,9 @@ class WGANDiscLossLimiter(object):
 
 class BPTTWGANDriver(GANDriver):
     # TODO: don't rely on GANDriver
+
+    def make_generator_recorder(self):
+        return FlexGenParamRecorder.from_driver(self)
 
     def run(self, gan):
         learning_it = gan.learning()

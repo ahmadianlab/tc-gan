@@ -4,6 +4,8 @@ import itertools
 import lasagne
 import numpy as np
 
+from .networks.ssn import genparam_names
+
 
 class UpdateResult(SimpleNamespace):
     """
@@ -151,24 +153,10 @@ class DiscLearningRecorder(BaseRecorder):
     )
 
 
-def _genparam_names():
-    """
-    >>> _genparam_names()                              # doctest: +ELLIPSIS
-    ('J_EE', 'J_EI', 'J_IE', 'J_II', 'D_EE', ...)
-    """
-    def names(prefix):
-        J = (prefix + '_{}').format
-        return np.array([
-            [J('EE'), J('EI')],
-            [J('IE'), J('II')],
-        ])
-    return tuple(np.concatenate([names('J'), names('D'), names('S')]).flat)
-
-
 class GenParamRecorder(BaseRecorder):
 
     filename = 'generator.csv'
-    column_names = ('gen_step',) + _genparam_names()
+    column_names = ('gen_step',) + genparam_names
 
     def __init__(self, datastore, gan):
         self.gan = gan
@@ -183,6 +171,22 @@ class GenParamRecorder(BaseRecorder):
     @classmethod
     def from_driver(cls, driver):
         return cls.make(driver.datastore, driver.gan)
+
+
+class FlexGenParamRecorder(GenParamRecorder):
+    """
+    Flexible version of `GenParamRecorder` with ssn_type=heteroin support.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(FlexGenParamRecorder, self).__init__(*args, **kwargs)
+
+        self.column_names = ('gen_step',) \
+            + tuple(self.gan.gen.model.get_flat_param_names())
+
+    def record(self, gen_step):
+        self._saverow([gen_step] + list(self.gan.gen.get_flat_param_values()))
+        return self.gan.get_gen_param()  # for compatibility  # TODO: remove!
 
 
 class DiscParamStatsRecorder(BaseRecorder):

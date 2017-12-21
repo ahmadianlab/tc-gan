@@ -95,6 +95,29 @@ def maybe_mixin_noise(self, rng=None, kwargs={}):
     return kwargs
 
 
+def concat_flat(arrays):
+    flat = []
+    for a in arrays:
+        flat.extend(a.flat)
+    return flat
+
+
+def _genparam_names():
+    """
+    >>> _genparam_names()                              # doctest: +ELLIPSIS
+    ('J_EE', 'J_EI', 'J_IE', 'J_II', 'D_EE', ...)
+    """
+    def names(prefix):
+        J = (prefix + '_{}').format
+        return np.array([
+            [J('EE'), J('EI')],
+            [J('IE'), J('II')],
+        ])
+    return tuple(concat_flat([names('J'), names('D'), names('S')]))
+
+genparam_names = _genparam_names()
+
+
 class BandwidthContrastStimulator(BaseComponent):
     r"""
     Stimulator for varying bandwidths and contrasts.
@@ -169,6 +192,9 @@ class BandwidthContrastStimulator(BaseComponent):
     def get_all_params(self):
         return []
 
+    def get_flat_param_names(self):
+        return ()
+
 
 class AbstractEulerSSNCore(BaseComponent, abc.ABC):
 
@@ -229,6 +255,10 @@ class AbstractEulerSSNCore(BaseComponent, abc.ABC):
     def get_all_params(self):
         params = self.stimulator.get_all_params()
         return params + [self.J, self.D, self.S]
+
+    def get_flat_param_names(self):
+        names = self.stimulator.get_flat_param_names()
+        return names + genparam_names
 
 
 class MapCloneEulerSSNCore(AbstractEulerSSNCore):
@@ -341,6 +371,8 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     D = property(lambda self: self.l_ssn.ssn.D)
     S = property(lambda self: self.l_ssn.ssn.S)
     get_all_params = property(lambda self: self.l_ssn.ssn.get_all_params)
+    get_flat_param_names = property(lambda self:
+                                    self.l_ssn.ssn.get_flat_param_names)
 
     num_tcdom = property(lambda self: self.stimulator.num_tcdom)
     num_sites = property(lambda self: self.stimulator.num_sites)
@@ -616,6 +648,10 @@ class HeteroInputWrapper(BaseComponent):
         params = self.stimulator.get_all_params()
         return params + [self.V]
 
+    def get_flat_param_names(self):
+        names = self.stimulator.get_flat_param_names()
+        return names + ('V_E', 'V_I')
+
     def gen_noise(self, rng, stimulator_bandwidths, **_):
         batchsize, _num_tcdom = stimulator_bandwidths.shape
         num_neurons = self.num_neurons
@@ -814,6 +850,13 @@ class TuningCurveGenerator(BaseComponent):
     @property
     def get_all_params(self):
         return self.model.get_all_params
+
+    @property
+    def get_flat_param_names(self):
+        return self.model.get_flat_param_names
+
+    def get_flat_param_values(self):
+        return concat_flat(p.get_value() for p in self.get_all_params())
 
     def set_params(self, params):
         rest = dict(params)

@@ -196,6 +196,8 @@ class GeneratorTrainer(BaseTrainer):
         for var in self.gen.get_all_params():
             p_min = getattr(self, var.name + '_min')
             p_max = getattr(self, var.name + '_max')
+            p_min = np.array(p_min, dtype=updates[var].dtype)
+            p_max = np.array(p_max, dtype=updates[var].dtype)
             updates[var] = updates[var].clip(p_min, p_max)
         return updates
 

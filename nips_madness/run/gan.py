@@ -1235,7 +1235,7 @@ def init_driver(
 
 
 def do_learning(learn, run_config, script_file,
-                init_driver=init_driver, extra_info={}):
+                init_driver=init_driver, extra_info={}, preprocess=preprocess):
     """
     Wrap `.execution.do_learning` with some pre-processing.
     """

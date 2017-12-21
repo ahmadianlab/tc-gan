@@ -6,8 +6,7 @@ from logging import getLogger
 
 import numpy as np
 
-from . import gan as plain_gan
-from .bptt_wgan import generate_dataset
+from .bptt_wgan import generate_dataset, do_learning
 from .. import execution
 from .. import utils
 from ..drivers import MomentMatchingDriver
@@ -175,8 +174,8 @@ def main(args=None):
     parser = make_parser()
     ns = parser.parse_args(args)
 
-    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver,
-                          script_file=__file__)
+    do_learning(learn, vars(ns), init_driver=init_driver,
+                script_file=__file__)
 
 
 if __name__ == '__main__':

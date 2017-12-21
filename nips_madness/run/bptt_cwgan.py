@@ -9,7 +9,7 @@ from . import gan as plain_gan
 from .. import utils
 from ..drivers import BPTTcWGANDriver
 from ..networks.cwgan import make_gan
-from .bptt_wgan import learn
+from .bptt_wgan import learn, do_learning
 
 logger = getLogger(__name__)
 
@@ -82,8 +82,8 @@ def main(args=None):
     # init_driver.  See also: [[../execution.py::layers_str]]
     ns.layers = ns.disc_layers
 
-    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver,
-                          script_file=__file__)
+    do_learning(learn, vars(ns), init_driver=init_driver,
+                script_file=__file__)
 
 
 if __name__ == '__main__':

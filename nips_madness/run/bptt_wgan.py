@@ -245,6 +245,23 @@ def init_driver(
                 **rest)
 
 
+def preprocess(run_config):
+    """
+    Pre-process `run_config` before it is dumped to ``info.json``.
+    """
+    plain_gan.preprocess(run_config)
+    if run_config.get('ssn_type') == 'heteroin':
+        run_config['true_ssn_options'].setdefault('V', [0.3, 0])
+        # See [[../networks/fixed_time_sampler.py::V=]]
+
+
+def do_learning(learn, run_config, script_file, init_driver,
+                preprocess=preprocess, **kwargs):
+    plain_gan.do_learning(
+        learn, run_config, script_file, init_driver,
+        preprocess=preprocess, **kwargs)
+
+
 def main(args=None):
     parser = make_parser()
     ns = parser.parse_args(args)
@@ -253,8 +270,8 @@ def main(args=None):
     # init_driver.  See also: [[../execution.py::layers_str]]
     ns.layers = ns.disc_layers
 
-    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver,
-                          script_file=__file__)
+    do_learning(learn, vars(ns), init_driver=init_driver,
+                script_file=__file__)
 
 
 if __name__ == '__main__':

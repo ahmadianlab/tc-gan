@@ -95,7 +95,8 @@ def dataset_by_fixedtime(
     # Set learnable parameters:
     for param in sampler.gen.get_all_params():
         if param.name in learnable_parameters:
-            param.set_value(learnable_parameters[param.name])
+            param.set_value(np.asarray(learnable_parameters[param.name],
+                                       dtype=param.dtype))
 
     sampler.prepare()
 

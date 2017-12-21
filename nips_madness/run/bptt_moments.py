@@ -6,7 +6,7 @@ from logging import getLogger
 
 import numpy as np
 
-from .bptt_wgan import generate_dataset, do_learning
+from .bptt_wgan import generate_dataset_and_save, do_learning
 from .. import execution
 from .. import utils
 from ..drivers import MomentMatchingDriver
@@ -22,15 +22,9 @@ def learn(driver, **generate_dataset_kwargs):
     logger.info('Compiling Theano functions...')
     with utils.log_timing('gan.prepare()'):
         mmatcher.prepare()
-    ssn = mmatcher.gen
 
-    data = generate_dataset(
-        driver,
-        sample_sites=mmatcher.sample_sites,
-        include_inhibitory_neurons=mmatcher.include_inhibitory_neurons,
-        num_sites=ssn.num_sites,
-        bandwidths=mmatcher.bandwidths,
-        contrasts=mmatcher.contrasts,
+    data = generate_dataset_and_save(
+        driver.datastore, mmatcher,
         **generate_dataset_kwargs)
 
     mmatcher.set_dataset(data)

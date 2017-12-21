@@ -661,6 +661,10 @@ class HeteroInEulerSSNModel(EulerSSNModel):
         return noise
 
 
+def is_heteroin(gen):
+    return hasattr(gen.model.stimulator, 'V')
+
+
 class FixedProber(BaseComponent):
 
     """
@@ -832,6 +836,10 @@ class TuningCurveGenerator(BaseComponent):
         for component in [self.stimulator, self.model.l_ssn.ssn, self.model,
                           self.prober]:
             config.update(component.to_config())
+        config['ssn_type'] = 'heteroin' if is_heteroin(self) else 'default'
+        config['ssn_impl'] = ('mapclone' if isinstance(self.model,
+                                                       MapCloneEulerSSNModel)
+                              else 'default')
         return config
 
 

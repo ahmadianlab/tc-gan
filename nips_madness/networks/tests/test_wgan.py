@@ -70,11 +70,10 @@ def test_wgan_heteroin():
 
 
 def normalize_to_gen_config(config):
-    config = dict(config)
-    config.update(TEST_PARAMS)
-    config.update(wgan.DEFAULT_PARAMS)
-    normalize_to_gen_config_common(config)
-    return config
+    new = dict(wgan.DEFAULT_PARAMS)
+    new.update(TEST_PARAMS)
+    new.update(config)
+    return normalize_to_gen_config_common(new)
 
 
 def normalize_to_gen_config_common(config):
@@ -94,7 +93,7 @@ def normalize_to_gen_config_common(config):
         if key in config:
             config[key] = np.asarray(config[key], dtype=theano.config.floatX)
 
-    for key in ['gen', 'disc', 'ssn_type', 'ssn_impl',
+    for key in ['gen', 'disc',
                 'bandwidths', 'contrasts', 'include_inhibitory_neurons',
                 'critic_iters', 'critic_iters_init', 'lipschitz_cost',
                 'truth_size']:
@@ -111,6 +110,8 @@ def normalize_to_gen_config_common(config):
 
     config.setdefault('unroll_scan', False)
     config.setdefault('include_time_avg', False)
+    config.setdefault('ssn_type', 'default')
+    config.setdefault('ssn_impl', 'default')
 
     return config
 

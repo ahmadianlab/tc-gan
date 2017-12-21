@@ -33,7 +33,7 @@ from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
     theano_function, log_timing,
 )
-from .ssn import make_tuning_curve_generator, maybe_mixin_noise
+from .ssn import make_tuning_curve_generator, maybe_mixin_noise, is_heteroin
 from .utils import largerrecursionlimit
 
 
@@ -228,10 +228,6 @@ class HeteroInGeneratorTrainer(GeneratorTrainer):
         self.V_max = V_max
         self.updater = updater
         self.post_init()
-
-
-def is_heteroin(gen):
-    return hasattr(gen.model.stimulator, 'V')
 
 
 def emit_generator_trainer(gen, *args, **kwargs):

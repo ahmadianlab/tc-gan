@@ -37,7 +37,7 @@ def make_parser():
         default=[0], type=utils.csv_line(float),
         help='''"Normalized" probes, i.e., locations (offsets) of
         neurons to be sampled from SSN in [-1, 1] space ("bandwidth
-        coordinate").  0 means the center of thenetwork.
+        coordinate").  0 means the center of the network.
         (default:%(default)s)''')
 
     bptt_wgan.add_bptt_common_options(parser)

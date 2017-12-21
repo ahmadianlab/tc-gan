@@ -230,8 +230,12 @@ class HeteroInGeneratorTrainer(GeneratorTrainer):
         self.post_init()
 
 
+def is_heteroin(gen):
+    return hasattr(gen.model.stimulator, 'V')
+
+
 def emit_generator_trainer(gen, *args, **kwargs):
-    if hasattr(gen.model.stimulator, 'V'):
+    if is_heteroin(gen):
         trainer_class = HeteroInGeneratorTrainer
     else:
         trainer_class = GeneratorTrainer
@@ -374,6 +378,13 @@ class BPTTWassersteinGAN(BaseComponent):
                 yield info
 
 
+def probes_from_stim_space(stim_locs, num_sites, include_inhibitory_neurons):
+    probes = sample_sites_from_stim_space(stim_locs, num_sites)
+    if include_inhibitory_neurons:
+        probes.extend(np.array(probes) + num_sites)
+    return probes
+
+
 def make_gan(config):
     """make_gan(config: dict) -> (GAN, dict)
     Initialize a GAN given `config` and return unconsumed part of `config`.
@@ -386,9 +397,8 @@ def _make_gan_from_kwargs(
         include_inhibitory_neurons,
         consume_union=True,
         **rest):
-    probes = sample_sites_from_stim_space(sample_sites, num_sites)
-    if include_inhibitory_neurons:
-        probes.extend(np.array(probes) + num_sites)
+    probes = probes_from_stim_space(sample_sites, num_sites,
+                                    include_inhibitory_neurons)
     if 'V0' in rest:
         rest['V'] = rest.pop('V0')
     gen, rest = make_tuning_curve_generator(

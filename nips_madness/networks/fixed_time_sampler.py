@@ -1,10 +1,12 @@
 import numpy as np
 
 from ..gradient_expressions.utils import sample_sites_from_stim_space
-from .wgan import DEFAULT_PARAMS, grid_stimulator_inputs
 from .ssn import make_tuning_curve_generator
 from .tests import test_euler_ssn
 from .utils import largerrecursionlimit
+from .wgan import (
+    DEFAULT_PARAMS, grid_stimulator_inputs, probes_from_stim_space,
+)
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -90,6 +92,37 @@ class FixedTimeTuningCurveSampler(object):
         with largerrecursionlimit(self.gen.model.unroll_scan,
                                   self.gen.model.seqlen):
             self.gen.prepare()
+
+    @classmethod
+    def from_learner(cls, learner, **override):
+        """
+        Initialize FixedTimeTuningCurveSampler based on `learner`.
+
+        Parameters not specified by keyword arguments are copied from
+        `learner`.
+        """
+        config = dict(
+            bandwidths=learner.bandwidths,
+            contrasts=learner.contrasts,
+        )
+        if 'gen' not in override:
+            gen_config = learner.gen.to_config()
+            gen_config = {k: v for k, v in gen_config.items()
+                          if k not in override}
+            if 'probes' not in gen_config and 'probes' not in override:
+                # Then the learner is cWGAN.
+                probes = probes_from_stim_space(
+                    learner.norm_probes,   # = sample_sites
+                    learner.num_sites,
+                    learner.include_inhibitory_neurons)
+                gen_config['probes'] = probes
+            # Pass gen_config as keyword arguments, to make sure all
+            # of them are used up.  Pass `override` as config to
+            # retrieve unconsumed ones:
+            gen, override = make_tuning_curve_generator(override, **gen_config)
+            config['gen'] = gen
+        config.update(override)
+        return cls(**config)
 
 
 def add_arguments(parser, exclude=()):

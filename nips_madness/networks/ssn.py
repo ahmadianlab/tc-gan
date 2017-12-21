@@ -827,6 +827,13 @@ class TuningCurveGenerator(BaseComponent):
                         .format(self.__class__.__name__)):
             self.forward_impl
 
+    def to_config(self):
+        config = super(TuningCurveGenerator, self).to_config()
+        for component in [self.stimulator, self.model.l_ssn.ssn, self.model,
+                          self.prober]:
+            config.update(component.to_config())
+        return config
+
 
 _ssn_classes = {
     ('default', 'default'): EulerSSNModel,

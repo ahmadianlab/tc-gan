@@ -1,24 +1,31 @@
 import pytest
 
+from . import test_wgan
 from .. import cwgan
-from .test_wgan import TEST_PARAMS
+
+TEST_PARAMS = dict(
+    test_wgan.TEST_PARAMS,
+    norm_probes=[0],
+)
 
 
-def emit_gan(norm_probes=[0],
-             **kwargs):
+def make_config(**kwargs):
     config = dict(
         TEST_PARAMS,
-        norm_probes=norm_probes,
         **kwargs)
     del kwargs
+    norm_probes = config['norm_probes']
     include_inhibitory_neurons = config['include_inhibitory_neurons']
     if 'probes_per_model' not in config:
         probes_per_model = len(norm_probes)
         if include_inhibitory_neurons:
             probes_per_model *= 2
         config['probes_per_model'] = probes_per_model
+    return config
 
-    return cwgan.make_gan(config)
+
+def emit_gan(**kwargs):
+    return cwgan.make_gan(make_config(**kwargs))
 
 
 def fake_data(gan, truth_size):
@@ -57,3 +64,32 @@ def test_cwgan_heteroin():
     gan.gen.model.stimulator.V
     gan.gen_trainer.V_min
     gan.gen_trainer.V_max
+
+
+def normalize_to_gen_config(config):
+    mixed = make_config(**config)
+    config = dict(cwgan.DEFAULT_PARAMS)
+    config.update(mixed)
+
+    bandwidths = config['bandwidths']
+    config.setdefault('num_tcdom', len(bandwidths))
+
+    num_models = config.pop('num_models')
+    probes_per_model = config.pop('probes_per_model')
+    config.setdefault('batchsize', num_models * probes_per_model)
+
+    test_wgan.normalize_to_gen_config_common(config)
+
+    for key in ['hide_cell_type', 'e_ratio', 'norm_probes']:
+        config.pop(key, None)
+    return config
+
+
+@pytest.mark.parametrize('config', [
+    {},
+    dict(ssn_type='heteroin'),
+])
+def test_cwgan_gen_to_config(config):
+    test_wgan.test_wgan_gen_to_config(config,
+                                      emit_gan,
+                                      normalize_to_gen_config)

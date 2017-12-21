@@ -30,6 +30,8 @@ See `BaseComponent` usage for why it helps composing elements.
 
 import inspect
 
+from .utils import is_theano
+
 
 class BaseComponent(object):
 
@@ -98,6 +100,30 @@ class BaseComponent(object):
       ...
     ValueError: Not all key-value pairs are consumed: ['spam']
 
+    Parameters passed to a `BaseComponent` subclass can be retrieved
+    by `to_config` method, provided that such subclass follows the
+    convention that arguments are set to the attributes with the same
+    name.
+
+    >>> bike.to_config()
+    {'color': 'brown'}
+
+    To include configurations of subcomponents, `to_config` method
+    must be overridden, ideally in a way that matches with
+    `consume_kwargs`:
+
+    >>> class DumpableBike(Bike):
+    ...
+    ...     def to_config(self):
+    ...         config = super(DumpableBike, self).to_config()
+    ...         config.update(self.wheel.to_config())
+    ...         config.update(self.handle.to_config())
+    ...         return config
+    ...
+    >>> config = dict(spokes=28, brakes=2, color='brown')
+    >>> bike2 = DumpableBike.from_dict(config)
+    >>> assert bike2.to_config() == config
+
     """
 
     @classmethod
@@ -144,6 +170,36 @@ class BaseComponent(object):
                 'Not all key-value pairs are consumed: {}'
                 .format(sorted(rest)))
         return self
+
+    def to_config(self):
+        """
+        Return a `dict` which can be used to construct an equivalent instance.
+
+        Note that this method is relying on the convention that
+        arguments are set to the attributes with the same name.
+        Subclasses must override this method if this is not the case.
+        """
+        config = {}
+        for name in inspect.getargspec(type(self)).args:
+            try:
+                value = getattr(self, name)
+            except AttributeError:
+                continue
+
+            if isinstance(value, BaseComponent):
+                continue
+
+            # Handle theano shared variable:
+            if is_theano(value):
+                if hasattr(value, 'get_value'):
+                    config[name] = value.get_value()
+                continue
+            # MAYBE: Move the above theano-related block to subclass,
+            #        to remove theano dependence from this module.
+
+            config[name] = value
+
+        return config
 
 
 def consume_config(emitter, config, *args, **kwargs):

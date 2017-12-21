@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
+import theano
 
 from .. import wgan
+from ...gradient_expressions.utils import sample_sites_from_stim_space
 
 
 TEST_PARAMS = dict(
@@ -66,3 +68,65 @@ def test_wgan_heteroin():
     gan.gen.model.stimulator.V
     gan.gen_trainer.V_min
     gan.gen_trainer.V_max
+
+
+def normalize_to_gen_config(config):
+    config = dict(config)
+    config.update(TEST_PARAMS)
+    config.update(wgan.DEFAULT_PARAMS)
+    normalize_to_gen_config_common(config)
+    return config
+
+
+def normalize_to_gen_config_common(config):
+    bandwidths = config['bandwidths']
+    contrasts = config['contrasts']
+    config.setdefault('num_tcdom', len(bandwidths) * len(contrasts))
+
+    num_sites = config['num_sites']
+    include_inhibitory_neurons = config['include_inhibitory_neurons']
+
+    for key in 'JDSV':
+        key0 = key + '0'
+        if key0 in config:
+            config[key] = config.pop(key0)
+
+    for key in 'JDSV':
+        if key in config:
+            config[key] = np.asarray(config[key], dtype=theano.config.floatX)
+
+    for key in ['gen', 'disc', 'ssn_type', 'ssn_impl',
+                'bandwidths', 'contrasts', 'include_inhibitory_neurons',
+                'critic_iters', 'critic_iters_init', 'lipschitz_cost',
+                'truth_size']:
+        config.pop(key, None)
+
+    try:
+        sample_sites = config.pop('sample_sites')
+    except KeyError:
+        pass
+    else:
+        assert 'probes' not in config
+        probes = sample_sites_from_stim_space(sample_sites, num_sites)
+        if include_inhibitory_neurons:
+            probes.extend(np.array(probes) + num_sites)
+        config['probes'] = probes
+
+    config.setdefault('unroll_scan', False)
+    config.setdefault('include_time_avg', False)
+
+    return config
+
+
+@pytest.mark.parametrize('config', [
+    {},
+    dict(ssn_type='heteroin'),
+])
+def test_wgan_gen_to_config(config, emit_gan=emit_gan,
+                            normalize=normalize_to_gen_config):
+    desired = normalize(config)
+    gan, _rest = emit_gan(**config)
+    actual = gan.gen.to_config()
+    print('set(actual) - set(desired) =', set(actual) - set(desired))
+    print('set(desired) - set(actual) =', set(desired) - set(actual))
+    np.testing.assert_equal(actual, desired)

@@ -1,7 +1,7 @@
 from matplotlib import pyplot
 
 from ..utils import log_timing
-from ..networks.finite_time_sampler import FiniteTimeTuningCurveSampler
+from ..networks.fixed_time_sampler import FixedTimeTuningCurveSampler
 
 
 def plot_trajectory(trajectories, sampler):
@@ -37,7 +37,7 @@ def plot_trajectory(trajectories, sampler):
 
 def plot_theano_euler_trajectory(**sampler_config):
     sampler_config['batchsize'] = 1
-    sampler = FiniteTimeTuningCurveSampler.from_dict(sampler_config)
+    sampler = FixedTimeTuningCurveSampler.from_dict(sampler_config)
     sampler.prepare()
     with log_timing("sampler.compute_trajectories()"):
         trajectories, = sampler.compute_trajectories()
@@ -47,7 +47,7 @@ def plot_theano_euler_trajectory(**sampler_config):
 
 def main(args=None):
     import argparse
-    from ..networks.finite_time_sampler import add_arguments
+    from ..networks.fixed_time_sampler import add_arguments
 
     class CustomFormatter(argparse.RawDescriptionHelpFormatter,
                           argparse.ArgumentDefaultsHelpFormatter):

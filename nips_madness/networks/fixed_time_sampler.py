@@ -14,7 +14,7 @@ DEFAULT_PARAMS = dict(
 )
 
 
-class FiniteTimeTuningCurveSampler(object):
+class FixedTimeTuningCurveSampler(object):
 
     @classmethod
     def from_dict(cls, dct):

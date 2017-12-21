@@ -105,23 +105,32 @@ class FixedTimeTuningCurveSampler(object):
             bandwidths=learner.bandwidths,
             contrasts=learner.contrasts,
         )
-        if 'gen' not in override:
+        config.update(override)
+        if 'gen' not in config:
             gen_config = learner.gen.to_config()
             gen_config = {k: v for k, v in gen_config.items()
-                          if k not in override}
-            if 'probes' not in gen_config and 'probes' not in override:
+                          if k not in config}
+
+            # num_tcdom has to be defined this way for cls to work.
+            # See also [[def consume_kwargs]]
+            bandwidths = config['bandwidths']
+            contrasts = config['contrasts']
+            gen_config['num_tcdom'] = len(bandwidths) * len(contrasts)
+
+            if 'probes' not in gen_config and 'probes' not in config:
                 # Then the learner is cWGAN.
                 probes = probes_from_stim_space(
                     learner.norm_probes,   # = sample_sites
                     learner.num_sites,
                     learner.include_inhibitory_neurons)
                 gen_config['probes'] = probes
+
             # Pass gen_config as keyword arguments, to make sure all
             # of them are used up.  Pass `override` as config to
             # retrieve unconsumed ones:
-            gen, override = make_tuning_curve_generator(override, **gen_config)
+            gen, config = make_tuning_curve_generator(config, **gen_config)
+
             config['gen'] = gen
-        config.update(override)
         return cls(**config)
 
 

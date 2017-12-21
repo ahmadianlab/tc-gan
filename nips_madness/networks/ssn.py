@@ -598,6 +598,7 @@ class HeteroInputWrapper(BaseComponent):
 
         V = np.asarray(V, dtype=theano.config.floatX)
         V = np.broadcast_to(V, 2)
+        V = np.ascontiguousarray(V)
         self.V = theano.shared(V, name='V')
 
         # self.zs_in.shape: (batchsize, num_neurons)

@@ -31,3 +31,16 @@ def test_single_g_step_slowtest(args, cleancwd):
         script_file=bptt_cwgan.__file__)
 
     assert_logfile_exists(cleancwd, 'store.hdf5')
+
+
+@pytest.mark.parametrize('args, config', [
+    ([], dict(ssn_type='heteroin')),
+    (['--include-inhibitory-neurons'], dict(ssn_type='heteroin')),
+    (['--include-inhibitory-neurons'], dict(ssn_type='heteroin',
+                                            V=[0.3, 0])),
+])
+def test_single_g_step_with_load_config_slowtest(args, config, cleancwd):
+    test_bptt_wgan.test_single_g_step_with_load_config_slowtest(
+        args, config, cleancwd,
+        single_g_step=single_g_step,
+        script_file=bptt_cwgan.__file__)

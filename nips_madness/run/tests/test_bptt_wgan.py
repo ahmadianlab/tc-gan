@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from .. import bptt_wgan
@@ -41,3 +43,25 @@ def test_single_g_step_slowtest(args, cleancwd,
 
     assert data.gen.shape == (1, len(recorders.GenParamRecorder.column_names))
     assert data.gen_names == list(recorders.GenParamRecorder.column_names)
+
+
+@pytest.mark.parametrize('args, config', [
+    ([], dict(ssn_type='heteroin')),
+    (['--include-inhibitory-neurons'], dict(ssn_type='heteroin')),
+    (['--include-inhibitory-neurons'], dict(ssn_type='heteroin',
+                                            V=[0.3, 0])),
+])
+def test_single_g_step_with_load_config_slowtest(args, config,
+                                                 cleancwd, **kwargs):
+    config = dict(config)
+    if config.get('ssn_type') == 'heteroin':
+        config.setdefault('dataset_provider', 'fixedtime')
+        # ...since, at the moment, dataset_provider='ssnode' does not
+        # work with ssn_type='heteroin'.
+
+    config_path = str(cleancwd.join('run.json'))
+    with open(config_path, 'w') as file:
+        json.dump(config, file)
+
+    args += ['--load-config', config_path]
+    test_single_g_step_slowtest(args, cleancwd, **kwargs)

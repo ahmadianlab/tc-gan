@@ -3,7 +3,6 @@ import pytest
 import theano
 
 from .. import wgan
-from ...gradient_expressions.utils import sample_sites_from_stim_space
 
 
 TEST_PARAMS = dict(
@@ -107,10 +106,8 @@ def normalize_to_gen_config_common(config):
         pass
     else:
         assert 'probes' not in config
-        probes = sample_sites_from_stim_space(sample_sites, num_sites)
-        if include_inhibitory_neurons:
-            probes.extend(np.array(probes) + num_sites)
-        config['probes'] = probes
+        config['probes'] = wgan.probes_from_stim_space(
+            sample_sites, num_sites, include_inhibitory_neurons)
 
     config.setdefault('unroll_scan', False)
     config.setdefault('include_time_avg', False)

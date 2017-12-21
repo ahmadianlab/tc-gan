@@ -815,6 +815,14 @@ class TuningCurveGenerator(BaseComponent):
     def get_all_params(self):
         return self.model.get_all_params
 
+    def set_params(self, params):
+        rest = dict(params)
+        for p in self.get_all_params():
+            if p.name in rest:
+                p.set_value(np.asarray(rest.pop(p.name), dtype=p.dtype))
+        if rest:
+            raise ValueError('Unknown parameters: {}'.format(rest))
+
     def get_output(self, **kwargs):
         if not kwargs:
             return self.prober.outputs[0]

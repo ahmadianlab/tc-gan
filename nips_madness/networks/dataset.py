@@ -92,12 +92,7 @@ def dataset_by_fixedtime(
         seed=truth_seed,
         **sampler_options)  # let sampler bark if it has unsupported options
 
-    # Set learnable parameters:
-    for param in sampler.gen.get_all_params():
-        if param.name in learnable_parameters:
-            param.set_value(np.asarray(learnable_parameters[param.name],
-                                       dtype=param.dtype))
-
+    sampler.gen.set_params(learnable_parameters)
     sampler.prepare()
 
     data_list = []

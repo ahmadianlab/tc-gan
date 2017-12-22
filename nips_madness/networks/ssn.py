@@ -630,7 +630,7 @@ class HeteroInputWrapper(BaseComponent):
 
         V = np.asarray(V, dtype=theano.config.floatX)
         V = np.broadcast_to(V, 2)
-        V = np.ascontiguousarray(V)
+        V = np.ascontiguousarray(V)  # [#contiguous]_
         self.V = theano.shared(V, name='V')
 
         # self.zs_in.shape: (batchsize, num_neurons)
@@ -643,6 +643,15 @@ class HeteroInputWrapper(BaseComponent):
         self.amplification = amp = 1 + vs * zs
 
         self.stimulus = amp * self.stimulator.stimulus
+
+    # .. [#contiguous] Converting `V` to a contiguous array before
+    #    passing it to `theano.shared` is important since otherwise
+    #    `TuningCurveGenerator.set_params` fails with ``ValueError:
+    #    ('Destination GpuArray is not contiguous', 'Container name
+    #    "V"')`` when ``THEANO_FLAGS=device=cuda``.
+    #
+    # .. [[./tests/test_tuning_curve.py::test_tcg_set_params]]
+    # .. [[./dataset.py::set_params]]
 
     def get_all_params(self):
         params = self.stimulator.get_all_params()

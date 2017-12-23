@@ -5,6 +5,33 @@ import numpy as np
 from ..networks.ssn import concat_flat
 
 
+def parse_gen_param_name(name):
+    """
+    Convert ``'J'`` to ``('J', None)`` and ``'J_EI'`` to ``('J', (0, 1))``.
+
+    >>> parse_gen_param_name('J')
+    ('J', None)
+    >>> parse_gen_param_name('D_IE')
+    ('D', (1, 0))
+    >>> parse_gen_param_name('V_E')
+    ('V', (0,))
+    >>> parse_gen_param_name('A_xx')
+    Traceback (most recent call last):
+      ...
+    ValueError: Unsupported suffix in A_xx
+
+    """
+    suffix_to_index = {'E': 0, 'I': 1}
+    if '_' in name:
+        array_name, suffix = name.split('_', 1)
+        if set(suffix) - set(suffix_to_index):
+            raise ValueError('Unsupported suffix in {}'.format(name))
+        index = tuple(suffix_to_index[i] for i in suffix)
+        return array_name, index
+    else:
+        return name, None
+
+
 class AbstractGANRunConfig(abc.ABC):
 
     @classmethod
@@ -94,11 +121,17 @@ class AbstractGANRunConfig(abc.ABC):
     def get_true_param(self, name):
         from .. import ssnode
         true_ssn_options = self.dict.get('true_ssn_options')
-        if name in true_ssn_options:
-            val = true_ssn_options[name]
-        elif name in ssnode.DEFAULT_PARAMS:
-            val = ssnode.DEFAULT_PARAMS[name]
-        return np.asarray(val)
+        array_name, index = parse_gen_param_name(name)
+        if index is None:
+            if name in true_ssn_options:
+                val = true_ssn_options[name]
+            elif name in ssnode.DEFAULT_PARAMS:
+                val = ssnode.DEFAULT_PARAMS[name]
+            else:
+                raise ValueError('Unknown parameter: {}'.format(name))
+            return np.asarray(val)
+        else:
+            return self.get_true_param(array_name)[index]
 
     def flatten_true_params(self, ndim=1):
         assert ndim in (1, 2)

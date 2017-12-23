@@ -346,6 +346,8 @@ class MomentMatchingDriver(object):
 
         jj, dd, ss = self.generator_recorder.record(gen_step)
 
+        self.datastore.flush_all()
+
         maybe_quit(
             self.datastore,
             JDS_fake=list(map(np.exp, [jj, dd, ss])),

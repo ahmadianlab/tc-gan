@@ -341,7 +341,7 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
 def analyze_learning(logpath, title_params):
     from ..loaders import load_records
     rec = load_records(logpath)
-    if rec.rc.run_module == 'bptt_moments':
+    if rec.run_module == 'bptt_moments':
         from .mm_learning import plot_mm_learning
         return plot_mm_learning(rec, title_params)
     else:

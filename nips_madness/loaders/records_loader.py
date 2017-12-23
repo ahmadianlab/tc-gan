@@ -8,7 +8,7 @@ from .run_configs import get_run_config
 
 
 def cached_record(name):
-    def get(self, name):
+    def get(self):
         df = self.datastore.load(name)
         if 'disc_step' in df.columns:
             disc_step = df.loc[:, 'disc_step']

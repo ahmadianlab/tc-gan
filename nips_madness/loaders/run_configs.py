@@ -243,7 +243,7 @@ module_class_map = {
 
 
 def get_run_config(info):
-    from .loader import guess_run_module
+    from ..analyzers.loader import guess_run_module
     run_module = guess_run_module(info)
     return module_class_map.get(
         run_module, LegacyGANRunConfig,

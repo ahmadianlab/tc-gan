@@ -34,7 +34,7 @@ class DataStoreLoader1(object):
                 yield file
 
     def open(self, fname, *args, **kwargs):
-        return open(str(self.directory.join(fname)), *args, **kwargs)
+        return open(str(self.directory.joinpath(fname)), *args, **kwargs)
 
     def read_csv(self, fname, **kwargs):
         with self.open_if_not(fname) as file:

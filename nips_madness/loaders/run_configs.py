@@ -30,7 +30,7 @@ def parse_gen_param_name(name):
         return name, None
 
 
-class BaseGANRunConfig(object):
+class BaseRunConfig(object):
 
     is_legacy = False
 
@@ -89,6 +89,33 @@ class BaseGANRunConfig(object):
     # def n_stim(self):
     #     return self.n_bandwidths * self.n_contrasts
 
+    def get_true_param(self, name):
+        from .. import ssnode
+        true_ssn_options = self.dict.get('true_ssn_options')
+        array_name, index = parse_gen_param_name(name)
+        if index is None:
+            if name in true_ssn_options:
+                val = true_ssn_options[name]
+            elif name in ssnode.DEFAULT_PARAMS:
+                val = ssnode.DEFAULT_PARAMS[name]
+            else:
+                raise ValueError('Unknown parameter: {}'.format(name))
+            return np.asarray(val)
+        else:
+            return self.get_true_param(array_name)[index]
+
+    def flatten_true_params(self, ndim=1):
+        assert ndim in (1, 2)
+        params = concat_flat(map(self.get_true_param,
+                                 self.param_array_names))
+        params = np.asarray(params)
+        if ndim == 2:
+            return params.reshape((1, -1))
+        return params
+
+
+class BaseGANRunConfig(BaseRunConfig):
+
     def gen_step_to_epoch(self, gen_step):
         disc_updates = self.gen_step_to_disc_updates(gen_step)
         return self.disc_updates_to_epoch(disc_updates)
@@ -117,30 +144,6 @@ class BaseGANRunConfig(object):
 
     def epoch_to_disc_updates(self, epoch):
         return epoch * self.datasize / self.batchsize
-
-    def get_true_param(self, name):
-        from .. import ssnode
-        true_ssn_options = self.dict.get('true_ssn_options')
-        array_name, index = parse_gen_param_name(name)
-        if index is None:
-            if name in true_ssn_options:
-                val = true_ssn_options[name]
-            elif name in ssnode.DEFAULT_PARAMS:
-                val = ssnode.DEFAULT_PARAMS[name]
-            else:
-                raise ValueError('Unknown parameter: {}'.format(name))
-            return np.asarray(val)
-        else:
-            return self.get_true_param(array_name)[index]
-
-    def flatten_true_params(self, ndim=1):
-        assert ndim in (1, 2)
-        params = concat_flat(map(self.get_true_param,
-                                 self.param_array_names))
-        params = np.asarray(params)
-        if ndim == 2:
-            return params.reshape((1, -1))
-        return params
 
 
 class LegacyGANRunConfig(BaseGANRunConfig):
@@ -272,9 +275,19 @@ class BPTTcWGANRunConfig(BaseWGANRunConfig):
         return self.dict.get('e_ratio', 0.8)
 
 
+class BPTTMomentsRunConfig(BaseRunConfig):
+
+    def step_to_epoch(self, step):
+        return step * self.batchsize / self.datasize
+
+    def epoch_to_step(self, epoch):
+        return epoch / self.batchsize * self.datasize
+
+
 module_class_map = {
     'bptt_wgan': BPTTWGANRunConfig,
     'bptt_cwgan': BPTTcWGANRunConfig,
+    'bptt_moments': BPTTMomentsRunConfig,
     'run': LegacyGANRunConfig,
     'cgan': LegacyGANRunConfig,
 }

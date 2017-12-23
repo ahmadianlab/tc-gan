@@ -19,6 +19,9 @@ def cached_record(name):
         elif 'gen_step' in df.columns:
             gen_step = df.loc[:, 'gen_step']
             df.loc[:, 'epoch'] = self.rc.gen_step_to_epoch(gen_step)
+        elif 'step' in df.columns:
+            step = df.loc[:, 'step']
+            df.loc[:, 'epoch'] = self.rc.step_to_epoch(step)
         return df
     get.__name__ = name
     return cached_property(get)

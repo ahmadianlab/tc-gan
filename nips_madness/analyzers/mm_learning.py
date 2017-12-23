@@ -3,33 +3,24 @@ from types import SimpleNamespace
 from matplotlib import pyplot
 
 from ..utils import csv_line
-from .mm_loader import MomentMatchingData
 from .learning import plot_gen_params
 
 
-def plot_loss(data, ax=None):
+def plot_loss(rec, ax=None):
     if ax is None:
         _, ax = pyplot.subplots()
 
-    ax.plot(data.epochs,
-            data.learning[:, 1],
-            label='loss')
+    ax.plot('epoch', 'loss', label='loss', data=rec.learning)
     ax.set_yscale('log')
 
     ax.legend(loc='best')
 
 
-def plot_moments(data, moment, ax=None):
+def plot_moments(rec, moment, ax=None):
     if ax is None:
         _, ax = pyplot.subplots()
 
-    imom = {
-        'mean': 0,
-        'var': 1,
-    }[moment]
-
-    gen_moments = data.gen_moments[:, imom]
-    ax.plot(data.epochs, gen_moments, linewidth=0.1)
+    ax.plot('epoch', moment, data=rec.gen_moments, linewidth=0.1)
     ax.set_yscale('log')
 
     ax.text(0.05, 0.95,
@@ -41,18 +32,17 @@ def plot_moments(data, moment, ax=None):
             transform=ax.transAxes)
 
 
-def plot_mm_learning(data, title_params=None):
-    raise NotImplementedError
+def plot_mm_learning(rec, title_params=None):
     fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))
 
-    plot_loss(data, axes[0, 0])
-    plot_moments(data, 'mean', axes[0, 1])
-    plot_moments(data, 'var', axes[0, 2])
+    plot_loss(rec, axes[0, 0])
+    plot_moments(rec, 'mean', axes[0, 1])
+    plot_moments(rec, 'var', axes[0, 2])
 
-    plot_gen_params(data, axes=axes[1, :])
-    plot_gen_params(data, axes=axes[2, :],
+    plot_gen_params(rec, axes=axes[1, :])
+    plot_gen_params(rec, axes=axes[2, :],
                     yscale='log', legend=False, ylim=False)
 
     for ax in axes[-1]:
@@ -60,7 +50,9 @@ def plot_mm_learning(data, title_params=None):
 
     def add_upper_ax(ax):
         def sync_xlim(ax):
-            ax_up.set_xlim(*map(data.epoch_to_step, ax.get_xlim()))
+            ax_up.set_xlim(*map(epoch_to_step, ax.get_xlim()))
+
+        epoch_to_step = rec.rc.epoch_to_step
 
         ax_up = ax.twiny()
         ax_up.set_xlabel('step')
@@ -74,7 +66,7 @@ def plot_mm_learning(data, title_params=None):
     # http://matplotlib.org/gallery/subplots_axes_and_figures/fahrenheit_celsius_scales.html
     # https://github.com/matplotlib/matplotlib/issues/7161#issuecomment-249620393
 
-    fig.suptitle(data.pretty_spec(title_params))
+    fig.suptitle(rec.pretty_spec(title_params))
     return SimpleNamespace(
         fig=fig,
         axes=axes,
@@ -83,8 +75,9 @@ def plot_mm_learning(data, title_params=None):
 
 
 def cli_mm_learning(datastore, show, figpath, title_params):
-    data = MomentMatchingData(datastore)
-    arts = plot_mm_learning(data, title_params)
+    from ..loaders import load_records
+    rec = load_records(datastore)
+    arts = plot_mm_learning(rec, title_params)
     fig = arts.fig
     if show:
         pyplot.show()

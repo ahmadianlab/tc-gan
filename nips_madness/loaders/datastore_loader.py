@@ -64,7 +64,7 @@ class DataStoreLoader1(object):
             (key, i) for key in ['mean', 'var']
             for i in range(len(gen_moments.columns) // 2)
         ])
-        gen_moments['gen_step'] = np.arange(len(gen_moments))
+        gen_moments['step'] = np.arange(len(gen_moments))
         return gen_moments
     # See: [[../drivers.py::gen_moments.csv]] which saves gen_moments.flat
     # of [[../networks/moment_matching.py::self.gen_moments]] which, in turn,

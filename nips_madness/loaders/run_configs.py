@@ -1,5 +1,3 @@
-import abc
-
 import numpy as np
 
 from ..networks.ssn import concat_flat
@@ -32,7 +30,7 @@ def parse_gen_param_name(name):
         return name, None
 
 
-class AbstractGANRunConfig(abc.ABC):
+class BaseGANRunConfig(object):
 
     @classmethod
     def from_info(cls, info):
@@ -71,7 +69,7 @@ class AbstractGANRunConfig(abc.ABC):
     def param_array_names(self):
         # TODO: save param_array_names in info.json
         if self.ssn_type == 'heteroin':
-            # See: AbstractEulerSSNCore.get_flat_param_names
+            # See: BaseEulerSSNCore.get_flat_param_names
             return ['V', 'J', 'D', 'S']
         else:
             return ['J', 'D', 'S']
@@ -143,7 +141,7 @@ class AbstractGANRunConfig(abc.ABC):
         return params
 
 
-class LegacyGANRunConfig(AbstractGANRunConfig):
+class LegacyGANRunConfig(BaseGANRunConfig):
 
     @property
     def track_offset_identity(self):
@@ -232,16 +230,16 @@ class LegacyGANRunConfig(AbstractGANRunConfig):
         return self.gan_type in ('cWGAN', 'WGAN')
 
 
-class AbstractWGANRunConfig(AbstractGANRunConfig):
+class BaseWGANRunConfig(BaseGANRunConfig):
     track_offset_identity = True
     is_WGAN = True
 
 
-class BPTTWGANRunConfig(AbstractWGANRunConfig):
+class BPTTWGANRunConfig(BaseWGANRunConfig):
     gan_type = 'WGAN'
 
 
-class BPTTcWGANRunConfig(AbstractWGANRunConfig):
+class BPTTcWGANRunConfig(BaseWGANRunConfig):
     gan_type = 'cWGAN'
 
     @property

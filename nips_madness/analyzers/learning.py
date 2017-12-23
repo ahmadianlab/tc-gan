@@ -39,11 +39,11 @@ def plot_data_smape(rec, ax=None, colors=0,
     else:
         colors = iter(colors)
 
-    ax.plot(rec.TC_mean['epochs'], smape(rec.TC_mean['gen'],
-                                         rec.TC_mean['data']),
+    ax.plot(rec.TC_mean['epoch'], smape(rec.TC_mean['gen'],
+                                        rec.TC_mean['data']),
             color=next(colors),
             label='TC sMAPE')
-    ax.plot(rec.generator['epochs'], gen_param_smape(rec),
+    ax.plot(rec.generator['epoch'], gen_param_smape(rec),
             color=next(colors),
             label='G param. sMAPE')
 
@@ -60,19 +60,19 @@ def plot_tc_errors(rec, legend=True, ax=None, per_stim=False,
         _, ax = pyplot.subplots()
     import matplotlib.patheffects as pe
 
-    epochs = rec.TC_mean['epochs']
+    epoch = rec.TC_mean['epoch']
     model = rec.TC_mean['gen'].as_matrix()
     true = rec.TC_mean['data'].as_matrix()
     total_error = smape(model, true)
 
     total_error_lines = ax.plot(
-        epochs,
+        epoch,
         total_error,
         path_effects=[pe.Stroke(linewidth=5, foreground='white'),
                       pe.Normal()])
     if per_stim:
         per_stim_error = 200 * abs((model - true) / (model + true))
-        per_stim_lines = ax.plot(epochs, per_stim_error, alpha=0.4)
+        per_stim_lines = ax.plot(epoch, per_stim_error, alpha=0.4)
     else:
         per_stim_error = per_stim_lines = None
 
@@ -122,7 +122,7 @@ def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
             raise ValueError('Needs {} axes; {} given.'
                              .format(len(param_array_names), len(axes)))
 
-    epochs = rec.generator['epochs']
+    epoch = rec.generator['epoch']
 
     arts = {}
     arts['gen_lines'] = gen_lines = {}
@@ -137,7 +137,7 @@ def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
                 linestyle='--',
                 color=color)
             gen_lines[name] = ax.plot(
-                epochs,
+                epoch,
                 rec.generator[name],
                 label=name_to_tex(name),
                 color=color)

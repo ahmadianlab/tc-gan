@@ -12,10 +12,10 @@ def cached_record(name):
         df = self.datastore.load(name)
         if 'disc_step' in df.columns:
             disc_step = df.loc[:, 'disc_step']
-            df.loc[:, 'epochs'] = self.rc.disc_updates_to_epoch(disc_step + 1)
+            df.loc[:, 'epoch'] = self.rc.disc_updates_to_epoch(disc_step + 1)
         elif 'gen_step' in df.columns:
             gen_step = df.loc[:, 'gen_step']
-            df.loc[:, 'epochs'] = self.rc.gen_step_to_epoch(gen_step)
+            df.loc[:, 'epoch'] = self.rc.gen_step_to_epoch(gen_step)
         return df
     get.__name__ = name
     return cached_property(get)
@@ -67,7 +67,7 @@ class GANRecords(BaseRecords):
     @property
     def disc_param_stats_names(self):
         return [name for name in self.disc_param_stats.columns
-                if name not in ('gen_step', 'disc_step', 'epochs')]
+                if name not in ('gen_step', 'disc_step', 'epoch')]
 
 
 class ConditionalGANRecords(GANRecords):

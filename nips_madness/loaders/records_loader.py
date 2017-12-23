@@ -1,6 +1,8 @@
 from pathlib import Path
 import json
 
+import numpy as np
+
 from ..analyzers.loader import guess_run_module
 from ..utils import cached_property
 from .datastore_loader import get_datastore
@@ -11,8 +13,8 @@ def cached_record(name):
     def get(self):
         df = self.datastore.load(name)
         if 'disc_step' in df.columns:
-            disc_step = df.loc[:, 'disc_step']
-            df.loc[:, 'epoch'] = self.rc.disc_updates_to_epoch(disc_step + 1)
+            disc_updates = np.arange(1, len(df) + 1)
+            df.loc[:, 'epoch'] = self.rc.disc_updates_to_epoch(disc_updates)
         elif 'gen_step' in df.columns:
             gen_step = df.loc[:, 'gen_step']
             df.loc[:, 'epoch'] = self.rc.gen_step_to_epoch(gen_step)

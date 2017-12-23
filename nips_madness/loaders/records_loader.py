@@ -54,7 +54,9 @@ class BaseRecords(object):
         datastore = get_datastore(datastore_path, info)
         return cls(datastore, info, rc)
 
-    def pretty_spec(self, keys=[]):
+    def pretty_spec(self, keys=None):
+        if keys is None:
+            keys = []
         spec = ' '.join('{}={}'.format(k, getattr(self.rc, k)) for k in keys)
         return '{}: {}'.format(self.rc.gan_type, spec)
 

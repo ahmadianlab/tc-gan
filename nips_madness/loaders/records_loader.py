@@ -96,6 +96,12 @@ class MomentMatchingRecords(BaseRecords):
             return
         df.loc[:, 'epoch'] = self.rc.step_to_epoch(step)
 
+    def pretty_spec(self, keys=None):
+        if keys is None:
+            keys = []
+        spec = ' '.join('{}={}'.format(k, getattr(self.rc, k)) for k in keys)
+        return 'MM: {}'.format(spec)
+
 
 def get_datastore_path(path):
     datastore_path = Path(path)

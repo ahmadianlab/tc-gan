@@ -23,7 +23,9 @@ def smape(x, y, axis=-1):
     """
     x = np.asarray(x)
     y = np.asarray(y)
-    return 200 * np.abs((x - y) / (x + y)).mean(axis=axis)
+    return 200 * np.nanmean(np.abs((x - y) / (x + y)), axis=axis)
+# Use nanmean to make it work for the case both x and y are zero at
+# some indices.
 
 
 def gen_param_smape(rec):

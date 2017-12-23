@@ -4,10 +4,9 @@ import warnings
 
 import numpy as np
 
-from ..analyzers.loader import guess_run_module
 from ..utils import cached_property
 from .datastore_loader import get_datastore
-from .run_configs import get_run_config
+from .run_configs import get_run_config, guess_run_module
 
 
 def cached_record(name):

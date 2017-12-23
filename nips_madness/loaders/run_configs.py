@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 
 from ..networks.ssn import concat_flat
@@ -28,6 +30,14 @@ def parse_gen_param_name(name):
         return array_name, index
     else:
         return name, None
+
+
+def guess_run_module(info):
+    try:
+        script_file = info['extra_info']['script_file']
+    except KeyError:
+        return 'gan'
+    return Path(script_file).stem
 
 
 class BaseRunConfig(object):
@@ -294,6 +304,5 @@ module_class_map = {
 
 
 def get_run_config(info):
-    from ..analyzers.loader import guess_run_module
     run_module = guess_run_module(info)
     return module_class_map[run_module].from_info(info)

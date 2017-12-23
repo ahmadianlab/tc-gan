@@ -1,3 +1,7 @@
+"""
+Old loader module.  # TODO: remove it
+"""
+
 from pathlib import Path
 import collections
 import json
@@ -7,6 +11,7 @@ import warnings
 import numpy as np
 
 from .. import ssnode
+from ..loaders.run_configs import guess_run_module
 
 try:
     string_types = (str, unicode)
@@ -486,14 +491,6 @@ def load_gandata(paths, **kwds):
     if isinstance(paths, string_types):
         return GANData.load(paths)
     return GANGrid(map(GANData.load, paths), **kwds)
-
-
-def guess_run_module(info):
-    try:
-        script_file = info['extra_info']['script_file']
-    except KeyError:
-        return 'gan'
-    return Path(script_file).stem
 
 
 def get_run_module(path):

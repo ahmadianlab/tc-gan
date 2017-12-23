@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import warnings
 
 import numpy as np
 
@@ -38,10 +39,6 @@ class BaseRecords(object):
     def run_module(self):
         return guess_run_module(self.info)
 
-    # @property
-    # def is_legacy(self):
-    #     return self.run_module in ('gan', 'cgan', 'moments')
-
     learning = cached_record('learning')
     generator = cached_record('generator')
 
@@ -54,6 +51,9 @@ class BaseRecords(object):
     def from_info(cls, info, datastore_path):
         rc = get_run_config(info)
         datastore = get_datastore(datastore_path, info)
+        if rc.is_legacy:
+            # TODO: test loading legacy GAN data or ditch them completely.
+            warnings.warn('Loading legacy GAN data is not well tested!')
         return cls(datastore, info, rc)
 
     def pretty_spec(self, keys=None):

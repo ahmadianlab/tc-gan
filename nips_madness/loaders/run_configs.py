@@ -32,6 +32,8 @@ def parse_gen_param_name(name):
 
 class BaseGANRunConfig(object):
 
+    is_legacy = False
+
     @classmethod
     def from_info(cls, info):
         return cls(info['run_config'])
@@ -142,6 +144,8 @@ class BaseGANRunConfig(object):
 
 
 class LegacyGANRunConfig(BaseGANRunConfig):
+
+    is_legacy = True
 
     @property
     def track_offset_identity(self):

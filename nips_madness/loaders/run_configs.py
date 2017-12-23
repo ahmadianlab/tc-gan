@@ -2,6 +2,8 @@ import abc
 
 import numpy as np
 
+from ..networks.ssn import concat_flat
+
 
 class AbstractGANRunConfig(abc.ABC):
 
@@ -29,6 +31,32 @@ class AbstractGANRunConfig(abc.ABC):
     @property
     def n_contrasts(self):
         return len(self.contrasts)
+
+    @property
+    def ssn_impl(self):
+        return self.dict.get('ssn_impl', 'default')
+
+    @property
+    def ssn_type(self):
+        return self.dict.get('ssn_type', 'default')
+
+    @property
+    def param_array_names(self):
+        # TODO: save param_array_names in info.json
+        if self.ssn_type == 'heteroin':
+            # See: AbstractEulerSSNCore.get_flat_param_names
+            return ['V', 'J', 'D', 'S']
+        else:
+            return ['J', 'D', 'S']
+
+    @property
+    def param_element_names(self):
+        # TODO: save param_element_names in info.json
+        from ..networks.ssn import genparam_names
+        names = list(genparam_names)
+        if self.ssn_type == 'heteroin':
+            names = ['V_E', 'V_I'] + names
+        return names
 
     # @property
     # def n_stim(self):
@@ -62,6 +90,23 @@ class AbstractGANRunConfig(abc.ABC):
 
     def epoch_to_disc_updates(self, epoch):
         return epoch * self.datasize / self.batchsize
+
+    def get_true_param(self, name):
+        from .. import ssnode
+        true_ssn_options = self.dict.get('true_ssn_options')
+        if name in true_ssn_options:
+            val = true_ssn_options[name]
+        elif name in ssnode.DEFAULT_PARAMS:
+            val = ssnode.DEFAULT_PARAMS[name]
+        return np.asarray(val)
+
+    def flatten_true_params(self, ndim=1):
+        assert ndim in (1, 2)
+        params = concat_flat(map(self.get_true_param,
+                                 self.param_array_names))
+        if ndim == 2:
+            return params.reshape((1, -1))
+        return params
 
 
 class LegacyGANRunConfig(AbstractGANRunConfig):

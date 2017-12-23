@@ -42,6 +42,7 @@ def plot_moments(data, moment, ax=None):
 
 
 def plot_mm_learning(data, title_params=None):
+    raise NotImplementedError
     fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))

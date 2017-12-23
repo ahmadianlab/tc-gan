@@ -28,8 +28,25 @@ class BaseRecords(object):
         self.info = info
         self.rc = rc
 
+    @property
+    def data_version(self):
+        return self.info.get('extra_info', {}).get('data_version', 0)
+
+    @property
+    def run_module(self):
+        return guess_run_module(self.info)
+
+    # @property
+    # def is_legacy(self):
+    #     return self.run_module in ('gan', 'cgan', 'moments')
+
     learning = cached_record('learning')
     generator = cached_record('generator')
+
+    flatten_true_params = property(lambda self: self.rc.flatten_true_params)
+
+    def flatten_gen_params(self):
+        return self.generator.loc[:, self.rc.param_element_names].as_matrix()
 
     @classmethod
     def from_info(cls, info, datastore_path):
@@ -37,11 +54,20 @@ class BaseRecords(object):
         datastore = get_datastore(datastore_path, info)
         return cls(datastore, info, rc)
 
+    def pretty_spec(self, keys=[]):
+        spec = ' '.join('{}={}'.format(k, getattr(self.rc, k)) for k in keys)
+        return '{}: {}'.format(self.rc.gan_type, spec)
+
 
 class GANRecords(BaseRecords):
 
     disc_param_stats = cached_record('disc_param_stats')
     disc_learning = cached_record('disc_learning')
+
+    @property
+    def disc_param_stats_names(self):
+        return [name for name in self.disc_param_stats.columns
+                if name not in ('gen_step', 'disc_step', 'epochs')]
 
 
 class ConditionalGANRecords(GANRecords):

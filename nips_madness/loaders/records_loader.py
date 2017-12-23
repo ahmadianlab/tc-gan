@@ -13,15 +13,7 @@ from .run_configs import get_run_config
 def cached_record(name):
     def get(self):
         df = self.datastore.load(name)
-        if 'disc_step' in df.columns:
-            disc_updates = np.arange(1, len(df) + 1)
-            df.loc[:, 'epoch'] = self.rc.disc_updates_to_epoch(disc_updates)
-        elif 'gen_step' in df.columns:
-            gen_step = df.loc[:, 'gen_step']
-            df.loc[:, 'epoch'] = self.rc.gen_step_to_epoch(gen_step)
-        elif 'step' in df.columns:
-            step = df.loc[:, 'step']
-            df.loc[:, 'epoch'] = self.rc.step_to_epoch(step)
+        self.insert_epoch_column(df)
         return df
     get.__name__ = name
     return cached_property(get)
@@ -44,6 +36,14 @@ class BaseRecords(object):
 
     learning = cached_record('learning')
     generator = cached_record('generator')
+
+    def insert_epoch_column(self, df):
+        if 'disc_step' in df.columns:
+            disc_updates = np.arange(1, len(df) + 1)
+            df.loc[:, 'epoch'] = self.rc.disc_updates_to_epoch(disc_updates)
+        elif 'gen_step' in df.columns:
+            gen_step = df.loc[:, 'gen_step']
+            df.loc[:, 'epoch'] = self.rc.gen_step_to_epoch(gen_step)
 
     flatten_true_params = property(lambda self: self.rc.flatten_true_params)
 
@@ -86,6 +86,15 @@ class ConditionalGANRecords(GANRecords):
 class MomentMatchingRecords(BaseRecords):
 
     gen_moments = cached_record('gen_moments')
+
+    def insert_epoch_column(self, df):
+        if 'gen_step' in df.columns:
+            step = df.loc[:, 'gen_step']
+        elif 'step' in df.columns:
+            step = df.loc[:, 'step']
+        else:
+            return
+        df.loc[:, 'epoch'] = self.rc.step_to_epoch(step)
 
 
 def get_datastore_path(path):

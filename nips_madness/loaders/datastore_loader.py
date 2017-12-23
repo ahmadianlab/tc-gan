@@ -44,7 +44,19 @@ class DataStoreLoader1(object):
         try:
             loader = getattr(self, 'load_' + name)
         except AttributeError:
-            return self.read_csv(name + '.csv')  # TODO: improve
+            csv_name = name + '.csv'
+            if self.directory.joinpath(csv_name).exists():
+                return self.read_csv(csv_name)
+
+            import h5py
+            h5_name = name + '.hdf5'
+            if self.directory.joinpath(h5_name).exists():
+                with h5py.File(h5_name) as file:
+                    return file[name]
+
+            # TODO: don't re-open for every call:
+            with h5py.File('store.hdf5') as file:
+                return file[name]
         else:
             return loader()
 

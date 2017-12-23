@@ -61,6 +61,7 @@ class BaseRecords(object):
 
 class GANRecords(BaseRecords):
 
+    TC_mean = cached_record('TC_mean')
     disc_param_stats = cached_record('disc_param_stats')
     disc_learning = cached_record('disc_learning')
 

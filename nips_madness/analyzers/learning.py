@@ -21,6 +21,8 @@ def smape(x, y, axis=-1):
 
     https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error
     """
+    x = np.asarray(x)
+    y = np.asarray(y)
     return 200 * np.abs((x - y) / (x + y)).mean(axis=axis)
 
 
@@ -163,7 +165,7 @@ def plot_gan_cost_and_rate_penalty(rec, ax=None,
                                    yscale_rate_penalty='log'):
     if ax is None:
         _, ax = pyplot.subplots()
-    df = rec.generator
+    df = rec.learning
 
     color = 'C0'
     if rec.rc.is_WGAN:
@@ -208,9 +210,8 @@ def plot_disc_param_stats(
     if ax is None:
         _, ax = pyplot.subplots()
     param_names = rec.disc_param_stats_names
-    rec.param_stats.plot('epoch', param_names,
-                         logy=logy, legend=False, ax=ax,
-                         **kwargs)
+    rec.disc_param_stats.plot(
+        'epoch', param_names, logy=logy, legend=False, ax=ax, **kwargs)
 
     for line in ax.get_lines():
         label = param_stats_to_pretty_label(line.get_label())

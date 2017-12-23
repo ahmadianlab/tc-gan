@@ -104,6 +104,7 @@ class AbstractGANRunConfig(abc.ABC):
         assert ndim in (1, 2)
         params = concat_flat(map(self.get_true_param,
                                  self.param_array_names))
+        params = np.asarray(params)
         if ndim == 2:
             return params.reshape((1, -1))
         return params

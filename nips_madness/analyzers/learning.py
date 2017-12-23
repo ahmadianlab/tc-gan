@@ -202,13 +202,37 @@ def plot_gan_cost_and_rate_penalty(rec, ax=None,
     ax.set_yscale(yscale_dacc)
 
 
+def disc_param_stats_to_pretty_label(name):
+    """
+    Convert param_stats names to latex label for plotting.
+
+    >>> disc_param_stats_to_pretty_label('W.nnorm')
+    '$|W_0|$'
+    >>> disc_param_stats_to_pretty_label('W.nnorm.1')
+    '$|W_1|$'
+    >>> disc_param_stats_to_pretty_label('b.nnorm.2')
+    '$|b_2|$'
+    >>> disc_param_stats_to_pretty_label('scales.nnorm.3')
+    '$|g_3|$'
+    >>> disc_param_stats_to_pretty_label('spam')
+
+    """
+    parts = name.split('.')
+    if 2 <= len(parts) <= 3 and parts[1] == 'nnorm':
+        var = parts[0]
+        suffix = parts[2] if len(parts) == 3 else '0'
+        if var == 'scales':
+            var = 'g'
+            # "g" for gain; see: Ba et al (2016) Layer Normalization
+        return '$|{}_{}|$'.format(var, suffix)
+
+
 def plot_disc_param_stats(
         rec, ax=None, logy=True,
         legend=dict(loc='center left', ncol='auto', fontsize='small',
                     handlelength=0.5, columnspacing=0.4),
         legend_max_rows=7,
         **kwargs):
-    from .disc_learning import param_stats_to_pretty_label
     if ax is None:
         _, ax = pyplot.subplots()
     param_names = rec.disc_param_stats_names
@@ -216,7 +240,7 @@ def plot_disc_param_stats(
         'epoch', param_names, logy=logy, legend=False, ax=ax, **kwargs)
 
     for line in ax.get_lines():
-        label = param_stats_to_pretty_label(line.get_label())
+        label = disc_param_stats_to_pretty_label(line.get_label())
         if label:
             line.set_label(label)
 

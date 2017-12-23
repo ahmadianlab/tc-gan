@@ -36,6 +36,9 @@ class AbstractGANRunConfig(abc.ABC):
 
     def gen_step_to_epoch(self, gen_step):
         disc_updates = self.gen_step_to_disc_updates(gen_step)
+        return self.disc_updates_to_epoch(disc_updates)
+
+    def disc_updates_to_epoch(self, disc_updates):
         return disc_updates * self.batchsize / self.datasize
 
     def gen_step_to_disc_updates(self, gen_step):

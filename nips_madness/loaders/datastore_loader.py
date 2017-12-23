@@ -1,16 +1,9 @@
+from contextlib import contextmanager
 from pathlib import Path
 import warnings
 
 import numpy as np
-
-
-def prepend_dtype(a, dtype_head):
-    dtype = list(dtype_head)
-    dtype.extend((a.dtype[i], a.dtype.names[i]) for i in range(len(a.dtype)))
-    b = np.empty(len(a), dtype=dtype)
-    for k in a.dtype.names:
-        b[k] = a[k]
-    return b
+import pandas
 
 
 def has_csv_header(file):
@@ -32,34 +25,50 @@ class DataStoreLoader1(object):
     def __init__(self, directory):
         self.directory = Path(directory)
 
+    @contextmanager
+    def open_if_not(self, file_or_name, *args, **kwargs):
+        if hasattr(file_or_name, 'read'):
+            yield file_or_name
+        else:
+            with self.open(file_or_name, *args, **kwargs) as file:
+                yield file
+
     def open(self, fname, *args, **kwargs):
         return open(str(self.directory.join(fname)), *args, **kwargs)
 
-    def genfromtxt(self, fname, *args, **kwds):
-        if hasattr(fname, 'read'):
-            array = np.genfromtxt(fname, *args, **kwds)
-        else:
-            with self.open(fname) as file:
-                array = np.genfromtxt(file, *args, **kwds)
-        if array.ndim == 0:
-            array = array.reshape(1)
-        return array
-
-    def load_csv(self, fname, *args, names=True, dtype=None, **kwds):
-        return self.genfromtxt(fname, *args, delimiter=',', names=names,
-                               dtype=dtype, **kwds)
+    def read_csv(self, fname, **kwargs):
+        with self.open_if_not(fname) as file:
+            return pandas.read_csv(file, **kwargs)
 
     def load(self, name):
         try:
             loader = getattr(self, 'load_' + name)
         except AttributeError:
-            return self.load_csv(name + '.csv')  # TODO: improve
+            return self.read_csv(name + '.csv')  # TODO: improve
         else:
             return loader()
 
     def load_TC_mean(self):
-        with self.open('TC_mean.csv') as file:
-            return np.loadtxt(file, delimiter=',')
+        TC_mean = self.read_csv('TC_mean.csv', header=None)
+        TC_mean.columns = pandas.MultiIndex.from_tuples([
+            (key, i) for key in ['gen', 'data']
+            for i in range(len(TC_mean.columns) // 2)
+        ])
+        TC_mean['gen_step'] = np.arange(len(TC_mean))
+        return TC_mean
+    # See: [[../drivers.py::TC_mean.csv]]
+
+    def load_gen_moments(self):
+        gen_moments = self.read_csv('gen_moments.csv', header=None)
+        gen_moments.columns = pandas.MultiIndex.from_tuples([
+            (key, i) for key in ['mean', 'var']
+            for i in range(len(gen_moments.columns) // 2)
+        ])
+        gen_moments['gen_step'] = np.arange(len(gen_moments))
+        return gen_moments
+    # See: [[../drivers.py::gen_moments.csv]] which saves gen_moments.flat
+    # of [[../networks/moment_matching.py::self.gen_moments]] which, in turn,
+    # is calculated from [[../networks/moment_matching.py::sample_moments]]
 
     def load_tc_stats(self):
         raise NotImplementedError
@@ -70,34 +79,33 @@ class DataStoreLoader0(DataStoreLoader1):
 
     def load_generator(self):
         with self.open('generator.csv') as file:
-            names = has_csv_header(file)
-            generator = self.load_csv(file, names=names)
+            header = 0 if has_csv_header(file) else None
+            generator = self.read_csv(file, header=header)
 
-        if len(generator.dtype) == 12:
+        if len(generator.columns) == 12:
             warnings.warn('generator.csv only contains 12 columns; '
                           'inserting index columns.')
-            generator = prepend_dtype(generator, [('gen_step', int)])
             generator['gen_step'] = np.arange(len(generator))
 
-        if names is None:
+        if header is None:
             warnings.warn('generator.csv has no header line; '
                           'assuming the default.')
-            generator.dtype.names = ['gen_step',
-                                     'J_EE', 'J_EI', 'J_IE', 'J_II',
-                                     'D_EE', 'D_EI', 'D_IE', 'D_II',
-                                     'S_EE', 'S_EI', 'S_IE', 'S_II']
+            generator.columns = ['gen_step',
+                                 'J_EE', 'J_EI', 'J_IE', 'J_II',
+                                 'D_EE', 'D_EI', 'D_IE', 'D_II',
+                                 'S_EE', 'S_EI', 'S_IE', 'S_II']
 
         return generator
 
     def load_learning(self):
         with self.open('learning.csv') as file:
-            names = has_csv_header(file)
-            learning = self.load_csv(file, names=names)
+            header = 0 if has_csv_header(file) else None
+            learning = self.read_csv(file, header=header)
 
-        if names is None:
+        if header is None:
             warnings.warn('learning.csv has no header line; '
                           'assuming the default.')
-            learning.dtype.names = [
+            learning.columns = [
                 'gen_step', 'Gloss', 'Dloss', 'Daccuracy', 'SSsolve_time',
                 'gradient_time', 'model_convergence', 'model_unused',
                 'rate_penalty']

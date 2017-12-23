@@ -9,7 +9,14 @@ from .run_configs import get_run_config
 
 def cached_record(name):
     def get(self, name):
-        return self.datastore.load(name)
+        df = self.datastore.load(name)
+        if 'disc_step' in df.columns:
+            disc_step = df.loc[:, 'disc_step']
+            df.loc[:, 'epochs'] = self.rc.disc_updates_to_epoch(disc_step + 1)
+        elif 'gen_step' in df.columns:
+            gen_step = df.loc[:, 'gen_step']
+            df.loc[:, 'epochs'] = self.rc.gen_step_to_epoch(gen_step)
+        return df
     get.__name__ = name
     return cached_property(get)
 

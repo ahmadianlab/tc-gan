@@ -35,6 +35,14 @@ def gen_param_smape(rec):
 
 def plot_data_smape(rec, ax=None, colors=0,
                     ylim=(0, 200)):
+    """
+    Plot sMPAE of mean TC and generator parameter.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
 
@@ -59,7 +67,17 @@ def plot_data_smape(rec, ax=None, colors=0,
 
 def plot_tc_errors(rec, legend=True, ax=None, per_stim=False,
                    ylim=(0, 200)):
-    """Plot tuning curve (TC) sMAPE."""
+    """
+    Plot tuning curve (TC) sMAPE.
+
+    .. WARNING:: Untested!
+    .. TODO:: Test or remove `plot_tc_errors`.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
     import matplotlib.patheffects as pe
@@ -115,6 +133,18 @@ def name_to_tex(name):
 
 def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
                     param_array_names=None):
+    """
+    Plot evolution of generator parameters.
+
+    Generator parameters in `rec.generator <.BaseRecords.generator>`
+    and corresponding "true" parameters are plotted.
+
+    Parameters
+    ----------
+    rec : `.BaseRecords`
+        Works for both GAN and moment-matching data records.
+
+    """
     if param_array_names is None:
         param_array_names = rec.rc.param_array_names
     if axes is None:
@@ -165,6 +195,16 @@ def plot_gan_cost_and_rate_penalty(rec, ax=None,
                                    ymax_dacc=1, ymin_dacc=-0.05,
                                    yscale_dacc='symlog',
                                    yscale_rate_penalty='log'):
+    """
+    Plot GAN loss and rate penalty (if recorded).
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+        `rec.learning <.GANRecords.learning>` is plotted.
+        If it is a WGAN, Wasserstein distance is plotted.
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
     df = rec.learning
@@ -233,6 +273,15 @@ def plot_disc_param_stats(
                     handlelength=0.5, columnspacing=0.4),
         legend_max_rows=7,
         **kwargs):
+    """
+    Plot recorded statistics of discriminator network parameters.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+        `rec.disc_param_stats <.GANRecords.disc_param_stats>` is plotted.
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
     param_names = rec.disc_param_stats_names
@@ -256,6 +305,14 @@ def plot_disc_param_stats(
 
 
 def plot_learning(rec, title_params=None):
+    """
+    Plot various GAN learning records are plotted in 4x3 axes.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+
+    """
     df = rec.learning.copy()
     fig, axes = pyplot.subplots(nrows=4, ncols=3,
                                 sharex=True,
@@ -324,6 +381,17 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
                           include_true=True,
                           xlabel='Bandwidths',
                           ylabel='Average Firing Rate'):
+    """
+    Plot evolution of TC averaged over noise (zs).
+
+    .. WARNING:: It is not used for a long time.
+    .. TODO:: Make `plot_tuning_curve_evo` accept `.GANRecords`.
+
+    Parameters
+    ----------
+    data : `.GANData`
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
 
@@ -366,6 +434,9 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
 
 
 def analyze_learning(logpath, title_params):
+    """
+    Load learning records from `logpath` and plot them in a figure.
+    """
     from ..loaders import load_records
     rec = load_records(logpath)
     if rec.run_module == 'bptt_moments':

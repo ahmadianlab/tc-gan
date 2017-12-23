@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import collections
 import itertools
 
 import lasagne
@@ -60,12 +61,9 @@ class BaseRecorder(object):
         self.datastore = datastore
         self.quiet = quiet
 
-    def _saverow(self, row):
-        assert len(row) == len(self.column_names)
-        self.datastore.tables.saverow(self.filename, row, echo=not self.quiet)
-
-    def write_header(self):
-        self._saverow(self.column_names)
+    @property
+    def column_names(self):
+        return self.dtype.names
 
     def record(self, *row):
         self._saverow(row)
@@ -81,7 +79,23 @@ class BaseRecorder(object):
         return cls.make(driver.datastore)
 
 
+class CSVRecorder(BaseRecorder):
+
+    @property
+    def filename(self):
+        return self.tablename + '.csv'
+
+    def _saverow(self, row):
+        assert len(row) == len(self.column_names)
+        self.datastore.tables.saverow(self.filename, row, echo=not self.quiet)
+
+    def write_header(self):
+        self._saverow(self.column_names)
+
+
 class HDF5Recorder(BaseRecorder):
+
+    dedicated = False
 
     def _saverow(self, row):
         typed_row = np.array(tuple(row), dtype=self.dtype)
@@ -90,20 +104,24 @@ class HDF5Recorder(BaseRecorder):
                                          echo=not self.quiet)
 
     def write_header(self):
-        self.datastore.h5.tables.create_table(self.tablename, self.dtype)
-
-    @property
-    def column_names(self):
-        return self.dtype.names
+        self.datastore.h5.tables.create_table(self.tablename, self.dtype,
+                                              dedicated=self.dedicated)
 
 
-class LearningRecorder(BaseRecorder):
+class LearningRecorder(HDF5Recorder):
 
-    filename = "learning.csv"
-    column_names = (
-        "gen_step", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
-        "gradient_time", "model_convergence", "model_unused",
-        "rate_penalty")
+    tablename = 'learning'
+    dtype = np.dtype([
+        ('gen_step', 'uint32'),
+        ('Gloss', 'double'),
+        ('Dloss', 'double'),
+        ('Daccuracy', 'double'),
+        ('SSsolve_time', 'double'),
+        ('gradient_time', 'double'),
+        ('model_convergence', 'uint32'),
+        ('model_unused', 'uint32'),
+        ('rate_penalty', 'double')
+    ])
 
     def record(self, gen_step, update_result):
         self._saverow([
@@ -123,12 +141,15 @@ class LearningRecorder(BaseRecorder):
         return cls.make(driver.datastore, quiet=driver.quiet)
 
 
-class MMLearningRecorder(BaseRecorder):
+class MMLearningRecorder(HDF5Recorder):
 
-    filename = "learning.csv"
-    column_names = (
-        "step", "loss", "dynamics_penalty", "train_time",
-    )
+    tablename = 'learning'
+    dtype = np.dtype([
+        ('step', 'uint32'),
+        ('loss', 'double'),
+        ('dynamics_penalty', 'double'),
+        ('train_time', 'double'),
+    ])
 
     def record(self, gen_step, update_result):
         self._saverow([
@@ -143,20 +164,33 @@ class MMLearningRecorder(BaseRecorder):
         return cls.make(driver.datastore, quiet=driver.quiet)
 
 
-class DiscLearningRecorder(BaseRecorder):
+class DiscLearningRecorder(HDF5Recorder):
 
-    filename = 'disc_learning.csv'
-    column_names = (
-        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
-        'SSsolve_time', 'gradient_time',
-        "model_convergence", "model_unused",
-    )
+    tablename = 'disc_learning'
+    dtype = np.dtype([
+        ('gen_step', 'uint32'),
+        ('disc_step', 'uint32'),
+        ('Dloss', 'double'),
+        ('Daccuracy', 'double'),
+        ('SSsolve_time', 'double'),
+        ('gradient_time', 'double'),
+        ('model_convergence', 'uint32'),
+        ('model_unused', 'uint32'),
+    ])
 
 
-class GenParamRecorder(BaseRecorder):
+def gen_param_dtype(names):
+    return [
+        ('gen_step', 'uint32'),
+    ] + [
+        (n, 'double') for n in names
+    ]
 
-    filename = 'generator.csv'
-    column_names = ('gen_step',) + genparam_names
+
+class GenParamRecorder(HDF5Recorder):
+
+    tablename = 'generator'
+    dtype = np.dtype(gen_param_dtype(genparam_names))
 
     def __init__(self, datastore, gan):
         self.gan = gan
@@ -181,27 +215,37 @@ class FlexGenParamRecorder(GenParamRecorder):
     def __init__(self, *args, **kwargs):
         super(FlexGenParamRecorder, self).__init__(*args, **kwargs)
 
-        self.column_names = ('gen_step',) \
-            + tuple(self.gan.gen.model.get_flat_param_names())
+        self.dtype = np.dtype(gen_param_dtype(
+            self.gan.gen.model.get_flat_param_names()))
 
     def record(self, gen_step):
         self._saverow([gen_step] + list(self.gan.gen.get_flat_param_values()))
         return self.gan.get_gen_param()  # for compatibility  # TODO: remove!
 
 
-class DiscParamStatsRecorder(BaseRecorder):
+class DiscParamStatsRecorder(HDF5Recorder):
 
-    filename = 'disc_param_stats.csv'
+    tablename = 'disc_param_stats'
 
     def __init__(self, datastore, discriminator):
         self.discriminator = discriminator
         super(DiscParamStatsRecorder, self).__init__(datastore)
 
         params = lasagne.layers.get_all_params(discriminator, trainable=True)
-        self.column_names = tuple(['gen_step', 'disc_step'] + [
-            '{}.nnorm'.format(p.name)  # Normalized NORM
-            for p in params
+        self.dtype = np.dtype([
+            ('gen_step', 'uint32'),
+            ('disc_step', 'uint32'),
+        ] + [
+            (name, 'double')
+            for name in self.disc_param_unique_names(p.name for p in params)
         ])
+
+    @staticmethod
+    def disc_param_unique_names(names):
+        counter = collections.Counter()
+        for n in names:
+            yield '{}.nnorm.{}'.format(n, counter[n])  # Normalized NORM
+            counter[n] += 1
 
     def record(self, gen_step, disc_step):
         nnorms = [
@@ -221,6 +265,7 @@ class DiscParamStatsRecorder(BaseRecorder):
 class ConditionalTuningCurveStatsRecorder(HDF5Recorder):
 
     tablename = "tc_stats"
+    dedicated = True
 
     def __init__(self, datastore, num_bandwidths):
         super(ConditionalTuningCurveStatsRecorder, self).__init__(datastore)

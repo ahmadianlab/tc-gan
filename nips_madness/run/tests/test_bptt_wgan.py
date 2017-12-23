@@ -4,7 +4,8 @@ import pytest
 
 from .. import bptt_wgan
 from ... import recorders
-from .test_gan import load_json, load_gandata
+from ...loaders import load_records
+from .test_gan import load_json
 
 
 def single_g_step(args):
@@ -19,6 +20,11 @@ def single_g_step(args):
     ] + args)
 
 
+def test_single_g_step_logfiles_slowtest(cleancwd):
+    single_g_step([])
+    assert cleancwd.join('logfiles').check(dir=1)
+
+
 @pytest.mark.parametrize('args', [
     [],
     ['--sample-sites', '0, 0.5'],
@@ -27,10 +33,12 @@ def single_g_step(args):
 def test_single_g_step_slowtest(args, cleancwd,
                                 single_g_step=single_g_step,
                                 script_file=bptt_wgan.__file__):
-    single_g_step(args)
-    assert cleancwd.join('logfiles').check()
+    datastore_name = 'results'
+    single_g_step(args + ['--datastore', datastore_name])
+    datastore_path = cleancwd.join(datastore_name)
+    assert datastore_path.check()
 
-    info = load_json(cleancwd, 'info.json')
+    info = load_json(datastore_path, 'info.json')
     assert info['extra_info']['script_file'] == script_file
     assert 'PATH' in info['meta_info']['environ']
 
@@ -39,14 +47,16 @@ def test_single_g_step_slowtest(args, cleancwd,
         return
 
     with pytest.warns(None) as record:
-        data = load_gandata(cleancwd)
+        rec = load_records(str(datastore_path))
     assert len(record) == 0
 
-    assert data.main.shape == (1, len(recorders.LearningRecorder.column_names))
-    assert data.main_names == list(recorders.LearningRecorder.column_names)
+    df = rec.learning
+    assert df.column.names == len(recorders.LearningRecorder.column_names)
+    assert len(df) == 1
 
-    assert data.gen.shape == (1, len(recorders.GenParamRecorder.column_names))
-    assert data.gen_names == list(recorders.GenParamRecorder.column_names)
+    df = rec.generator
+    assert df.column.names == len(recorders.GenParamRecorder.column_names)
+    assert len(df) == 1
 
 
 @pytest.mark.parametrize('args, config', [

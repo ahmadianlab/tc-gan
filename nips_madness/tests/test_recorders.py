@@ -38,7 +38,7 @@ class FakeLearningRecords(object):
 class FakeDiscLearningRecords(object):
 
     def send_record(self, rec):
-        rec.record(*[0] * len(recorders.DiscLearningRecorder.column_names))
+        rec.record(*[0] * len(rec.column_names))
 
 
 class FakeGenParamRecords(object):
@@ -61,18 +61,38 @@ recorder_faker_map = {
 }
 
 
+def setup_recorder(recclass):
+    driver = mock.Mock()
+    driver.gan.gen, _ = gen, _ = emit_tcg_for_test()
+
+    if recclass is recorders.GenParamRecorder:
+        driver.gan.get_gen_param.return_value \
+            = [p.get_value() for p in gen.get_all_params()]
+    elif recclass is recorders.DiscParamStatsRecorder:
+        layers = [16, 16]
+        normalization = ['none', 'layer']
+        driver.gan.discriminator \
+            = make_net((2, 3), 'WGAN', layers, normalization)
+
+    rec = recclass.from_driver(driver)
+    rec._saverow = mock.Mock()
+
+    return rec, driver
+
+
 @pytest.mark.parametrize('recclass', sorted(recorder_faker_map, key=str))
 def test_record_shape(recclass):
-    driver = fake_driver()
-    rec = recclass.from_driver(driver)
+    rec, _ = setup_recorder(recclass)
 
     faker = recorder_faker_map[recclass]()
     faker.send_record(rec)
     faker.send_record(rec)
     faker.send_record(rec)
 
-    loaded = load_csv(driver.datastore, rec.filename)
-    assert loaded.shape == (3, len(rec.column_names))
+    saverow = rec._saverow
+    assert len(saverow.call_args_list) == 3
+    lengths = [len(row) for (row,), _kwds in saverow.call_args_list]
+    assert set(lengths) == {len(rec.column_names)}
 
 
 @pytest.mark.parametrize('recclass', [
@@ -80,19 +100,13 @@ def test_record_shape(recclass):
     recorders.FlexGenParamRecorder,
 ])
 def test_generator_param_order(recclass):
-    driver = mock.Mock()
-    driver.gan.gen, _ = gen, _ = emit_tcg_for_test()
-
-    J, D, S = [p.get_value() for p in gen.get_all_params()]
-    if recclass is recorders.GenParamRecorder:
-        driver.gan.get_gen_param.return_value = [J, D, S]
-
-    rec = recclass.from_driver(driver)
-    rec._saverow = saverow = mock.Mock()
+    rec, driver = setup_recorder(recclass)
 
     gen_step = 0
     rec.record(gen_step)
 
+    gen = driver.gan.gen
+    J, D, S = [p.get_value() for p in gen.get_all_params()]
     E = 0
     I = 1
     flat_JDS = [
@@ -107,6 +121,7 @@ def test_generator_param_order(recclass):
         S[I, E], S[I, I],
     ]
 
+    saverow = rec._saverow
     saverow.assert_called_with([gen_step] + flat_JDS)
     assert len(set(flat_JDS)) > 1  # make sure the test was non-trivial
 

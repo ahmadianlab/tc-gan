@@ -1,7 +1,15 @@
 thisdir="$(dirname "${BASH_SOURCE[0]}")"
 source "$thisdir/rc/rc.sh"
 
-PATH="$(realpath $thisdir/../env/bin):$PATH"
+# Use readlink instead of realpath since it is available in more
+# environments:
+env="$(readlink --canonicalize $thisdir/../env)"
+
+export PATH="$env/bin:$PATH"
+export CPATH="$env/include:$CPATH"
+export LIBRARY_PATH="$env/lib:$LIBRARY_PATH"
+export LD_LIBRARY_PATH="$env/lib:$LD_LIBRARY_PATH"
+
 # In principle, this is better done via env/bin/activate like this:
 #
 #     source "$thisdir/../env/bin/activate" "$thisdir/../env"

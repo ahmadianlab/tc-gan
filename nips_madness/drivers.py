@@ -36,8 +36,17 @@ class GANDriver(object):
 
     """
 
+    def make_learning_recorder(self):
+        return LearningRecorder.from_driver(self)
+
     def make_generator_recorder(self):
         return GenParamRecorder.from_driver(self)
+
+    def make_discparamstats_recorder(self):
+        return DiscParamStatsRecorder.from_driver(self)
+
+    def make_disclearning_recorder(self):
+        return DiscLearningRecorder.from_driver(self)
 
     def __init__(self, gan, datastore, **kwargs):
         self.gan = gan
@@ -45,10 +54,10 @@ class GANDriver(object):
         self.__dict__.update(kwargs)
 
     def pre_loop(self):
-        self.learning_recorder = LearningRecorder.from_driver(self)
+        self.learning_recorder = self.make_learning_recorder()
         self.generator_recorder = self.make_generator_recorder()
-        self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
-        self.disclearning_recorder = DiscLearningRecorder.from_driver(self)
+        self.discparamstats_recorder = self.make_discparamstats_recorder()
+        self.disclearning_recorder = self.make_disclearning_recorder()
         self.rejection_limiter = SSNRejectionLimiter.from_driver(self)
         self.disc_loss_limiter = disc_loss_limiter(self)
 

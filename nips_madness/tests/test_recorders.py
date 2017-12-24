@@ -1,29 +1,11 @@
 from unittest import mock
 
-import numpy as np
 import pytest
 
 from .. import recorders
 from ..networks.simple_discriminator import make_net
 from ..networks.tests.test_tuning_curve import emit_tcg_for_test
-from .test_drivers import fake_datastore, setup_fake_gan, \
-    GenFakeUpdateResults
-
-
-def fake_driver():
-    driver = mock.Mock()
-    driver.datastore = fake_datastore()
-    setup_fake_gan(driver.gan)
-    return driver
-
-
-def load_csv(datastore, name, skiprows=1, **kwargs):
-    stream, = datastore.path.side_effect.returned[name, ]
-    stream.seek(0)
-    loaded = np.loadtxt(stream, delimiter=',', skiprows=skiprows, **kwargs)
-    if loaded.ndim == 1:
-        loaded = loaded.reshape((1, -1))
-    return loaded
+from .test_drivers import GenFakeUpdateResults
 
 
 class FakeLearningRecords(object):
@@ -127,13 +109,3 @@ def test_generator_param_order(recclass):
 
     if recclass is recorders.GenParamRecorder:
         driver.gan.get_gen_param.assert_called_once()
-
-
-def test_paramstats_layernorm():
-    recclass = recorders.DiscParamStatsRecorder
-    driver = fake_driver()
-    layers = [16, 16]
-    normalization = ['none', 'layer']
-    driver.gan.discriminator = make_net((2, 3), 'WGAN', layers, normalization)
-    rec = recclass.from_driver(driver)
-    rec.record(0, 0)

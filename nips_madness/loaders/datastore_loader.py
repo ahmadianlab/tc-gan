@@ -20,6 +20,12 @@ def has_csv_header(file):
         file.seek(pos)
 
 
+def structured_array_to_dataframe(a):
+    return pandas.DataFrame.from_items((k, a[k]) for k in a.dtype.names)
+# This is better than from_records(a, columns=a.dtype.names) since it
+# maps dtype as well.
+
+
 class DataStoreLoader1(object):
 
     def __init__(self, directory):
@@ -40,6 +46,12 @@ class DataStoreLoader1(object):
         with self.open_if_not(fname) as file:
             return pandas.read_csv(file, **kwargs)
 
+    def read_hdf5(self, fname, name, mode='r', **kwargs):
+        # TODO: don't re-open fname='store.hdf5' for every call:
+        import h5py
+        with h5py.File(str(self.directory.joinpath(fname)), 'r') as file:
+            return structured_array_to_dataframe(file[name])
+
     def load(self, name):
         try:
             loader = getattr(self, 'load_' + name)
@@ -48,16 +60,11 @@ class DataStoreLoader1(object):
             if self.directory.joinpath(csv_name).exists():
                 return self.read_csv(csv_name)
 
-            import h5py
-            dedicated_path = self.directory.joinpath(name + '.hdf5')
-            if dedicated_path.exists():
-                with h5py.File(str(dedicated_path), 'r') as file:
-                    return file[name]
+            dedicated_fname = name + '.hdf5'
+            if self.directory.joinpath(dedicated_fname).exists():
+                return self.read_hdf5(dedicated_fname, name)
 
-            # TODO: don't re-open for every call:
-            store_path = self.directory.joinpath('store.hdf5')
-            with h5py.File(str(store_path), 'r') as file:
-                return file[name]
+            return self.read_hdf5('store.hdf5', name)
         else:
             return loader()
 

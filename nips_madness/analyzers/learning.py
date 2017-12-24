@@ -6,7 +6,6 @@ import matplotlib
 import numpy as np
 
 from ..utils import csv_line
-from .loader import load_learning
 
 
 def clip_ymax(ax, ymax, ymin=0):
@@ -22,17 +21,28 @@ def smape(x, y, axis=-1):
 
     https://en.wikipedia.org/wiki/Symmetric_mean_absolute_percentage_error
     """
-    return 200 * np.abs((x - y) / (x + y)).mean(axis=axis)
+    x = np.asarray(x)
+    y = np.asarray(y)
+    return 200 * np.nanmean(np.abs((x - y) / (x + y)), axis=axis)
+# Use nanmean to make it work for the case both x and y are zero at
+# some indices.
 
 
-def gen_param_smape(data):
-    true = data.true_JDS().reshape((1, -1))
-    fake = data.fake_JDS()
-    return smape(fake, true)
+def gen_param_smape(rec):
+    return smape(rec.flatten_true_params(ndim=2),
+                 rec.flatten_gen_params())
 
 
-def plot_data_smape(data, ax=None, colors=0,
+def plot_data_smape(rec, ax=None, colors=0,
                     ylim=(0, 200)):
+    """
+    Plot sMPAE of mean TC and generator parameter.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
 
@@ -41,11 +51,11 @@ def plot_data_smape(data, ax=None, colors=0,
     else:
         colors = iter(colors)
 
-    epochs = data.epochs
-    ax.plot(epochs, smape(data.model_tuning, data.true_tuning),
+    ax.plot(rec.TC_mean['epoch'], smape(rec.TC_mean['gen'],
+                                        rec.TC_mean['data']),
             color=next(colors),
             label='TC sMAPE')
-    ax.plot(epochs, gen_param_smape(data),
+    ax.plot(rec.generator['epoch'], gen_param_smape(rec),
             color=next(colors),
             label='G param. sMAPE')
 
@@ -55,25 +65,36 @@ def plot_data_smape(data, ax=None, colors=0,
         ax.set_ylim(ylim)
 
 
-def plot_tc_errors(data, legend=True, ax=None, per_stim=False,
+def plot_tc_errors(rec, legend=True, ax=None, per_stim=False,
                    ylim=(0, 200)):
-    """Plot tuning curve (TC) sMAPE."""
+    """
+    Plot tuning curve (TC) sMAPE.
+
+    .. WARNING:: Untested!
+    .. TODO:: Test or remove `plot_tc_errors`.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
     import matplotlib.patheffects as pe
 
-    model = data.model_tuning
-    true = data.true_tuning
+    epoch = rec.TC_mean['epoch']
+    model = rec.TC_mean['gen'].as_matrix()
+    true = rec.TC_mean['data'].as_matrix()
     total_error = smape(model, true)
 
     total_error_lines = ax.plot(
-        data.epochs,
+        epoch,
         total_error,
         path_effects=[pe.Stroke(linewidth=5, foreground='white'),
                       pe.Normal()])
     if per_stim:
         per_stim_error = 200 * abs((model - true) / (model + true))
-        per_stim_lines = ax.plot(data.epochs, per_stim_error, alpha=0.4)
+        per_stim_lines = ax.plot(epoch, per_stim_error, alpha=0.4)
     else:
         per_stim_error = per_stim_lines = None
 
@@ -103,49 +124,93 @@ def plot_tc_errors(data, legend=True, ax=None, per_stim=False,
     )
 
 
-def plot_gen_params(data, axes=None, yscale=None, legend=True, ylim=True):
+def name_to_tex(name):
+    if '_' in name:
+        return '${}_{{{}}}$'.format(*name.split('_', 1))
+    else:
+        return name
+
+
+def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
+                    param_array_names=None):
+    """
+    Plot evolution of generator parameters.
+
+    Generator parameters in `rec.generator <.BaseRecords.generator>`
+    and corresponding "true" parameters are plotted.
+
+    Parameters
+    ----------
+    rec : `.BaseRecords`
+        Works for both GAN and moment-matching data records.
+
+    """
+    if param_array_names is None:
+        param_array_names = rec.rc.param_array_names
     if axes is None:
-        _, axes = pyplot.subplots(ncols=3, sharex=True, figsize=(9, 3))
-    for column, name in enumerate('JDS'):
-        true_param = data.true_param(name)
-        fake_param = data.gen_param(name)
-        for c, ((i, p), (j, q)) in enumerate(itertools.product(
-                enumerate('EI'), enumerate('EI'))):
+        ncols = len(param_array_names)
+        _, (axes,) = pyplot.subplots(ncols=ncols, sharex=True, squeeze=False,
+                                     figsize=(3 * ncols, 3))
+    else:
+        if len(axes) != len(param_array_names):
+            raise ValueError('Needs {} axes; {} given.'
+                             .format(len(param_array_names), len(axes)))
+
+    epoch = rec.generator['epoch']
+
+    arts = {}
+    arts['gen_lines'] = gen_lines = {}
+    arts['true_lines'] = true_lines = {}
+    for ax, array_name in zip(axes, param_array_names):
+        element_names = [name for name in rec.rc.param_element_names
+                         if name.startswith(array_name)]
+        for c, name in enumerate(element_names):
             color = 'C{}'.format(c)
-            axes[column].axhline(
-                true_param[i, j],
+            true_lines[name] = ax.axhline(
+                rec.rc.get_true_param(name),
                 linestyle='--',
                 color=color)
-            axes[column].plot(
-                data.epochs,
-                fake_param[:, i, j],
-                label='${}_{{{}{}}}$'.format(name, p, q),
+            gen_lines[name] = ax.plot(
+                epoch,
+                rec.generator[name],
+                label=name_to_tex(name),
                 color=color)
+
         if ylim:
-            _, ymax0 = axes[column].get_ylim()
-            ymax1 = true_param.max() * 2.0
+            _, ymax0 = ax.get_ylim()
+            ymax1 = max(map(rec.rc.get_true_param, element_names)) * 2.0
             if ymax0 > ymax1:
-                axes[column].set_ylim(-0.05 * ymax1, ymax1)
+                ax.set_ylim(-0.05 * ymax1, ymax1)
         if yscale:
-            axes[column].set_yscale(yscale)
+            ax.set_yscale(yscale)
         if legend:
-            leg = axes[column].legend(loc='best')
+            leg = ax.legend(loc='best')
             leg.set_frame_on(True)
             leg.get_frame().set_facecolor('white')
-    return axes
+
+    return arts
 
 
-def plot_gan_cost_and_rate_penalty(data, df=None, ax=None,
+def plot_gan_cost_and_rate_penalty(rec, ax=None,
                                    ymax_dacc=1, ymin_dacc=-0.05,
                                    yscale_dacc='symlog',
                                    yscale_rate_penalty='log'):
+    """
+    Plot GAN loss and rate penalty (if recorded).
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+        `rec.learning <.GANRecords.learning>` is plotted.
+        If it is a WGAN, Wasserstein distance is plotted.
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
-    if df is None:
-        df = data.to_dataframe()
+    df = rec.learning
 
     color = 'C0'
-    if data.is_WGAN:
+    if rec.rc.is_WGAN:
         lines = ax.plot(
             df['epoch'], -df['Daccuracy'],
             label='Wasserstein distance', color=color)
@@ -177,34 +242,109 @@ def plot_gan_cost_and_rate_penalty(data, df=None, ax=None,
     ax.set_yscale(yscale_dacc)
 
 
-def plot_learning(data, title_params=None):
-    df = data.to_dataframe()
+def disc_param_stats_to_pretty_label(name):
+    """
+    Convert param_stats names to latex label for plotting.
+
+    >>> disc_param_stats_to_pretty_label('W.nnorm')
+    '$|W_0|$'
+    >>> disc_param_stats_to_pretty_label('W.nnorm.1')
+    '$|W_1|$'
+    >>> disc_param_stats_to_pretty_label('b.nnorm.2')
+    '$|b_2|$'
+    >>> disc_param_stats_to_pretty_label('scales.nnorm.3')
+    '$|g_3|$'
+    >>> disc_param_stats_to_pretty_label('spam')
+
+    """
+    parts = name.split('.')
+    if 2 <= len(parts) <= 3 and parts[1] == 'nnorm':
+        var = parts[0]
+        suffix = parts[2] if len(parts) == 3 else '0'
+        if var == 'scales':
+            var = 'g'
+            # "g" for gain; see: Ba et al (2016) Layer Normalization
+        return '$|{}_{}|$'.format(var, suffix)
+
+
+def plot_disc_param_stats(
+        rec, ax=None, logy=True,
+        legend=dict(loc='center left', ncol='auto', fontsize='small',
+                    handlelength=0.5, columnspacing=0.4),
+        legend_max_rows=7,
+        **kwargs):
+    """
+    Plot recorded statistics of discriminator network parameters.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+        `rec.disc_param_stats <.GANRecords.disc_param_stats>` is plotted.
+
+    """
+    if ax is None:
+        _, ax = pyplot.subplots()
+    param_names = rec.disc_param_stats_names
+    rec.disc_param_stats.plot(
+        'epoch', param_names, logy=logy, legend=False, ax=ax, **kwargs)
+
+    for line in ax.get_lines():
+        label = disc_param_stats_to_pretty_label(line.get_label())
+        if label:
+            line.set_label(label)
+
+    if legend:
+        if not isinstance(legend, dict):
+            legend = {}
+        legend = dict(legend)
+        if legend.get('ncol') == 'auto':
+            n_stats = len(param_names)
+            legend['ncol'] = int(np.ceil(n_stats / legend_max_rows))
+        leg = ax.legend(**legend)
+        leg.set_frame_on(True)
+
+
+def plot_learning(rec, title_params=None):
+    """
+    Plot various GAN learning records are plotted in 4x3 axes.
+
+    Parameters
+    ----------
+    rec : `.GANRecords`
+
+    """
+    df = rec.learning.copy()
     fig, axes = pyplot.subplots(nrows=4, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 8))
+    is_heteroin = rec.rc.ssn_type == 'heteroin'
 
     plot_kwargs = dict(ax=axes[0, 0], alpha=0.8)
-    if data.is_WGAN:
+    if rec.rc.is_WGAN:
         df['Lip. penalty'] = df['Dloss'] - df['Daccuracy']
         df.plot('epoch', ['Gloss', 'Dloss', 'Lip. penalty'], **plot_kwargs)
     else:
         df.plot('epoch', ['Gloss', 'Dloss'], **plot_kwargs)
 
-    plot_gan_cost_and_rate_penalty(data, df=df, ax=axes[0, 1])
+    plot_gan_cost_and_rate_penalty(rec, ax=axes[0, 1])
 
     df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0],
             logy=True)
-    df.plot('epoch', ['model_convergence'], ax=axes[1, 1], logy=True)
+    if not is_heteroin:
+        df.plot('epoch', ['model_convergence'], ax=axes[1, 1], logy=True)
 
     ax_loss = axes[0, 0]
     ax_loss.set_yscale('symlog')
 
-    plot_data_smape(data, ax=axes[0, 2], colors=2)
+    plot_data_smape(rec, ax=axes[0, 2], colors=2)
 
-    data.disc.plot_param_stats(ax=axes[1, 2])
+    plot_disc_param_stats(rec, ax=axes[1, 2])
 
-    plot_gen_params(data, axes=axes[2, :])
-    plot_gen_params(data, axes=axes[3, :],
+    if is_heteroin:
+        plot_gen_params(rec, axes=[axes[1, 1]] + list(axes[2, :]))
+    else:
+        plot_gen_params(rec, axes=axes[2, :])
+    plot_gen_params(rec, axes=axes[3, :], param_array_names=['J', 'D', 'S'],
                     yscale='log', legend=False, ylim=False)
 
     for ax in axes[-1]:
@@ -212,7 +352,9 @@ def plot_learning(data, title_params=None):
 
     def add_upper_ax(ax):
         def sync_xlim(ax):
-            ax_up.set_xlim(*map(data.epoch_to_gen_step, ax.get_xlim()))
+            ax_up.set_xlim(*map(epoch_to_gen_step, ax.get_xlim()))
+
+        epoch_to_gen_step = rec.rc.epoch_to_gen_step
 
         ax_up = ax.twiny()
         ax_up.set_xlabel('gen_step')
@@ -226,7 +368,7 @@ def plot_learning(data, title_params=None):
     # http://matplotlib.org/gallery/subplots_axes_and_figures/fahrenheit_celsius_scales.html
     # https://github.com/matplotlib/matplotlib/issues/7161#issuecomment-249620393
 
-    fig.suptitle(data.pretty_spec(title_params))
+    fig.suptitle(rec.pretty_spec(title_params))
     return SimpleNamespace(
         fig=fig,
         axes=axes,
@@ -239,6 +381,17 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
                           include_true=True,
                           xlabel='Bandwidths',
                           ylabel='Average Firing Rate'):
+    """
+    Plot evolution of TC averaged over noise (zs).
+
+    .. WARNING:: It is not used for a long time.
+    .. TODO:: Make `plot_tuning_curve_evo` accept `.GANRecords`.
+
+    Parameters
+    ----------
+    data : `.GANData`
+
+    """
     if ax is None:
         _, ax = pyplot.subplots()
 
@@ -281,12 +434,16 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
 
 
 def analyze_learning(logpath, title_params):
-    data = load_learning(logpath)
-    if data.run_module == 'bptt_moments':
+    """
+    Load learning records from `logpath` and plot them in a figure.
+    """
+    from ..loaders import load_records
+    rec = load_records(logpath)
+    if rec.run_module == 'bptt_moments':
         from .mm_learning import plot_mm_learning
-        return plot_mm_learning(data, title_params)
+        return plot_mm_learning(rec, title_params)
     else:
-        return plot_learning(data, title_params)
+        return plot_learning(rec, title_params)
 
 
 def cli_analyze_learning(logpath, title_params, show, figpath):

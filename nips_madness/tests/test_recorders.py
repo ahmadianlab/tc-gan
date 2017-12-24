@@ -3,9 +3,9 @@ from unittest import mock
 import numpy as np
 import pytest
 
+from .. import recorders
 from ..networks.simple_discriminator import make_net
 from ..networks.tests.test_tuning_curve import emit_tcg_for_test
-from .. import recorders
 from .test_drivers import fake_datastore, setup_fake_gan, \
     GenFakeUpdateResults
 

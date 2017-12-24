@@ -146,7 +146,7 @@ def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
 
     """
     if param_array_names is None:
-        param_array_names = rec.rc.param_array_names
+        param_array_names = rec.param_array_names
     if axes is None:
         ncols = len(param_array_names)
         _, (axes,) = pyplot.subplots(ncols=ncols, sharex=True, squeeze=False,
@@ -162,7 +162,7 @@ def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
     arts['gen_lines'] = gen_lines = {}
     arts['true_lines'] = true_lines = {}
     for ax, array_name in zip(axes, param_array_names):
-        element_names = [name for name in rec.rc.param_element_names
+        element_names = [name for name in rec.param_element_names
                          if name.startswith(array_name)]
         for c, name in enumerate(element_names):
             color = 'C{}'.format(c)

@@ -216,7 +216,7 @@ class FlexGenParamRecorder(GenParamRecorder):
         super(FlexGenParamRecorder, self).__init__(*args, **kwargs)
 
         self.dtype = np.dtype(gen_param_dtype(
-            self.gan.gen.model.get_flat_param_names()))
+            self.gan.gen.get_flat_param_names()))
 
     def record(self, gen_step):
         self._saverow([gen_step] + list(self.gan.gen.get_flat_param_values()))

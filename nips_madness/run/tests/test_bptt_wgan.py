@@ -60,6 +60,23 @@ def test_single_g_step_slowtest(args, cleancwd,
     assert list(generator_df.columns) == names
     assert len(generator_df) == 1
 
+    default_param_array_names = ['J', 'D', 'S']
+    default_param_element_names = [
+        'J_EE', 'J_EI',
+        'J_IE', 'J_II',
+        'D_EE', 'D_EI',
+        'D_IE', 'D_II',
+        'S_EE', 'S_EI',
+        'S_IE', 'S_II',
+    ]
+    if info['run_config'].get('ssn_type') == 'heteroin':
+        assert rec.param_array_names == ['V'] + default_param_array_names
+        assert rec.param_element_names \
+            == ['V_E', 'V_I'] + default_param_element_names
+    else:
+        assert rec.param_array_names == default_param_array_names
+        assert rec.param_element_names == default_param_element_names
+
 
 @pytest.mark.parametrize('args, config', [
     ([], dict(ssn_type='heteroin')),

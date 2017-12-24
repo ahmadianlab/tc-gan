@@ -42,10 +42,6 @@ def test_single_g_step_slowtest(args, cleancwd,
     assert info['extra_info']['script_file'] == script_file
     assert 'PATH' in info['meta_info']['environ']
 
-    if info['run_config'].get('ssn_type') == 'heteroin':
-        # Skip load_gandata test, since it's not implemented yet.  # FIXME
-        return
-
     with pytest.warns(None) as record:
         rec = load_records(str(datastore_path))
     assert len(record) == 0
@@ -57,6 +53,10 @@ def test_single_g_step_slowtest(args, cleancwd,
 
     generator_df = rec.generator
     names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
+    if info['run_config'].get('ssn_type') == 'heteroin':
+        i = names.index('J_EE')
+        assert i >= 0
+        names = names[:i] + ['V_E', 'V_I'] + names[i:]
     assert list(generator_df.columns) == names
     assert len(generator_df) == 1
 

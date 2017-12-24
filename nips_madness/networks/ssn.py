@@ -121,22 +121,6 @@ def make_flat_param_names(parameters):
     return tuple(concat_flat(map(names, parameters)))
 
 
-def _genparam_names():
-    """
-    >>> _genparam_names()                              # doctest: +ELLIPSIS
-    ('J_EE', 'J_EI', 'J_IE', 'J_II', 'D_EE', ...)
-    """
-    def names(prefix):
-        J = (prefix + '_{}').format
-        return np.array([
-            [J('EE'), J('EI')],
-            [J('IE'), J('II')],
-        ])
-    return tuple(concat_flat([names('J'), names('D'), names('S')]))
-
-genparam_names = _genparam_names()
-
-
 class BandwidthContrastStimulator(BaseComponent):
     r"""
     Stimulator for varying bandwidths and contrasts.

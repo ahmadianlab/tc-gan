@@ -5,7 +5,7 @@ import itertools
 import lasagne
 import numpy as np
 
-from .networks.ssn import genparam_names
+from .networks.ssn import concat_flat
 
 
 class UpdateResult(SimpleNamespace):
@@ -179,6 +179,20 @@ class DiscLearningRecorder(HDF5Recorder):
     ])
 
 
+def _genparam_names():
+    """
+    >>> _genparam_names()                              # doctest: +ELLIPSIS
+    ('J_EE', 'J_EI', 'J_IE', 'J_II', 'D_EE', ...)
+    """
+    def names(prefix):
+        J = (prefix + '_{}').format
+        return np.array([
+            [J('EE'), J('EI')],
+            [J('IE'), J('II')],
+        ])
+    return tuple(concat_flat([names('J'), names('D'), names('S')]))
+
+
 def gen_param_dtype(names):
     return [
         ('gen_step', 'uint32'),
@@ -190,7 +204,7 @@ def gen_param_dtype(names):
 class GenParamRecorder(HDF5Recorder):
 
     tablename = 'generator'
-    dtype = np.dtype(gen_param_dtype(genparam_names))
+    dtype = np.dtype(gen_param_dtype(_genparam_names()))
 
     def __init__(self, datastore, gan):
         self.gan = gan

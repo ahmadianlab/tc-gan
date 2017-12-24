@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from ..networks.simple_discriminator import make_net
+from ..networks.tests.test_tuning_curve import emit_tcg_for_test
 from .. import recorders
 from .test_drivers import fake_datastore, setup_fake_gan, \
     GenFakeUpdateResults
@@ -74,20 +75,26 @@ def test_record_shape(recclass):
     assert loaded.shape == (3, len(rec.column_names))
 
 
-def test_generator_param_order():
-    recclass = recorders.GenParamRecorder
-    driver = fake_driver()
+@pytest.mark.parametrize('recclass', [
+    recorders.GenParamRecorder,
+    recorders.FlexGenParamRecorder,
+])
+def test_generator_param_order(recclass):
+    driver = mock.Mock()
+    driver.gan.gen, _ = gen, _ = emit_tcg_for_test()
+
+    J, D, S = [p.get_value() for p in gen.get_all_params()]
+    if recclass is recorders.GenParamRecorder:
+        driver.gan.get_gen_param.return_value = [J, D, S]
+
     rec = recclass.from_driver(driver)
+    rec._saverow = saverow = mock.Mock()
 
-    faker = recorder_faker_map[recclass]()
-    faker.send_record(rec)
+    gen_step = 0
+    rec.record(gen_step)
 
-    J = driver.gan.J.get_value.return_value
-    D = driver.gan.D.get_value.return_value
-    S = driver.gan.S.get_value.return_value
     E = 0
     I = 1
-
     flat_JDS = [
         # J
         J[E, E], J[E, I],
@@ -100,9 +107,11 @@ def test_generator_param_order():
         S[I, E], S[I, I],
     ]
 
-    driver.datastore.tables.saverow.assert_called_with(
-        recclass.filename, [0] + flat_JDS, echo=False)
-    assert len(flat_JDS) == len(set(flat_JDS))
+    saverow.assert_called_with([gen_step] + flat_JDS)
+    assert len(set(flat_JDS)) > 1  # make sure the test was non-trivial
+
+    if recclass is recorders.GenParamRecorder:
+        driver.gan.get_gen_param.assert_called_once()
 
 
 def test_paramstats_layernorm():

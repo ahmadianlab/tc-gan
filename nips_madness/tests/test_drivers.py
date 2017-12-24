@@ -9,9 +9,9 @@ import lasagne
 import numpy as np
 import pytest
 
-from .. import lasagne_param_file
 from .. import drivers
 from .. import execution
+from .. import lasagne_param_file
 from .. import recorders
 from ..execution import DataTables
 from ..run.gan import init_driver

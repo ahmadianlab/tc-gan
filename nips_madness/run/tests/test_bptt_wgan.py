@@ -50,13 +50,15 @@ def test_single_g_step_slowtest(args, cleancwd,
         rec = load_records(str(datastore_path))
     assert len(record) == 0
 
-    df = rec.learning
-    assert df.column.names == len(recorders.LearningRecorder.column_names)
-    assert len(df) == 1
+    learning_df = rec.learning
+    desired = list(recorders.LearningRecorder.dtype.names) + ['epoch']
+    assert list(learning_df.columns) == desired
+    assert len(learning_df) == 1
 
-    df = rec.generator
-    assert df.column.names == len(recorders.GenParamRecorder.column_names)
-    assert len(df) == 1
+    generator_df = rec.generator
+    names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
+    assert list(generator_df.columns) == names
+    assert len(generator_df) == 1
 
 
 @pytest.mark.parametrize('args, config', [

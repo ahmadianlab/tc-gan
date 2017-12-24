@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from ...core import consume_config
+from ..cwgan import ConditionalTuningCurveGenerator
 from ..ssn import emit_tuning_curve_generator
 from ..wgan import DEFAULT_PARAMS
 from .test_euler_ssn import JDS
@@ -76,3 +77,27 @@ def test_tcg_set_unknown_params():
     with pytest.raises(ValueError) as excinfo:
         tcg.set_params(dict(V=[0.3, 0]))
     assert 'Unknown parameters:' in str(excinfo.value)
+
+
+flat_param_names = {
+    'default': [
+        'J_EE', 'J_EI',
+        'J_IE', 'J_II',
+        'D_EE', 'D_EI',
+        'D_IE', 'D_II',
+        'S_EE', 'S_EI',
+        'S_IE', 'S_II',
+    ],
+}
+flat_param_names['heteroin'] = ['V_E', 'V_I'] + flat_param_names['default']
+
+
+@pytest.mark.parametrize('ssn_type', ['default', 'heteroin'])
+@pytest.mark.parametrize('conditional', [False, True])
+def test_tcg_flat_param_names(ssn_type, conditional):
+    desired_names = tuple(flat_param_names[ssn_type])
+    config = {}
+    if conditional:
+        config['emit_tcg'] = ConditionalTuningCurveGenerator.consume_kwargs
+    tcg = tcg_for_test(config, ssn_type=ssn_type)
+    assert tcg.get_flat_param_names() == desired_names

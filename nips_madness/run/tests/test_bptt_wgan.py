@@ -5,6 +5,7 @@ import pytest
 from .. import bptt_wgan
 from ... import recorders
 from ...loaders import load_records
+from ...networks.tests.test_tuning_curve import flat_param_names
 from .test_gan import load_json
 
 
@@ -41,6 +42,7 @@ def test_single_g_step_slowtest(args, cleancwd,
     info = load_json(datastore_path, 'info.json')
     assert info['extra_info']['script_file'] == script_file
     assert 'PATH' in info['meta_info']['environ']
+    ssn_type = info['run_config'].get('ssn_type', 'default')
 
     with pytest.warns(None) as record:
         rec = load_records(str(datastore_path))
@@ -53,29 +55,18 @@ def test_single_g_step_slowtest(args, cleancwd,
 
     generator_df = rec.generator
     names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
-    if info['run_config'].get('ssn_type') == 'heteroin':
+    if ssn_type == 'heteroin':
         i = names.index('J_EE')
         assert i >= 0
         names = names[:i] + ['V_E', 'V_I'] + names[i:]
     assert list(generator_df.columns) == names
     assert len(generator_df) == 1
 
-    default_param_array_names = ['J', 'D', 'S']
-    default_param_element_names = [
-        'J_EE', 'J_EI',
-        'J_IE', 'J_II',
-        'D_EE', 'D_EI',
-        'D_IE', 'D_II',
-        'S_EE', 'S_EI',
-        'S_IE', 'S_II',
-    ]
-    if info['run_config'].get('ssn_type') == 'heteroin':
-        assert rec.param_array_names == ['V'] + default_param_array_names
-        assert rec.param_element_names \
-            == ['V_E', 'V_I'] + default_param_element_names
+    if ssn_type == 'heteroin':
+        assert rec.param_array_names == ['V', 'J', 'D', 'S']
     else:
-        assert rec.param_array_names == default_param_array_names
-        assert rec.param_element_names == default_param_element_names
+        assert rec.param_array_names == ['J', 'D', 'S']
+    assert rec.param_element_names == flat_param_names[ssn_type]
 
 
 @pytest.mark.parametrize('args, config', [

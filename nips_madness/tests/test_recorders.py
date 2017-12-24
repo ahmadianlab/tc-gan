@@ -5,7 +5,7 @@ import pytest
 from .. import recorders
 from ..networks.simple_discriminator import make_net
 from ..networks.tests.test_tuning_curve import emit_tcg_for_test
-from .test_drivers import GenFakeUpdateResults
+from .test_legacy_drivers import GenFakeUpdateResults
 
 
 class FakeLearningRecords(object):

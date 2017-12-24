@@ -12,7 +12,7 @@ from ..gradient_expressions.utils import subsample_neurons, \
 from ..run import gan as run_gan
 from ..run.gan import GenerativeAdversarialNetwork, setup_gan, train_gan
 from .. import ssnode
-from .test_drivers import fake_datastore
+from .test_legacy_drivers import fake_datastore
 
 
 def make_gan(

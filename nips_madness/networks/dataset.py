@@ -14,6 +14,17 @@ from .wgan import is_heteroin
 logger = getLogger(__name__)
 
 
+def log_descriptive_stats(name, data):
+    logger.info('Summary statistics of %s:', name)
+    logger.info('  mean: %s', data.mean())
+    logger.info('  std : %s', data.std())
+    logger.info('  min : %s', data.min())
+    logger.info('  25%% : %s', np.percentile(data, 25))
+    logger.info('  50%% : %s', np.percentile(data, 50))
+    logger.info('  75%% : %s', np.percentile(data, 75))
+    logger.info('  max : %s', data.max())
+
+
 def dataset_by_ssnode(
         num_sites, bandwidths, contrasts,
         truth_size, truth_seed,
@@ -49,8 +60,8 @@ def dataset_by_ssnode(
             ), **true_ssn_options))
     data = np.array(data.T)      # shape: (N_data, nb)
 
-    logger.info('Information of sampled tuning curves:')
-    logger.info('  len(data): %s', len(data))
+    log_descriptive_stats('tuning curve dataset', data)
+    logger.info('Information from ssnode.sample_tuning_curves:')
     logger.info('  rejections: %s', fpinfo.rejections)
     logger.info('  rejection rate'
                 ' = rejections / (rejections + len(data)) : %s',
@@ -104,19 +115,14 @@ def dataset_by_fixedtime(
                 out = sampler.forward(full_output=True)
             dynamics_penalty_list.append(out.model_dynamics_penalty)
             data_list.append(out.prober_tuning_curve)
-
-    dynamics_penalty = np.array(dynamics_penalty_list)
-    logger.info('Statistics of dynamics_penalty:')
-    logger.info('  mean: %s', dynamics_penalty.mean())
-    logger.info('  std : %s', dynamics_penalty.std())
-    logger.info('  min : %s', dynamics_penalty.min())
-    logger.info('  25%% : %s', np.percentile(dynamics_penalty, 25))
-    logger.info('  50%% : %s', np.percentile(dynamics_penalty, 50))
-    logger.info('  75%% : %s', np.percentile(dynamics_penalty, 75))
-    logger.info('  max : %s', dynamics_penalty.max())
-
     data = np.concatenate(data_list)
-    return data[:truth_size]
+    data = data[:truth_size]
+    dynamics_penalty = np.array(dynamics_penalty_list)
+
+    log_descriptive_stats('tuning curve dataset', data)
+    log_descriptive_stats('dynamics_penalty', dynamics_penalty)
+
+    return data
 
 
 dataset_provider_choices = ('ssnode', 'fixedtime')

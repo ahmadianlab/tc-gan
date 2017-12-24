@@ -24,7 +24,7 @@ def load_table(directory, name):
     path = directory.join('store.hdf5')
     if not path.check():
         path = directory.join(name + '.hdf5')
-    with h5py.File(str(path)) as file:
+    with h5py.File(str(path), 'r') as file:
         return file[name]
 
 
@@ -68,26 +68,33 @@ def test_single_g_step_slowtest(args, cleancwd):
     assert info['extra_info']['script_file'] == gan.__file__
     assert 'PATH' in info['meta_info']['environ']
 
+    with pytest.warns(None) as warned:
+        rec = load_records(str(datastore_path))
+    assert len(warned) == 1
+    assert 'Loading legacy GAN' in warned.list[0].message.args[0]
+
+    learning_df = rec.learning
+    desired = list(recorders.LearningRecorder.dtype.names) + ['epoch']
+    assert list(learning_df.columns) == desired
+    assert len(learning_df) == 1
+
+    generator_df = rec.generator
+    names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
+    assert list(generator_df.columns) == names
+    assert len(generator_df) == 1
+
+    disc_learning_df = rec.disc_learning
+    desired = list(recorders.DiscLearningRecorder.dtype.names) + ['epoch']
+    assert list(disc_learning_df.columns) == desired
+    assert len(disc_learning_df) == 1
+
     ganet = make_gan(**info['run_config'])
     _, n_tc_points = ganet.disc_input_shape
-
-    tc_mean = load_table(datastore_path, 'TC_mean')
-    assert tc_mean.shape[1] == n_tc_points * 2  # fake and ture
-
-    disc_learning = load_table(datastore_path, 'disc_learning')
-    assert disc_learning.dtype == recorders.DiscLearningRecorder.dtype
-
-    with pytest.warns(None) as record:
-        rec = load_records(str(datastore_path))
-    assert len(record) == 0
-
-    df = rec.learning
-    assert df.column.names == len(recorders.LearningRecorder.column_names)
-    assert len(df) == 1
-
-    df = rec.generator
-    assert df.column.names == len(recorders.GenParamRecorder.column_names)
-    assert len(df) == 1
+    tc_mean_df = rec.TC_mean
+    assert list(tc_mean_df['gen'].columns) == list(range(n_tc_points))
+    assert list(tc_mean_df['data'].columns) == list(range(n_tc_points))
+    tc_mean_df['gen_step']  # should be accessible
+    tc_mean_df['epoch']     # should be accessible
 
 
 @old_gan

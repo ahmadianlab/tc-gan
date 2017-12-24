@@ -1,6 +1,5 @@
 import json
 
-import h5py
 import pytest
 
 from .. import gan
@@ -18,14 +17,6 @@ def single_g_step(args):
         '--n_bandwidths', '1',
         '--WGAN_n_critic0', '1',
     ] + args)
-
-
-def load_table(directory, name):
-    path = directory.join('store.hdf5')
-    if not path.check():
-        path = directory.join(name + '.hdf5')
-    with h5py.File(str(path), 'r') as file:
-        return file[name]
 
 
 def load_json(directory, name):

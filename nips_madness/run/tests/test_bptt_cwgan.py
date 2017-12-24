@@ -2,7 +2,6 @@ import pytest
 
 from . import test_bptt_wgan
 from .. import bptt_cwgan
-from .utils import assert_logfile_exists
 
 
 def single_g_step(args):
@@ -30,7 +29,7 @@ def test_single_g_step_slowtest(args, cleancwd):
         single_g_step=single_g_step,
         script_file=bptt_cwgan.__file__)
 
-    assert_logfile_exists(cleancwd, 'store.hdf5')
+    assert cleancwd.join('results', 'store.hdf5').check()
 
 
 @pytest.mark.parametrize('args, config', [

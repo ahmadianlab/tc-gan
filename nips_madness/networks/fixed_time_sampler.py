@@ -1,6 +1,5 @@
 import numpy as np
 
-from ..gradient_expressions.utils import sample_sites_from_stim_space
 from .ssn import make_tuning_curve_generator
 from .tests import test_euler_ssn
 from .utils import largerrecursionlimit
@@ -12,8 +11,11 @@ DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
     V=[0.3, 0],
     seed=0,
+    norm_probes=[0],
+    include_inhibitory_neurons=False,
     **test_euler_ssn.JDS
 )
+del DEFAULT_PARAMS['sample_sites']
 
 
 class FixedTimeTuningCurveSampler(object):
@@ -26,7 +28,8 @@ class FixedTimeTuningCurveSampler(object):
 
     @classmethod
     def consume_kwargs(cls, bandwidths, contrasts, seed,
-                       sample_sites, num_sites, consume_union=True, **kwargs):
+                       norm_probes, num_sites, include_inhibitory_neurons,
+                       consume_union=True, **kwargs):
         gen, rest = make_tuning_curve_generator(
             kwargs,
             consume_union=consume_union,
@@ -34,7 +37,8 @@ class FixedTimeTuningCurveSampler(object):
             num_tcdom=len(bandwidths) * len(contrasts),
             num_sites=num_sites,
             # Prober:
-            probes=sample_sites_from_stim_space(sample_sites, num_sites),
+            probes=probes_from_stim_space(norm_probes, num_sites,
+                                          include_inhibitory_neurons),
         )
         return cls(gen, bandwidths, contrasts, seed), rest
 

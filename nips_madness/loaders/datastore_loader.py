@@ -49,13 +49,14 @@ class DataStoreLoader1(object):
                 return self.read_csv(csv_name)
 
             import h5py
-            h5_name = name + '.hdf5'
-            if self.directory.joinpath(h5_name).exists():
-                with h5py.File(h5_name) as file:
+            dedicated_path = self.directory.joinpath(name + '.hdf5')
+            if dedicated_path.exists():
+                with h5py.File(str(dedicated_path), 'r') as file:
                     return file[name]
 
             # TODO: don't re-open for every call:
-            with h5py.File('store.hdf5') as file:
+            store_path = self.directory.joinpath('store.hdf5')
+            with h5py.File(str(store_path), 'r') as file:
                 return file[name]
         else:
             return loader()

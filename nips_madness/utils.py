@@ -162,8 +162,13 @@ def tolist_if_not(arr):
 
 def cpu_count(_environ=os.environ):
     """cpu_count() -> int
-    Return available number of CPUs; Slurm/PBS-aware version.
+    Return available number of CPUs; OpenMP/Slurm/PBS-aware version.
     """
+
+    try:
+        return int(_environ['OMP_NUM_THREADS'])
+    except (KeyError, ValueError):
+        pass
 
     try:
         # Note: Using SLURM_CPUS_PER_TASK here instead of

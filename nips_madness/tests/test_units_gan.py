@@ -48,7 +48,7 @@ def make_gan(
         disc_l1_regularization=0,
         disc_l2_regularization=0,
         gen_learn_rate=0.01,
-        disc_learn_rate=0.01,
+        disc_learn_rate=0.0001,
         rate_penalty_threshold=150,
         rate_penalty_no_I=False,
         WGAN_lambda=10,

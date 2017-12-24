@@ -18,6 +18,12 @@ def single_g_step(args):
 
 
 @old_gan
+def test_single_g_step_logfiles_slowtest(cleancwd):
+    single_g_step([])
+    assert cleancwd.join('logfiles').check(dir=1)
+
+
+@old_gan
 @pytest.mark.parametrize('args', [
     [],
     ['--disc-param-save-interval', '1'],
@@ -26,11 +32,13 @@ def single_g_step(args):
     pytest.mark.skip(['--track_offset_identity']),
     pytest.mark.skip(['--sample-sites', '0, 0.5']),
 ])
-def test_smoke_slowtest(args, cleancwd):
-    single_g_step(args)
-    assert cleancwd.join('logfiles').check()
+def test_single_g_step_slowtest(args, cleancwd):
+    datastore_name = 'results'
+    single_g_step(args + ['--datastore', datastore_name])
+    datastore_path = cleancwd.join(datastore_name)
+    assert datastore_path.check()
 
-    info = load_json(cleancwd, 'info.json')
+    info = load_json(datastore_path, 'info.json')
     assert info['extra_info']['script_file'] == cgan.__file__
     assert 'PATH' in info['meta_info']['environ']
 

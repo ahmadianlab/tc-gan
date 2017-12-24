@@ -298,7 +298,7 @@ module_class_map = {
     'bptt_wgan': BPTTWGANRunConfig,
     'bptt_cwgan': BPTTcWGANRunConfig,
     'bptt_moments': BPTTMomentsRunConfig,
-    'run': LegacyGANRunConfig,
+    'gan': LegacyGANRunConfig,
     'cgan': LegacyGANRunConfig,
 }
 

@@ -21,9 +21,11 @@ def single_g_step(args):
     ['--include-inhibitory-neurons'],
 ])
 def test_single_g_step_slowtest(args, cleancwd):
-    single_g_step(args)
-    assert cleancwd.join('logfiles').check()
+    datastore_name = 'results'
+    single_g_step(args + ['--datastore', datastore_name])
+    datastore_path = cleancwd.join(datastore_name)
+    assert datastore_path.check()
 
-    info = load_json(cleancwd, 'info.json')
+    info = load_json(datastore_path, 'info.json')
     assert info['extra_info']['script_file'] == bptt_moments.__file__
     assert 'PATH' in info['meta_info']['environ']

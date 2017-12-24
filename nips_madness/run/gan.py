@@ -1219,10 +1219,11 @@ def init_driver(
         iterations, quit_JDS_threshold, quiet,
         disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
+        driver_class=GANDriver,
         **run_config):
 
     gan = GenerativeAdversarialNetwork()
-    driver = GANDriver(
+    driver = driver_class(
         gan, datastore,
         iterations=iterations, quiet=quiet,
         disc_param_save_interval=disc_param_save_interval,

@@ -7,7 +7,6 @@ import numpy
 import theano
 
 from . import utils
-from .utils import cached_property
 
 logger = getLogger(__name__)
 
@@ -91,43 +90,62 @@ class DataTables(object):
 
 class HDF5Tables(object):
 
+    shared_filename = 'store.hdf5'
+
     def __init__(self, h5):
         self.h5 = h5
+        self._datasets = {}
 
-    def create_table(self, name, dtype):
-        return self.h5.file.create_dataset(name, (0,), maxshape=(None,),
-                                           dtype=dtype)
+    def _create_dataset(self, name, dtype, dedicated=False):
+        if dedicated:
+            file = self.h5.open(name + '.hdf5')
+        else:
+            file = self.h5.open(self.shared_filename)
+        dataset = file.create_dataset(name, (0,), maxshape=(None,),
+                                      dtype=dtype)
+        return dataset, file
+
+    def _get_dataset(self, name, *args, **kwds):
+        if name not in self._datasets:
+            self._datasets[name] = self._create_dataset(name, *args, **kwds)
+        return self._datasets[name]
+
+    def create_table(self, name, dtype, dedicated=False):
+        assert name not in self._datasets
+        self._get_dataset(name, dtype, dedicated)
 
     def saverow(self, name, row, echo=False, flush=False):
-        file = self.h5.file
-        if name in file:
-            dataset = file[name]
-        else:
-            dataset = self.create_table(name, row.dtype)
-
+        dataset, file = self._get_dataset(name, row.dtype)
         dataset.resize((len(dataset) + 1,))
         dataset[-1] = row
 
         if flush:
             file.flush()
         if echo:
-            print(*row, sep=',')
+            print(*row.tolist(), sep=',')
 
 
 class HDF5Store(object):
 
-    def __init__(self, datastore, filename='store.hdf5'):
+    def __init__(self, datastore):
         self.datastore = datastore
-        self.path = os.path.join(datastore.directory, filename)
         self.tables = HDF5Tables(self)
-        self.flush_all = lambda: None
+        self._files = {}
 
-    @cached_property
-    def file(self):
+    def _open(self, filename):
         import h5py
-        file = self.datastore.enter_context(h5py.File(self.path))
-        self.flush_all = file.flush
+        path = os.path.join(self.datastore.directory, filename)
+        file = self.datastore.enter_context(h5py.File(path))
         return file
+
+    def open(self, filename):
+        if filename not in self._files:
+            self._files[filename] = self._open(filename)
+        return self._files[filename]
+
+    def flush_all(self):
+        for file in self._files.values():
+            file.flush()
 
 
 class DataStore(object):

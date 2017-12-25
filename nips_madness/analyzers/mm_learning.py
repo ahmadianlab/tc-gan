@@ -34,8 +34,9 @@ def plot_moments(rec, moment, ax=None):
 
 
 def moments_smape(rec):
-    num = rec.gen_moments.sub(rec.data_moments)
-    den = rec.gen_moments.add(rec.data_moments)
+    gen_moments = rec.gen_moments[rec.moment_names]  # exclude 'epoch' etc.
+    num = gen_moments.sub(rec.data_moments)
+    den = gen_moments.add(rec.data_moments)
     return 200 * np.nanmean(np.abs(num / den), axis=1)
 
 

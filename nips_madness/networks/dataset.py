@@ -8,7 +8,7 @@ import numpy as np
 
 from .. import ssnode
 from .. import utils
-from .fixed_time_sampler import FixedTimeTuningCurveSampler
+from .fixed_time_sampler import FixedTimeTuningCurveSampler, DEFAULT_PARAMS
 from .wgan import is_heteroin
 
 logger = getLogger(__name__)
@@ -88,22 +88,17 @@ def dataset_by_fixedtime(
                 truth_size, truth_batchsize,
                 truth_batchsize * repeat - truth_size)
 
-    # Collect learnable parameters:
-    learnable_parameters = {}
+    # Fill unspecified parameters:
     sampler_options = dict(true_ssn_options)
     for param in learner.gen.get_all_params():
-        try:
-            learnable_parameters[param.name] = sampler_options.pop(param.name)
-        except KeyError:
-            continue
+        if param.name not in sampler_options:
+            sampler_options[param.name] = DEFAULT_PARAMS[param.name]
 
     sampler = FixedTimeTuningCurveSampler.from_learner(
         learner,
         batchsize=truth_batchsize,
         seed=truth_seed,
         **sampler_options)  # let sampler bark if it has unsupported options
-
-    sampler.gen.set_params(learnable_parameters)
     sampler.prepare()
 
     data_list = []

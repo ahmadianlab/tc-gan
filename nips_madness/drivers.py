@@ -344,7 +344,7 @@ class MomentMatchingDriver(object):
 
     def pre_loop(self):
         self.learning_recorder = MMLearningRecorder.from_driver(self)
-        self.generator_recorder = GenParamRecorder.from_driver(self)
+        self.generator_recorder = FlexGenParamRecorder.from_driver(self)
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)

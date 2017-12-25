@@ -44,9 +44,9 @@ def test_single_g_step_slowtest(args, cleancwd,
     assert 'PATH' in info['meta_info']['environ']
     ssn_type = info['run_config'].get('ssn_type', 'default')
 
-    with pytest.warns(None) as record:
+    with pytest.warns(None) as warned:
         rec = load_records(str(datastore_path))
-    assert len(record) == 0
+    assert len(warned) == 0
 
     learning_df = rec.learning
     desired = list(recorders.LearningRecorder.dtype.names) + ['epoch']

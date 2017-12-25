@@ -3,6 +3,9 @@ import json
 import pytest
 
 from .. import bptt_moments
+from ... import recorders
+from ...loaders import load_records
+from ...networks.tests.test_tuning_curve import flat_param_names
 from .test_gan import load_json
 
 
@@ -31,6 +34,31 @@ def test_single_g_step_slowtest(args, cleancwd):
     info = load_json(datastore_path, 'info.json')
     assert info['extra_info']['script_file'] == bptt_moments.__file__
     assert 'PATH' in info['meta_info']['environ']
+    ssn_type = info['run_config'].get('ssn_type', 'default')
+
+    with pytest.warns(None) as warned:
+        rec = load_records(str(datastore_path))
+    assert len(warned) == 0
+
+    learning_df = rec.learning
+    desired = list(recorders.MMLearningRecorder.dtype.names) + ['epoch']
+    assert list(learning_df.columns) == desired
+    assert len(learning_df) == 1
+
+    generator_df = rec.generator
+    names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
+    if ssn_type == 'heteroin':
+        i = names.index('J_EE')
+        assert i >= 0
+        names = names[:i] + ['V_E', 'V_I'] + names[i:]
+    assert list(generator_df.columns) == names
+    assert len(generator_df) == 1
+
+    if ssn_type == 'heteroin':
+        assert rec.param_array_names == ['V', 'J', 'D', 'S']
+    else:
+        assert rec.param_array_names == ['J', 'D', 'S']
+    assert rec.param_element_names == flat_param_names[ssn_type]
 
 
 @pytest.mark.parametrize('args, config', [

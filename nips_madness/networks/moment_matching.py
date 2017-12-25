@@ -11,7 +11,7 @@ from ..utils import (
     theano_function, log_timing, asarray,
 )
 from .wgan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
-from .ssn import make_tuning_curve_generator
+from .ssn import make_tuning_curve_generator, maybe_mixin_noise, is_heteroin
 from .utils import largerrecursionlimit
 
 DEFAULT_PARAMS = dict(
@@ -201,10 +201,15 @@ class MMGeneratorTrainer(BaseTrainer):
         self.S_min = S_min
         self.S_max = S_max
         self.updater = updater
+        self.post_init()
 
+    def post_init(self):
+        gen = self.gen
         self.moment_weights = theano.tensor.matrix('moment_weights')
         self.data_moments = theano.tensor.matrix('data_moments')
         self.inputs = gen.inputs + (self.moment_weights, self.data_moments)
+        self.input_names = gen._input_names \
+            + ['moment_weights', 'data_moments']
 
         self.gen_moments = sample_moments(gen.get_output())
         self.gen_moments.name = 'gen_moments'
@@ -214,18 +219,20 @@ class MMGeneratorTrainer(BaseTrainer):
         self.loss += self.dynamics_cost * self.gen.model.dynamics_penalty
         self.loss.name = 'loss'
 
-    def clip_JDS(self, updates):
+    def clip_params(self, updates):
         for var in self.gen.get_all_params():
             p_min = getattr(self, var.name + '_min')
             p_max = getattr(self, var.name + '_max')
+            p_min = np.array(p_min, dtype=updates[var].dtype)
+            p_max = np.array(p_max, dtype=updates[var].dtype)
             updates[var] = updates[var].clip(p_min, p_max)
         return updates
 
     def get_updates(self):
-        return self.clip_JDS(super(MMGeneratorTrainer, self).get_updates())
+        return self.clip_params(super(MMGeneratorTrainer, self).get_updates())
 
     @cached_property
-    def train(self):
+    def train_impl(self):
         outputs = [
             self.loss,
             self.gen.model.dynamics_penalty,
@@ -234,6 +241,32 @@ class MMGeneratorTrainer(BaseTrainer):
         with log_timing("compiling {}.train".format(self.__class__.__name__)):
             return theano_function(self.inputs, outputs,
                                    updates=self.get_updates())
+
+    def train(self, rng=None, **kwargs):
+        kwargs = maybe_mixin_noise(self.gen, rng, kwargs)
+        values = [kwargs.pop(k) for k in self.input_names]
+        assert not kwargs
+        return self.train_impl(*values)
+
+
+class HeteroInMMGeneratorTrainer(MMGeneratorTrainer):
+
+    def __init__(self, gen, dynamics_cost,
+                 J_min, J_max, D_min, D_max, S_min, S_max,
+                 updater,
+                 V_min=0, V_max=1):
+        self.target = self.gen = gen
+        self.dynamics_cost = dynamics_cost
+        self.J_min = J_min
+        self.J_max = J_max
+        self.D_min = D_min
+        self.D_max = D_max
+        self.S_min = S_min
+        self.S_max = S_max
+        self.V_min = V_min
+        self.V_max = V_max
+        self.updater = updater
+        self.post_init()
 
 
 class BPTTMomentMatcher(BaseComponent):
@@ -363,17 +396,16 @@ class BPTTMomentMatcher(BaseComponent):
             self.gen_trainer.prepare()
 
     def train_generator(self, info):
-        zg = self.rng.rand(self.batchsize, self.num_neurons, self.num_neurons)
         with self.train_watch:
             (info.loss,
              info.dynamics_penalty,
              info.gen_moments) = self.gen_trainer.train(
-                self.stimulator_bandwidths,
-                self.stimulator_contrasts,
-                zg,
-                self.moment_weights,
-                self.data_moments,
-            )
+                rng=self.rng,
+                stimulator_bandwidths=self.stimulator_bandwidths,
+                stimulator_contrasts=self.stimulator_contrasts,
+                moment_weights=self.moment_weights,
+                data_moments=self.data_moments,
+             )
 
         info.train_time = self.train_watch.sum()
         return info
@@ -411,7 +443,11 @@ def _make_mm_from_kwargs(
         # Prober:
         probes=probes,
     )
-    gen_trainer, rest = MMGeneratorTrainer.consume_kwargs(gen, **rest)
+    if is_heteroin(gen):
+        gen_trainer, rest \
+            = HeteroInMMGeneratorTrainer.consume_kwargs(gen, **rest)
+    else:
+        gen_trainer, rest = MMGeneratorTrainer.consume_kwargs(gen, **rest)
     return BPTTMomentMatcher.consume_kwargs(
         gen, gen_trainer, bandwidths, contrasts,
         include_inhibitory_neurons=include_inhibitory_neurons,

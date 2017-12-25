@@ -3,6 +3,7 @@ import json
 import warnings
 
 import numpy as np
+import pandas
 
 from ..networks.ssn import concat_flat
 from ..utils import cached_property
@@ -52,6 +53,7 @@ class BaseRecords(object):
 
     learning = cached_record('learning')
     generator = cached_record('generator')
+    truth = cached_property(lambda self: self.datastore.load('truth'))
 
     def insert_epoch_column(self, df):
         if 'disc_step' in df.columns:
@@ -134,6 +136,25 @@ class ConditionalGANRecords(GANRecords):
 class MomentMatchingRecords(BaseRecords):
 
     gen_moments = cached_record('gen_moments')
+
+    moment_names = ['mean', 'var']
+    # it must be consistent with [[./datastore_loader.py::load_gen_moments]]
+    # TODO: generate it from gen_moments or generate gen_moments from it.
+
+    @cached_property
+    def data_moments(self):
+        """
+        Data moments calculated from ``"truth.npy"``.
+
+        To be consistent with `.gen_moments`, it is a `pandas.Series`
+        instead of an array.  This works nicely with broadcasting in
+        pandas, e.g., taking difference is as easy as
+        ``self.gen_moments.sub(self.data_moments)``.
+        """
+        from ..networks.moment_matching import sample_moments
+        array = sample_moments(self.truth)
+        index = self.moment_names
+        return pandas.DataFrame(array, index=index).stack()
 
     def insert_epoch_column(self, df):
         if 'gen_step' in df.columns:

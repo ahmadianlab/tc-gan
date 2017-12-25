@@ -1,8 +1,10 @@
 from types import SimpleNamespace
+import itertools
 
 from matplotlib import pyplot
+import numpy as np
 
-from .learning import plot_gen_params
+from .learning import plot_gen_params, gen_param_smape
 
 
 def plot_loss(rec, ax=None):
@@ -31,17 +33,57 @@ def plot_moments(rec, moment, ax=None):
             transform=ax.transAxes)
 
 
+def moments_smape(rec):
+    num = rec.gen_moments.sub(rec.data_moments)
+    den = rec.gen_moments.add(rec.data_moments)
+    return 200 * np.nanmean(np.abs(num / den), axis=1)
+
+
+def plot_mm_smape(rec, ax=None, colors=0,
+                  ylim=(0, 200)):
+    """
+    Plot sMPAE of mean TC and generator parameter.
+
+    Parameters
+    ----------
+    rec : `.MomentMatchingRecords`
+
+    """
+    if ax is None:
+        _, ax = pyplot.subplots()
+
+    if isinstance(colors, int):
+        colors = map('C{}'.format, itertools.count(colors))
+    else:
+        colors = iter(colors)
+
+    ax.plot(rec.gen_moments['epoch'], moments_smape(rec),
+            color=next(colors),
+            label='Mom. sMAPE')
+    ax.plot(rec.generator['epoch'], gen_param_smape(rec),
+            color=next(colors),
+            label='G param. sMAPE')
+
+    ax.legend(loc='best')
+
+    if ylim:
+        ax.set_ylim(ylim)
+
+
 def plot_mm_learning(rec, title_params=None):
+    is_heteroin = rec.rc.ssn_type == 'heteroin'
     fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))
 
     plot_loss(rec, axes[0, 0])
-    plot_moments(rec, 'mean', axes[0, 1])
-    plot_moments(rec, 'var', axes[0, 2])
+    plot_mm_smape(rec, ax=axes[0, 2])
 
-    plot_gen_params(rec, axes=axes[1, :])
-    plot_gen_params(rec, axes=axes[2, :],
+    if is_heteroin:
+        plot_gen_params(rec, axes=[axes[0, 1]] + list(axes[1, :]))
+    else:
+        plot_gen_params(rec, axes=axes[1, :])
+    plot_gen_params(rec, axes=axes[2, :], param_array_names=['J', 'D', 'S'],
                     yscale='log', legend=False, ylim=False)
 
     for ax in axes[-1]:

@@ -68,6 +68,9 @@ class DataStoreLoader1(object):
         else:
             return loader()
 
+    def load_truth(self):
+        return np.load(self.directory.joinpath('truth.npy'))
+
     def load_TC_mean(self):
         TC_mean = self.read_csv('TC_mean.csv', header=None)
         TC_mean.columns = pandas.MultiIndex.from_tuples([

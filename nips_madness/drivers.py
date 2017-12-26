@@ -5,8 +5,8 @@ import lasagne
 import numpy as np
 
 from . import execution
-from . import lasagne_param_file
 from . import ssnode
+from .lasagne_toppings import param_file
 from .recorders import LearningRecorder, GenParamRecorder, \
     FlexGenParamRecorder, \
     DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
@@ -100,7 +100,7 @@ class GANDriver(object):
 
         if self.disc_param_save_interval > 0 \
                 and gen_step % self.disc_param_save_interval == 0:
-            lasagne_param_file.dump(
+            param_file.dump(
                 self.gan.discriminator,
                 self.datastore.path('disc_param',
                                     self.disc_param_template.format(gen_step)))
@@ -135,7 +135,7 @@ class GANDriver(object):
 
         """
         if self.disc_param_save_on_error:
-            update_func = lasagne_param_file.wrap_with_save_on_error(
+            update_func = param_file.wrap_with_save_on_error(
                 self.gan.discriminator,
                 self.datastore.path('disc_param', 'pre_error.npz'),
                 self.datastore.path('disc_param', 'post_error.npz'),

@@ -17,7 +17,6 @@ from ..gradient_expressions.utils import subsample_neurons, \
 from ..gradient_expressions import make_w_batch as make_w
 from ..gradient_expressions import SS_grad as SSgrad
 from .. import ssnode as SSsolve
-from .. import lasagne_param_file
 from .gan import add_learning_options, do_learning
 
 import time

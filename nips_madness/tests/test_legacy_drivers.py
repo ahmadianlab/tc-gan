@@ -11,9 +11,9 @@ import pytest
 
 from .. import drivers
 from .. import execution
-from .. import lasagne_param_file
 from .. import recorders
 from ..execution import DataTables
+from ..lasagne_toppings import param_file
 from ..run.gan import init_driver
 from ..ssnode import DEFAULT_PARAMS
 
@@ -289,7 +289,7 @@ def test_gan_driver_iterate(iterations):
     def lasagne_load(name):
         stream, = rc.datastore.path.side_effect.returned['disc_param', name]
         stream.seek(0)
-        return lasagne_param_file.load(stream)
+        return param_file.load(stream)
 
     stored_values = lasagne_load(driver.disc_param_template)
     desired_values = lasagne.layers.get_all_param_values(rc.gan.discriminator)

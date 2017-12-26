@@ -8,8 +8,9 @@ from ..utils import make_progressbar
 
 def plot_gridified_truth(truth_df,
                          col='cell_type', row='norm_probe',
-                         hue='contrast', x='bandwidth', size=2,
-                         linewidth=0.1, alpha=0.5,
+                         hue='contrast', x='bandwidth', y='rate',
+                         legend_ax_idx=(-1, 0),
+                         size=2, linewidth=0.1, alpha=0.5,
                          colors=None, title=None, tight_layout=True):
 
     icol = truth_df.columns.names.index(col)
@@ -58,8 +59,14 @@ def plot_gridified_truth(truth_df,
             col_val = idx[icol]
             ax.set_title('{}={} | {}={}'.format(row, row_val, col, col_val))
 
+    for ax in axes[:, 0]:
+        ax.set_ylabel(y)
+
     for ax in axes[-1]:
         ax.set_xlabel(x)
+
+    if legend_ax_idx:
+        axes[legend_ax_idx].legend(loc='best')
 
     if title:
         fig.suptitle(title)

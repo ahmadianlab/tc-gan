@@ -16,6 +16,7 @@ from .wgan import (
     BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, emit_generator_trainer,
 )
 from .ssn import TuningCurveGenerator, make_tuning_curve_generator
+from .utils import gridify_tc_data
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -299,16 +300,19 @@ class RandomChoiceSampler(object):
 
         """
         cell_types = [0, 1] if include_inhibitory_neurons else [0]
-
-        # This is the order of dimensions varied in subsample_neurons:
-        cond_values = [contrasts, bandwidths, cell_types, norm_probes]
-        shape = (len(data),) + tuple(map(len, cond_values))
-        nested = data.reshape(shape)
-
-        # Shuffle the dimension to the order that RandomChoiceSampler
-        # understands:
-        nested = nested.transpose((0, 3, 4, 1, 2))
+        nested = gridify_tc_data(
+            data,
+            num_contrasts=len(contrasts),
+            num_bandwidths=len(bandwidths),
+            num_cell_types=len(cell_types),
+            num_probes=len(norm_probes),
+        )
         cond_values = [cell_types, norm_probes, contrasts, bandwidths]
+
+        # TC data is reshaped and shuffled to the format that
+        # RandomChoiceSampler understands:
+        assert nested.shape == (len(data),) + tuple(map(len, cond_values))
+
         return cls(nested, cond_values, **kwargs)
 
     def __init__(self, nested, cond_values, e_ratio,

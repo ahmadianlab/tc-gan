@@ -6,13 +6,13 @@ import theano
 
 from ..core import BaseComponent
 from ..gradient_expressions.utils import sample_sites_from_stim_space
+from ..lasagne_toppings.rechack import largerrecursionlimit
 from ..utils import (
     cached_property, StopWatch,
     theano_function, log_timing, asarray,
 )
 from .wgan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
 from .ssn import make_tuning_curve_generator, maybe_mixin_noise, is_heteroin
-from .utils import largerrecursionlimit
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,

@@ -1,8 +1,8 @@
 import numpy as np
 
+from ..lasagne_toppings.rechack import largerrecursionlimit
 from .ssn import make_tuning_curve_generator
 from .tests import test_euler_ssn
-from .utils import largerrecursionlimit
 from .wgan import (
     DEFAULT_PARAMS, grid_stimulator_inputs, probes_from_stim_space,
 )

@@ -29,12 +29,12 @@ import numpy as np
 from .. import ssnode
 from ..core import BaseComponent, consume_subdict
 from ..gradient_expressions.utils import sample_sites_from_stim_space
+from ..lasagne_toppings.rechack import largerrecursionlimit
 from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
     theano_function, log_timing,
 )
 from .ssn import make_tuning_curve_generator, maybe_mixin_noise, is_heteroin
-from .utils import largerrecursionlimit
 
 
 DEFAULT_PARAMS = dict(

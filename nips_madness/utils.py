@@ -1,7 +1,9 @@
 from __future__ import print_function
 
+from collections import OrderedDict
 from contextlib import contextmanager
 from logging import getLogger
+import inspect
 import multiprocessing
 import os
 import subprocess
@@ -474,3 +476,25 @@ def report_allclose_tols(a, b, rtols, atols, **isclose_kwargs):
             p = np.isclose(a, b, rtol=rtol, atol=atol, **isclose_kwargs).mean()
             print('mismatch {:>7.3%} with rtol={:<4.1e} atol={:<4.1e}'
                   .format(1 - p, rtol, atol))
+
+
+def default_arguments(func):
+    return OrderedDict(
+        (n, p.default) for n, p in inspect.signature(func).parameters.items()
+        if (p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY) and
+            p.default is not p.empty)
+    )
+
+
+def add_arguments_from_function(parser, func, help=None, **kwargs):
+    if help is None:
+        help = '{} parameters'.format(func.__name__)
+    for key, val in default_arguments(func).items():
+        if isinstance(val, (str, float, int)):
+            argtype = type(val)
+        else:
+            argtype = eval
+        parser.add_argument(
+            '--{}'.format(key.replace('_', '-')),
+            type=argtype, default=val, help=help,
+            **kwargs)

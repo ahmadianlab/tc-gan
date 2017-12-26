@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from matplotlib import pyplot
 import numpy as np
 
-from ..utils import make_progressbar
+from ..utils import make_progressbar, add_arguments_from_function
 
 
 def plot_gridified_truth(truth_df,
@@ -79,17 +79,18 @@ def plot_gridified_truth(truth_df,
     )
 
 
-def cli_plot_gridified_truth(logpath, title_params):
+def cli_plot_gridified_truth(logpath, title_params, **kwargs):
     from ..loaders import load_records
     rec = load_records(logpath)
-    arts = plot_gridified_truth(rec.truth_df(),
-                                title=rec.pretty_spec(title_params))
+    kwargs.setdefault('title', rec.pretty_spec(title_params))
+    arts = plot_gridified_truth(rec.truth_df(), **kwargs)
     return arts.fig
 
 
 def main(args=None):
     from .basecli import make_base_parser, call_cli
     parser = make_base_parser(description=__doc__)
+    add_arguments_from_function(parser, plot_gridified_truth)
     call_cli(cli_plot_gridified_truth, parser.parse_args(args))
 
 

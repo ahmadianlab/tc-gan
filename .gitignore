@@ -5,7 +5,7 @@
 *.csv
 *.sh.*
 *~
-/.cache
+.cache
 /prof
 python
 taka

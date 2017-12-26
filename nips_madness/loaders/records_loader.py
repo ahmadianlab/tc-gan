@@ -6,7 +6,7 @@ import numpy as np
 import pandas
 
 from ..networks.ssn import concat_flat
-from ..networks.utils import gridify_tc_data, sampled_tc_axes
+from ..networks.utils import gridify_tc_samples, sampled_tc_axes
 from ..utils import cached_property
 from .datastore_loader import get_datastore
 from .run_configs import get_run_config, guess_run_module
@@ -124,9 +124,9 @@ class BaseRecords(object):
         """
         Accessing `.truth` as order-5 array.
 
-        See: `gridify_tc_data`.
+        See: `gridify_tc_samples`.
         """
-        return gridify_tc_data(
+        return gridify_tc_samples(
             self.truth,
             num_contrasts=len(self.rc.contrasts),
             num_bandwidths=len(self.rc.bandwidths),

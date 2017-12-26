@@ -16,7 +16,7 @@ from .wgan import (
     BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, emit_generator_trainer,
 )
 from .ssn import TuningCurveGenerator, make_tuning_curve_generator
-from .utils import gridify_tc_data
+from .utils import gridify_tc_samples
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -300,7 +300,7 @@ class RandomChoiceSampler(object):
 
         """
         cell_types = [0, 1] if include_inhibitory_neurons else [0]
-        nested = gridify_tc_data(
+        nested = gridify_tc_samples(
             data,
             num_contrasts=len(contrasts),
             num_bandwidths=len(bandwidths),

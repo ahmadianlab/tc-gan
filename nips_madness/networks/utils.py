@@ -1,13 +1,13 @@
 gridified_tc_axes = \
     ('sample', 'cell_type', 'norm_probe', 'contrast', 'bandwidth')
-"""Names of axes of array returned by `gridify_tc_data`."""
+"""Names of axes of array returned by `gridify_tc_samples`."""
 
 sampled_tc_axes = \
     ('sample', 'contrast', 'bandwidth', 'cell_type', 'norm_probe')
-"""Names of axes of array accepted by `gridify_tc_data`"""
+"""Names of axes of array accepted by `gridify_tc_samples`"""
 
 
-def gridify_tc_data(
+def gridify_tc_samples(
         data, num_contrasts, num_bandwidths, num_cell_types, num_probes):
     """
     Convert tuning curve `data` to the "grid" representation.
@@ -53,7 +53,7 @@ def gridify_tc_data(
        ...          num_cell_types, num_probes)
        >>> data = np.arange(np.prod(shape)).reshape(shape)
 
-    >>> grid = gridify_tc_data(
+    >>> grid = gridify_tc_samples(
     ...    data, num_bandwidths=num_bandwidths, num_contrasts=num_contrasts,
     ...    num_probes=num_probes, num_cell_types=num_cell_types)
     >>> grid.shape == (len(data),

@@ -5,8 +5,6 @@ from matplotlib import pyplot
 import matplotlib
 import numpy as np
 
-from ..utils import csv_line
-
 
 def clip_ymax(ax, ymax, ymin=0):
     if ax.get_ylim()[1] > ymax:
@@ -446,29 +444,15 @@ def analyze_learning(logpath, title_params):
         return plot_learning(rec, title_params)
 
 
-def cli_analyze_learning(logpath, title_params, show, figpath):
+def cli_analyze_learning(logpath, title_params):
     arts = analyze_learning(logpath, title_params)
-    fig = arts.fig
-    if show:
-        pyplot.show()
-    if figpath:
-        fig.savefig(figpath)
+    return arts.fig
 
 
 def main(args=None):
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        'logpath',
-        help='''Path to GAN output directory. It can also be any file
-        in such directory; filename part is ignored.''')
-    parser.add_argument('--figpath')
-    parser.add_argument('--show', action='store_true')
-    parser.add_argument(
-        '--title-params', type=csv_line(str),
-        help='Comma separated name of parameters to be used in figure title.')
-    ns = parser.parse_args(args)
-    cli_analyze_learning(**vars(ns))
+    from .basecli import make_base_parser, call_cli
+    parser = make_base_parser(description=__doc__)
+    call_cli(cli_analyze_learning, parser.parse_args(args))
 
 
 if __name__ == '__main__':

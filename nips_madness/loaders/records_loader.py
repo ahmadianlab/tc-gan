@@ -6,6 +6,7 @@ import numpy as np
 import pandas
 
 from ..networks.ssn import concat_flat
+from ..networks.utils import gridify_tc_data, sampled_tc_axes
 from ..utils import cached_property
 from .datastore_loader import get_datastore
 from .run_configs import get_run_config, guess_run_module
@@ -34,6 +35,25 @@ def element_to_array_names(element_names):
         if prefix not in names:
             names.append(prefix)
     return names
+
+
+def tc_samples_as_dataframe(data, rc=None, **kwargs):
+    # The experiment parameters flatten in the second axis of `.truth`.
+    names = sampled_tc_axes[1:]  # skip 'sample'
+    keys = [n + 's' for n in names]  # turn them to plural
+
+    if rc is None:
+        values = [kwargs.pop(n) for n in keys]
+    else:
+        values = [getattr(rc, n) for n in keys]
+    if kwargs:
+        raise TypeError('Unrecognized arguments: {}'.format(sorted(kwargs)))
+
+    columns = pandas.MultiIndex.from_product(values, names=names)
+    df = pandas.DataFrame(data, columns=columns)
+    df.index.name = sampled_tc_axes[0]
+
+    return df
 
 
 class BaseRecords(object):
@@ -99,6 +119,26 @@ class BaseRecords(object):
 
     def flatten_gen_params(self):
         return self.generator.loc[:, self.param_element_names].as_matrix()
+
+    def truth_grid(self):
+        """
+        Accessing `.truth` as order-5 array.
+
+        See: `gridify_tc_data`.
+        """
+        return gridify_tc_data(
+            self.truth,
+            num_contrasts=len(self.rc.contrasts),
+            num_bandwidths=len(self.rc.bandwidths),
+            num_cell_types=len(self.rc.cell_types),
+            num_probes=len(self.rc.norm_probes),
+        )
+
+    def truth_df(self):
+        """
+        Accessing `.truth` as multi-index dataframe.
+        """
+        return tc_samples_as_dataframe(self.truth, rc=self.rc)
 
     @classmethod
     def from_info(cls, info, datastore_path):

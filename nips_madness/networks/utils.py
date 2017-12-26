@@ -1,3 +1,12 @@
+gridified_tc_axes = \
+    ('sample', 'cell_type', 'norm_probe', 'contrast', 'bandwidth')
+"""Names of axes of array returned by `gridify_tc_data`."""
+
+sampled_tc_axes = \
+    ('sample', 'contrast', 'bandwidth', 'cell_type', 'norm_probe')
+"""Names of axes of array accepted by `gridify_tc_data`"""
+
+
 def gridify_tc_data(
         data, num_contrasts, num_bandwidths, num_cell_types, num_probes):
     """
@@ -14,6 +23,8 @@ def gridify_tc_data(
       3  1  ::  cell types
       4  2  ::  probes
 
+    See also `gridified_tc_axes`.
+
     Parameters
     ----------
     data : numpy.ndarray
@@ -28,6 +39,7 @@ def gridify_tc_data(
     -------
     grid : numpy.ndarray
         `data` reshaped and shuffled.
+        For canonical names of each axis, use `gridified_tc_axes`.
 
     Examples
     --------

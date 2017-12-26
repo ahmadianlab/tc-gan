@@ -68,6 +68,22 @@ class BaseRunConfig(object):
         return len(self.contrasts)
 
     @property
+    def cell_types(self):
+        return [0, 1] if self.include_inhibitory_neurons else [0]
+
+    @property
+    def norm_probes(self):
+        try:
+            return self.dict['norm_probes']
+        except KeyError:
+            pass
+        try:
+            return self.dict['sample_sites']
+        except KeyError:
+            pass
+        raise AttributeError("{} has no attribute 'norm_probes'".format(self))
+
+    @property
     def ssn_impl(self):
         return self.dict.get('ssn_impl', 'default')
 

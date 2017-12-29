@@ -47,10 +47,13 @@ def test_single_g_step_slowtest(args, cleancwd):
 
     generator_df = rec.generator
     names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
-    if ssn_type == 'heteroin':
+    if ssn_type in ('heteroin', 'deg-heteroin'):
         i = names.index('J_EE')
         assert i >= 0
-        names = names[:i] + ['V_E', 'V_I'] + names[i:]
+        if ssn_type == 'heteroin':
+            names = names[:i] + ['V_E', 'V_I'] + names[i:]
+        elif ssn_type == 'deg-heteroin':
+            names = names[:i] + ['V'] + names[i:]
     assert list(generator_df.columns) == names
     assert len(generator_df) == 1
 
@@ -69,11 +72,13 @@ def test_single_g_step_slowtest(args, cleancwd):
     (['--include-inhibitory-neurons'], dict(ssn_type='heteroin',
                                             V_min=[0, 0],
                                             V_max=[1, 0])),
+    ([], dict(ssn_type='deg-heteroin')),
+    (['--include-inhibitory-neurons'], dict(ssn_type='deg-heteroin', V=0.5)),
 ])
 def test_single_g_step_with_load_config_slowtest(args, config,
                                                  cleancwd, **kwargs):
     config = dict(config)
-    if config.get('ssn_type') == 'heteroin':
+    if config.get('ssn_type') in ('heteroin', 'deg-heteroin'):
         config.setdefault('dataset_provider', 'fixedtime')
         # ...since, at the moment, dataset_provider='ssnode' does not
         # work with ssn_type='heteroin'.

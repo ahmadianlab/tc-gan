@@ -80,11 +80,13 @@ def test_single_g_step_slowtest(args, cleancwd,
     (['--include-inhibitory-neurons'], dict(ssn_type='heteroin',
                                             gen_V_min=[0, 0],
                                             gen_V_max=[1, 0])),
+    ([], dict(ssn_type='deg-heteroin')),
+    (['--include-inhibitory-neurons'], dict(ssn_type='deg-heteroin', V=0.5)),
 ])
 def test_single_g_step_with_load_config_slowtest(args, config,
                                                  cleancwd, **kwargs):
     config = dict(config)
-    if config.get('ssn_type') == 'heteroin':
+    if config.get('ssn_type') in ('heteroin', 'deg-heteroin'):
         config.setdefault('dataset_provider', 'fixedtime')
         # ...since, at the moment, dataset_provider='ssnode' does not
         # work with ssn_type='heteroin'.

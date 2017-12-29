@@ -40,6 +40,8 @@ def test_single_g_step_slowtest(args, cleancwd):
     (['--include-inhibitory-neurons'], dict(ssn_type='heteroin',
                                             gen_V_min=[0, 0],
                                             gen_V_max=[1, 0])),
+    ([], dict(ssn_type='deg-heteroin')),
+    (['--include-inhibitory-neurons'], dict(ssn_type='deg-heteroin', V=0.5)),
 ])
 def test_single_g_step_with_load_config_slowtest(args, config, cleancwd):
     test_bptt_wgan.test_single_g_step_with_load_config_slowtest(

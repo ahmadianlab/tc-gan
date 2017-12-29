@@ -9,8 +9,9 @@ import numpy as np
 from . import gan as plain_gan
 from .. import utils
 from ..drivers import BPTTWGANDriver
-from ..networks.wgan import make_gan, DEFAULT_PARAMS
 from ..networks.dataset import generate_dataset
+from ..networks.fixed_time_sampler import new_JDS
+from ..networks.wgan import make_gan, DEFAULT_PARAMS
 
 logger = getLogger(__name__)
 
@@ -202,10 +203,15 @@ def preprocess(run_config):
     Pre-process `run_config` before it is dumped to ``info.json``.
     """
     plain_gan.preprocess(run_config)
+
+    true_ssn_options = run_config.setdefault('true_ssn_options', {})
+    # Default to "new" JDS:
+    for key in ['J', 'D', 'S']:
+        true_ssn_options.setdefault(key, new_JDS[key].tolist())
     if run_config.get('ssn_type') == 'heteroin':
-        run_config['true_ssn_options'].setdefault('V', [0.3, 0])
+        true_ssn_options.setdefault('V', [0.3, 0])
     elif run_config.get('ssn_type') == 'deg-heteroin':
-        run_config['true_ssn_options'].setdefault('V', 0.5)
+        true_ssn_options.setdefault('V', 0.5)
 
 
 def do_learning(learn, run_config, script_file, init_driver,

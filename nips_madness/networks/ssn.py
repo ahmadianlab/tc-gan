@@ -149,11 +149,11 @@ class BandwidthContrastStimulator(BaseComponent):
     num_tcdom : int
         Number of points in :term:`tuning curve domain` (TC dom).
 
-    bandwidths : theano.vector.matrix
+    bandwidths : theano.tensor.matrix
         shape: ``(batchsize, num_tcdom)``;
         :math:`s` in :eq:`BandwidthContrastStimulator-input`
 
-    contrasts : theano.vector.matrix
+    contrasts : theano.tensor.matrix
         shape: ``(batchsize, num_tcdom)``;
         :math:`A` in :eq:`BandwidthContrastStimulator-input`
 
@@ -693,7 +693,7 @@ class HeteroInputWrapper(BaseComponent):
         return dict(zs_in=zs_in)
 
     def __getattr__(self, name):
-        """ Trun ``self.XXX`` into ``self.stimulator.XXX``. """
+        """ Return ``self.stimulator.XXX`` when ``self.XXX`` is accessed. """
         try:
             super(HeteroInputWrapper, self).__getattr__(name)
         except AttributeError:

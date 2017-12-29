@@ -58,8 +58,9 @@ def test_hide_cell_type():
     assert isinstance(gan.disc, cwgan.CellTypeBlindDiscriminator)
 
 
-def test_cwgan_heteroin():
-    gan, _rest = emit_gan(ssn_type='heteroin')
+@pytest.mark.parametrize('ssn_type', ['heteroin', 'deg-heteroin'])
+def test_cwgan_heteroin(ssn_type):
+    gan, _rest = emit_gan(ssn_type=ssn_type)
     # Those attributes must exist:
     gan.gen.model.stimulator.V
     gan.gen_trainer.V_min
@@ -88,6 +89,7 @@ def normalize_to_gen_config(config):
 @pytest.mark.parametrize('config', [
     {},
     dict(ssn_type='heteroin'),
+    dict(ssn_type='deg-heteroin'),
 ])
 def test_cwgan_gen_to_config(config):
     test_wgan.test_wgan_gen_to_config(config,

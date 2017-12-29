@@ -55,14 +55,17 @@ def test_single_g_step_slowtest(args, cleancwd,
 
     generator_df = rec.generator
     names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
-    if ssn_type == 'heteroin':
+    if ssn_type in ('heteroin', 'deg-heteroin'):
         i = names.index('J_EE')
         assert i >= 0
-        names = names[:i] + ['V_E', 'V_I'] + names[i:]
+        if ssn_type == 'heteroin':
+            names = names[:i] + ['V_E', 'V_I'] + names[i:]
+        elif ssn_type == 'deg-heteroin':
+            names = names[:i] + ['V'] + names[i:]
     assert list(generator_df.columns) == names
     assert len(generator_df) == 1
 
-    if ssn_type == 'heteroin':
+    if ssn_type in ('heteroin', 'deg-heteroin'):
         assert rec.param_array_names == ['V', 'J', 'D', 'S']
     else:
         assert rec.param_array_names == ['J', 'D', 'S']

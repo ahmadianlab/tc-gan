@@ -54,7 +54,7 @@ def test_single_g_step_slowtest(args, cleancwd):
     assert list(generator_df.columns) == names
     assert len(generator_df) == 1
 
-    if ssn_type == 'heteroin':
+    if ssn_type in ('heteroin', 'deg-heteroin'):
         assert rec.param_array_names == ['V', 'J', 'D', 'S']
     else:
         assert rec.param_array_names == ['J', 'D', 'S']

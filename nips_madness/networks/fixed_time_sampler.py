@@ -9,7 +9,7 @@ from .wgan import (
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
-    V=[0.3, 0],
+    V=0.5,  # make it work for both ssn_type='heteroin' and 'deg-heteroin'
     seed=0,
     norm_probes=[0],
     include_inhibitory_neurons=False,

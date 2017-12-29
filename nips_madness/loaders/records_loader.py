@@ -25,13 +25,13 @@ def element_to_array_names(element_names):
     """
     Convert a list of element names to a list of array names.
 
-    >>> element_to_array_names(['X_E', 'X_I', 'Y_E', 'Y_I'])
-    ['X', 'Y']
+    >>> element_to_array_names(['X_E', 'X_I', 'Y_E', 'Y_I', 'Z'])
+    ['X', 'Y', 'Z']
 
     """
     names = []
     for element in element_names:
-        prefix, _ = element.split('_', 1)
+        prefix = element.split('_', 1)[0]
         if prefix not in names:
             names.append(prefix)
     return names

@@ -104,7 +104,9 @@ def concat_flat(arrays):
 
 def make_flat_param_names(parameters):
     def names(p):
-        if p.ndim == 1:
+        if p.ndim == 0:
+            return np.asarray(p.name)
+        elif p.ndim == 1:
             V = (p.name + '_{}').format
             return np.array([V('E'), V('I')])
         elif p.ndim == 2:
@@ -417,6 +419,8 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
     Implementation of SSN in Theano (based on map & clone combo).
     """
 
+    ssn_type = 'default'
+
     @classmethod
     def consume_kwargs(cls, stimulator, **kwargs):
         ssn, kwargs = MapCloneEulerSSNCore.consume_kwargs(
@@ -548,6 +552,8 @@ class EulerSSNModel(AbstractEulerSSNModel):
     Implementation of SSN in Theano (based on `batched_dot`).
     """
 
+    ssn_type = 'default'
+
     @classmethod
     def consume_kwargs(cls, stimulator, **kwargs):
         ssn, kwargs = EulerSSNCore.consume_kwargs(
@@ -612,6 +618,22 @@ class EulerSSNModel(AbstractEulerSSNModel):
 class HeteroInputWrapper(BaseComponent):
     """
     Stimulator wrapper.
+
+    Attributes
+    ----------
+    V : `theano.shared`
+        Generator parameter for input variability.
+    vpop : theano.tensor.vector
+        shape: ``(2,)``;
+        `.V` reshaped so that the first element is for the excitatory
+        populations and the second element is for the inhibitory
+        populations.
+    zs_in : theano.tensor.matrix
+        shape: ``(batchsize, num_neurons)``;
+        Random variable to be multiplied by `.vpop`.
+    dist_in : {'bernoulli', 'uniform'}
+        distribution of `.zs_in`.
+
     """
 
     dist_in_choices = ('bernoulli', 'uniform')
@@ -622,21 +644,28 @@ class HeteroInputWrapper(BaseComponent):
         self.dist_in = dist_in
         assert dist_in in self.dist_in_choices
 
-        V = np.asarray(V, dtype=theano.config.floatX)
-        V = np.broadcast_to(V, 2)
-        V = np.ascontiguousarray(V)  # [#contiguous]_
-        self.V = theano.shared(V, name='V')
+        self.init_variability(V)
 
         # self.zs_in.shape: (batchsize, num_neurons)
         self.zs_in = theano.tensor.matrix('zs_in')
 
         # self.amplification, vs, zs: arrays broadcastable to:
         #     (batchsize, num_tcdom, num_neurons)
-        vs = neu_array(self.V, stimulator.num_sites, 2).reshape((1, 1, -1))
+        vs = neu_array(self.vpop, stimulator.num_sites, 2).reshape((1, 1, -1))
         zs = self.zs_in.reshape((self.zs_in.shape[0], 1, self.zs_in.shape[1]))
         self.amplification = amp = 1 + vs * zs
 
         self.stimulus = amp * self.stimulator.stimulus
+
+    def init_variability(self, V):
+        """
+        Setup attributes `.V` and `.vpop` from the constructor argument `V`.
+        """
+        V = np.asarray(V, dtype=theano.config.floatX)
+        V = np.broadcast_to(V, 2)
+        V = np.ascontiguousarray(V)  # [#contiguous]_
+        self.V = theano.shared(V, name='V')
+        self.vpop = self.V
 
     # .. [#contiguous] Converting `V` to a contiguous array before
     #    passing it to `theano.shared` is important since otherwise
@@ -671,11 +700,24 @@ class HeteroInputWrapper(BaseComponent):
             return getattr(self.stimulator, name)
 
 
+class DegenerateHeteroInputWrapper(HeteroInputWrapper):
+
+    def init_variability(self, V):
+        V = np.asarray(V, dtype=theano.config.floatX)
+        self.V = theano.shared(V, name='V')
+        self.vpop = theano.tensor.as_tensor_variable([self.V, self.V])
+
+        assert V.ndim == 0
+        assert self.V.ndim == 0
+        assert self.vpop.ndim == 1
+
+
 class HeteroInEulerSSNModel(EulerSSNModel):
     """
     SSN with heterogeneous (random) input.
     """
 
+    ssn_type = 'heteroin'
     input_wrapper_class = HeteroInputWrapper
 
     @classmethod
@@ -695,6 +737,11 @@ class HeteroInEulerSSNModel(EulerSSNModel):
         noise = super(HeteroInEulerSSNModel, self).gen_noise(rng, **kwargs)
         noise.update(self.stimulator.gen_noise(rng, **kwargs))
         return noise
+
+
+class DegenerateHeteroInEulerSSNModel(HeteroInEulerSSNModel):
+    ssn_type = 'deg-heteroin'
+    input_wrapper_class = DegenerateHeteroInputWrapper
 
 
 def is_heteroin(gen):
@@ -886,7 +933,7 @@ class TuningCurveGenerator(BaseComponent):
         for component in [self.stimulator, self.model.l_ssn.ssn, self.model,
                           self.prober]:
             config.update(component.to_config())
-        config['ssn_type'] = 'heteroin' if is_heteroin(self) else 'default'
+        config['ssn_type'] = ssn_type_of(self)
         config['ssn_impl'] = ('mapclone' if isinstance(self.model,
                                                        MapCloneEulerSSNModel)
                               else 'default')
@@ -897,15 +944,21 @@ _ssn_classes = {
     ('default', 'default'): EulerSSNModel,
     ('mapclone', 'default'): MapCloneEulerSSNModel,
     ('default', 'heteroin'): HeteroInEulerSSNModel,
+    ('default', 'deg-heteroin'): DegenerateHeteroInEulerSSNModel,
 }
 """
 Mapping form ``(ssn_impl, ssn_type)`` to SSN model class.
 """
 
 ssn_impl_choices = ('default', 'mapclone')
-ssn_type_choices = ('default', 'heteroin')
+ssn_type_choices = ('default', 'heteroin', 'deg-heteroin')
 assert set(ssn_impl_choices) == set(k for k, _ in _ssn_classes)
 assert set(ssn_type_choices) == set(k for _, k in _ssn_classes)
+assert all(k == v.ssn_type for (_, k), v in _ssn_classes.items())
+
+
+def ssn_type_of(gen):
+    return gen.model.ssn_type
 
 
 def emit_ssn(*args, ssn_impl='default', ssn_type='default', **kwargs):

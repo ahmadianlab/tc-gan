@@ -3,7 +3,7 @@ import pytest
 
 from ...core import consume_config
 from ..cwgan import ConditionalTuningCurveGenerator
-from ..ssn import emit_tuning_curve_generator
+from ..ssn import emit_tuning_curve_generator, ssn_type_choices
 from ..wgan import DEFAULT_PARAMS
 from .test_euler_ssn import JDS
 
@@ -43,19 +43,17 @@ def get_param_values(self):
     return values
 
 
-@pytest.mark.parametrize('params', [
-    {},
+@pytest.mark.parametrize('ssn_type, params', [
+    ('default', {}),
     # dict(J=0.5),  # unsupported (should I?)
-    dict(J=[[1, 2], [3, 4]]),
-    dict(J=np.array([[1, 2], [3, 4]], dtype=int)),
-    dict(J=np.array([[1, 2], [3, 4]], dtype='float32')),
-    dict(V=[0.3, 0]),
+    ('default', dict(J=[[1, 2], [3, 4]])),
+    ('default', dict(J=np.array([[1, 2], [3, 4]], dtype=int))),
+    ('default', dict(J=np.array([[1, 2], [3, 4]], dtype='float32'))),
+    ('heteroin', dict(V=[0.3, 0])),
+    ('deg-heteroin', dict(V=0.5)),
 ])
-def test_tcg_set_params(params):
-    config = {}
-    if 'V' in params:
-        config['ssn_type'] = 'heteroin'
-
+def test_tcg_set_params(ssn_type, params):
+    config = dict(ssn_type=ssn_type)
     tcg = tcg_for_test(config)
     keys = set(params)
     tcg.set_params(params)
@@ -90,9 +88,10 @@ flat_param_names = {
     ],
 }
 flat_param_names['heteroin'] = ['V_E', 'V_I'] + flat_param_names['default']
+flat_param_names['deg-heteroin'] = ['V'] + flat_param_names['default']
 
 
-@pytest.mark.parametrize('ssn_type', ['default', 'heteroin'])
+@pytest.mark.parametrize('ssn_type', ssn_type_choices)
 @pytest.mark.parametrize('conditional', [False, True])
 def test_tcg_flat_param_names(ssn_type, conditional):
     desired_names = tuple(flat_param_names[ssn_type])

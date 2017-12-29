@@ -204,7 +204,8 @@ def preprocess(run_config):
     plain_gan.preprocess(run_config)
     if run_config.get('ssn_type') == 'heteroin':
         run_config['true_ssn_options'].setdefault('V', [0.3, 0])
-        # See [[../networks/fixed_time_sampler.py::V=]]
+    elif run_config.get('ssn_type') == 'deg-heteroin':
+        run_config['true_ssn_options'].setdefault('V', 0.5)
 
 
 def do_learning(learn, run_config, script_file, init_driver,

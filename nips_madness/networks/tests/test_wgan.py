@@ -47,6 +47,7 @@ def fake_data(gan, truth_size):
 
 @pytest.mark.parametrize('config', [
     dict(ssn_type='heteroin'),
+    dict(ssn_type='deg-heteroin'),
 ])
 def test_smoke_wgan(config):
     gan, rest = emit_gan(**config)
@@ -61,8 +62,9 @@ def test_smoke_wgan(config):
     assert not info.is_discriminator
 
 
-def test_wgan_heteroin():
-    gan, _rest = emit_gan(ssn_type='heteroin')
+@pytest.mark.parametrize('ssn_type', ['heteroin', 'deg-heteroin'])
+def test_wgan_heteroin(ssn_type):
+    gan, _rest = emit_gan(ssn_type=ssn_type)
     # Those attributes must exist:
     gan.gen.model.stimulator.V
     gan.gen_trainer.V_min
@@ -119,6 +121,7 @@ def normalize_to_gen_config_common(config):
 @pytest.mark.parametrize('config', [
     {},
     dict(ssn_type='heteroin'),
+    dict(ssn_type='deg-heteroin'),
 ])
 def test_wgan_gen_to_config(config, emit_gan=emit_gan,
                             normalize=normalize_to_gen_config):

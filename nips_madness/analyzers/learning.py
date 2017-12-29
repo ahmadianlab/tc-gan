@@ -315,7 +315,7 @@ def plot_learning(rec, title_params=None):
     fig, axes = pyplot.subplots(nrows=4, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 8))
-    is_heteroin = rec.rc.ssn_type == 'heteroin'
+    is_heteroin = rec.rc.ssn_type in ('heteroin', 'deg-heteroin')
 
     plot_kwargs = dict(ax=axes[0, 0], alpha=0.8)
     if rec.rc.is_WGAN:

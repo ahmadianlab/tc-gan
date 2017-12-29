@@ -72,7 +72,7 @@ def plot_mm_smape(rec, ax=None, colors=0,
 
 
 def plot_mm_learning(rec, title_params=None):
-    is_heteroin = rec.rc.ssn_type == 'heteroin'
+    is_heteroin = rec.rc.ssn_type in ('heteroin', 'deg-heteroin')
     fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))

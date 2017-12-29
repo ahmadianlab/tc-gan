@@ -31,9 +31,11 @@ def test_single_g_step_logfiles_slowtest(cleancwd):
     ['--sample-sites', '0, 0.5'],
     ['--include-inhibitory-neurons'],
 ])
-def test_single_g_step_slowtest(args, cleancwd,
-                                single_g_step=single_g_step,
-                                script_file=bptt_wgan.__file__):
+def test_single_g_step_slowtest(
+        args, cleancwd,
+        single_g_step=single_g_step,
+        script_file=bptt_wgan.__file__,
+        learning_names=recorders.LearningRecorder.dtype.names):
     datastore_name = 'results'
     single_g_step(args + ['--datastore', datastore_name])
     datastore_path = cleancwd.join(datastore_name)
@@ -49,7 +51,7 @@ def test_single_g_step_slowtest(args, cleancwd,
     assert len(warned) == 0
 
     learning_df = rec.learning
-    desired = list(recorders.LearningRecorder.dtype.names) + ['epoch']
+    desired = list(learning_names) + ['epoch']
     assert list(learning_df.columns) == desired
     assert len(learning_df) == 1
 

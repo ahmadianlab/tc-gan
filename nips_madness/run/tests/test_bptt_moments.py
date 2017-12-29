@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from . import test_bptt_wgan
 from .. import bptt_moments
 from ... import recorders
 from ...loaders import load_records
@@ -26,42 +27,12 @@ def single_g_step(args):
     ['--include-inhibitory-neurons'],
 ])
 def test_single_g_step_slowtest(args, cleancwd):
-    datastore_name = 'results'
-    single_g_step(args + ['--datastore', datastore_name])
-    datastore_path = cleancwd.join(datastore_name)
-    assert datastore_path.check()
-
-    info = load_json(datastore_path, 'info.json')
-    assert info['extra_info']['script_file'] == bptt_moments.__file__
-    assert 'PATH' in info['meta_info']['environ']
-    ssn_type = info['run_config'].get('ssn_type', 'default')
-
-    with pytest.warns(None) as warned:
-        rec = load_records(str(datastore_path))
-    assert len(warned) == 0
-
-    learning_df = rec.learning
-    desired = list(recorders.MMLearningRecorder.dtype.names) + ['epoch']
-    assert list(learning_df.columns) == desired
-    assert len(learning_df) == 1
-
-    generator_df = rec.generator
-    names = list(recorders.GenParamRecorder.dtype.names) + ['epoch']
-    if ssn_type in ('heteroin', 'deg-heteroin'):
-        i = names.index('J_EE')
-        assert i >= 0
-        if ssn_type == 'heteroin':
-            names = names[:i] + ['V_E', 'V_I'] + names[i:]
-        elif ssn_type == 'deg-heteroin':
-            names = names[:i] + ['V'] + names[i:]
-    assert list(generator_df.columns) == names
-    assert len(generator_df) == 1
-
-    if ssn_type in ('heteroin', 'deg-heteroin'):
-        assert rec.param_array_names == ['V', 'J', 'D', 'S']
-    else:
-        assert rec.param_array_names == ['J', 'D', 'S']
-    assert rec.param_element_names == flat_param_names[ssn_type]
+    test_bptt_wgan.test_single_g_step_slowtest(
+        args, cleancwd,
+        single_g_step=single_g_step,
+        script_file=bptt_moments.__file__,
+        learning_names=recorders.MMLearningRecorder.dtype.names,
+    )
 
 
 @pytest.mark.parametrize('args, config', [

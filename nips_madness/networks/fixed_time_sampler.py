@@ -2,10 +2,23 @@ import numpy as np
 
 from ..lasagne_toppings.rechack import largerrecursionlimit
 from .ssn import make_tuning_curve_generator
-from .tests import test_euler_ssn
 from .wgan import (
     DEFAULT_PARAMS, grid_stimulator_inputs, probes_from_stim_space,
 )
+
+
+def _make_new_JDS():
+    # Original SSN parameters:
+    J = np.array([[.0957, .0638], [.1197, .0479]])
+    D = np.array([[.7660, .5106], [.9575, .3830]])
+    S = np.array([[.6667, .2], [1.333, .2]]) / 8
+
+    # More stable parameters:
+    D_new = D / 2
+    J_new = J + D / 2 - D_new / 2
+    return dict(J=J_new, D=D_new, S=S)
+
+new_JDS = _make_new_JDS()
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -13,7 +26,7 @@ DEFAULT_PARAMS = dict(
     seed=0,
     norm_probes=[0],
     include_inhibitory_neurons=False,
-    **test_euler_ssn.JDS
+    **new_JDS
 )
 del DEFAULT_PARAMS['sample_sites']
 

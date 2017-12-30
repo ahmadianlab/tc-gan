@@ -37,3 +37,23 @@ def test_l1_decay_no_loss():
     results = update_single_param(updater, before)
     desired = [0.5, -0.5]
     np.testing.assert_allclose(results.after, desired)
+
+
+def test_l2_penalty_no_loss():
+    before = np.array([1, 2, 3])
+    reg_l2_penalty = 0.2
+    updater = Updater(learning_rate=1, update_name='sgd',
+                      reg_l2_penalty=reg_l2_penalty)
+    results = update_single_param(updater, before)
+    desired = before * (1 - 2 * reg_l2_penalty)
+    np.testing.assert_allclose(results.after, desired)
+
+
+def test_l1_penalty_no_loss():
+    before = np.array([1, -1])
+    reg_l1_penalty = 0.5
+    updater = Updater(learning_rate=1, update_name='sgd',
+                      reg_l1_penalty=reg_l1_penalty)
+    results = update_single_param(updater, before)
+    desired = [0.5, -0.5]
+    np.testing.assert_allclose(results.after, desired)

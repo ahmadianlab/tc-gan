@@ -124,7 +124,7 @@ class Updater(BaseComponent):
     def _get_updater(self):
         name, default = self._named_update_configs.get(
             self.update_name,
-            dict(name=self.update_name))
+            (self.update_name, {}))
         updater = getattr(lasagne.updates, name)
         config = dict(default, **self.update_config)
         return updater, config

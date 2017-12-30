@@ -89,6 +89,17 @@ class UnConditionalDiscriminator(BaseComponent):
         self.accuracy
 
 
+def apply_l2_decay(updates, params, decay):
+    for var in params:
+        updates[var] -= decay * var
+
+
+def apply_l1_decay(updates, params, decay):
+    from theano.tensor import sgn
+    for var in params:
+        updates[var] -= decay * sgn(var)
+
+
 class Updater(BaseComponent):
 
     _named_update_configs = {
@@ -98,10 +109,17 @@ class Updater(BaseComponent):
     }
 
     def __init__(self, learning_rate=0.001, update_name='adam-wgan',
-                 update_config={}):
+                 update_config={},
+                 reg_l2_penalty=0.0, reg_l2_decay=0.0,
+                 reg_l1_penalty=0.0, reg_l1_decay=0.0):
         self.learning_rate = learning_rate
         self.update_name = update_name
         self.update_config = update_config
+
+        self.reg_l2_penalty = reg_l2_penalty
+        self.reg_l1_penalty = reg_l1_penalty
+        self.reg_l2_decay = reg_l2_decay  # Loshchilov & Hutter (2017)
+        self.reg_l1_decay = reg_l1_decay
 
     def _get_updater(self):
         name, default = self._named_update_configs.get(
@@ -113,9 +131,30 @@ class Updater(BaseComponent):
 
     def __call__(self, loss, params):
         updater, config = self._get_updater()
-        return updater(
+
+        # Add L2/L1 regularizatio penalty to `loss`:
+        if self.reg_l2_penalty:
+            loss += lasagne.regularization.apply_penalty(
+                params, lasagne.regularization.l2,
+            ) * self.reg_l2_penalty
+        if self.reg_l1_penalty:
+            loss += lasagne.regularization.apply_penalty(
+                params, lasagne.regularization.l1,
+            ) * self.reg_l1_penalty
+
+        # Compute gradient & update formulae:
+        updates = updater(
             loss, params, learning_rate=self.learning_rate,
             **config)
+
+        # Add L2/L1 weight decay to the update:
+        learning_rate = self.learning_rate
+        if self.reg_l2_decay:
+            apply_l2_decay(updates, params, learning_rate * self.reg_l2_decay)
+        if self.reg_l1_decay:
+            apply_l1_decay(updates, params, learning_rate * self.reg_l1_decay)
+
+        return updates
 
 
 class BaseTrainer(BaseComponent):

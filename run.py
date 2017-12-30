@@ -31,7 +31,7 @@ conda list --prefix "{project_root}/env" --export > conda-list.txt
 '''
 
 
-def run_module(module, arguments, use_pdb, use_pudb,
+def run_module(module, arguments, use_pdb, use_pudb, pidfile,
                assert_repo_is_clean,
                record_env, mpl_style,
                log_level, log_format, log_datefmt):
@@ -60,6 +60,9 @@ def run_module(module, arguments, use_pdb, use_pudb,
     if mpl_style:
         import matplotlib
         matplotlib.style.use(mpl_style)
+    if pidfile:
+        with open(pidfile, 'w') as file:
+            file.write(str(os.getpid()))
     try:
         loaded.main(arguments)
     except Exception as err:
@@ -95,6 +98,9 @@ def main(args=None):
     parser.add_argument(
         'arguments', nargs='*',
         help="arguments passed to module's main function")
+    parser.add_argument(
+        '--pidfile',
+        help='Path to which PID of this process is written.')
     parser.add_argument(
         '--log-level', default='INFO',
         choices='CRITICAL ERROR WARNING INFO DEBUG NOTSET'.split(),

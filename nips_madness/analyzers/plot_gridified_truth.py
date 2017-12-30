@@ -61,6 +61,12 @@ def plot_gridified_truth(truth_df,
             col_val = idx[icol]
             ax.set_title('{}={} | {}={}'.format(row, row_val, col, col_val))
 
+    # "Close" progress bar:
+    try:
+        next(bar_it)
+    except StopIteration:
+        pass
+
     for ax in axes[:, 0]:
         ax.set_ylabel(y)
 

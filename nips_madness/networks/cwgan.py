@@ -121,7 +121,8 @@ class ConditionalTuningCurveGenerator(TuningCurveGenerator):
 class ConditionalDiscriminator(BaseComponent):
 
     def __init__(self, shape, cond_shape, loss_type,
-                 layers, normalization, nonlinearity):
+                 layers, normalization, nonlinearity,
+                 net_options=None):
         self.l_in = lasagne.layers.InputLayer(shape)
         self.l_cond = lasagne.layers.InputLayer(cond_shape)
         self.l_eff_in = lasagne.layers.ConcatLayer([self.l_in, self.l_cond])
@@ -129,7 +130,8 @@ class ConditionalDiscriminator(BaseComponent):
         l_hidden = simple_discriminator.stack_hidden_layers(
             self.l_eff_in, layers=layers,
             normalization=normalization,
-            nonlinearity=nonlinearity)
+            nonlinearity=nonlinearity,
+            options=net_options)
         self.l_out = simple_discriminator.make_output_layer(
             l_hidden, loss_type=loss_type)
 

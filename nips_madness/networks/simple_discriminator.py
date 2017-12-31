@@ -60,12 +60,15 @@ def layer_normalized_dense_layer(incoming, num_units,
     if use_scale == 'auto':
         use_scale = nonlinearity is not NL.rectify
 
+    dense_kwargs = {}
+    for key in {'num_leading_axes'} & set(kwargs):
+        dense_kwargs[key] = kwargs.pop(key)
     layer = L.DenseLayer(incoming, num_units,
                          W=W,
                          b=None,
                          nonlinearity=NL.linear,
-                         **kwargs)
-    layer = LayerNormLayer(layer)
+                         **dense_kwargs)
+    layer = LayerNormLayer(layer, **kwargs)
     if use_scale:
         layer = L.ScaleLayer(layer)
     layer = L.BiasLayer(layer, b=b)
@@ -88,8 +91,18 @@ def _validate_norm(normalization, n_layers):
         return (normalization,) * n_layers
 
 
+def _validate_options(options, normalization):
+    if options is None:
+        options = [{}] * len(normalization)
+    elif isinstance(options, dict):
+        assert set(options) <= set(normalization_types)
+        options = [options.get(key, {}) for key in normalization]
+    assert len(options) == len(normalization)
+    return options
+
+
 def make_net(in_shape, loss_type, layers=[], normalization='none',
-             nonlinearity='rectify'):
+             nonlinearity='rectify', options=None):
     """
     Make a discriminator network appropriate for loss `LOSS`.
 
@@ -118,20 +131,23 @@ def make_net(in_shape, loss_type, layers=[], normalization='none',
     """
 
     net = L.InputLayer(in_shape)
-    net = stack_hidden_layers(net, layers, normalization, nonlinearity)
+    net = stack_hidden_layers(net, layers, normalization, nonlinearity,
+                              options)
     return make_output_layer(net, loss_type)
 
 
-def stack_hidden_layers(net, layers, normalization, nonlinearity):
+def stack_hidden_layers(net, layers, normalization, nonlinearity,
+                        options=None):
 
     if isinstance(nonlinearity, str):
         nonlinearity = getattr(NL, nonlinearity)
     normalization = _validate_norm(normalization, len(layers))
+    options = _validate_options(options, normalization)
 
-    for width, layer_type in zip(layers, normalization):
+    for width, layer_type, opt in zip(layers, normalization, options):
         make_layer = normalization_types[layer_type]
         net = make_layer(net, width, b=lasagne.init.Normal(.01, 0),
-                         nonlinearity=nonlinearity)
+                         nonlinearity=nonlinearity, **opt)
 
     return net
 

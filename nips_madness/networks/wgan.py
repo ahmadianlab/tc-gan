@@ -60,11 +60,13 @@ DEFAULT_PARAMS = dict(
 class UnConditionalDiscriminator(BaseComponent):
 
     def __init__(self, shape, loss_type,
-                 layers, normalization, nonlinearity):
+                 layers, normalization, nonlinearity,
+                 net_options=None):
         from .simple_discriminator import make_net
         self.l_out = make_net(
             shape, loss_type,
             layers, normalization, nonlinearity,
+            options=net_options,
         )
 
         from theano import tensor as T

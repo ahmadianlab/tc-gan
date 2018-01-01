@@ -147,8 +147,7 @@ class FixedTimeTuningCurveSampler(object):
             gen_config['include_rate_penalty'] = False
 
             # Pass gen_config as keyword arguments, to make sure all
-            # of them are used up.  Pass `override` as config to
-            # retrieve unconsumed ones:
+            # of them are used up:
             gen, config = make_tuning_curve_generator(config, **gen_config)
 
             config['gen'] = gen

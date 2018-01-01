@@ -224,14 +224,16 @@ def plot_gan_cost_and_rate_penalty(rec, ax=None,
             label='Daccuracy', color=color)
     ax.tick_params('y', colors=color)
 
-    if 'rate_penalty' in df:
-        color = 'C1'
-        ax_rate_penalty = ax.twinx()
-        lines += ax_rate_penalty.plot(
-            'epoch', 'rate_penalty', data=df,
-            label='rate_penalty', color=color, alpha=0.8)
-        ax_rate_penalty.tick_params('y', colors=color)
-        ax_rate_penalty.set_yscale(yscale_rate_penalty)
+    for key in ['rate_penalty', 'dynamics_penalty']:
+        if key in df:
+            color = 'C1'
+            ax_rate_penalty = ax.twinx()
+            lines += ax_rate_penalty.plot(
+                'epoch', key, data=df,
+                label=key, color=color, alpha=0.8)
+            ax_rate_penalty.tick_params('y', colors=color)
+            ax_rate_penalty.set_yscale(yscale_rate_penalty)
+            break
 
     ax.legend(
         lines, [l.get_label() for l in lines],

@@ -71,9 +71,26 @@ class BaseRecords(object):
     def run_module(self):
         return guess_run_module(self.info)
 
-    learning = cached_record('learning')
     generator = cached_record('generator')
     truth = cached_property(lambda self: self.datastore.load('truth'))
+
+    @cached_property
+    def learning(self):
+        df = self.datastore.load('learning')
+        if 'rate_penalty' in df and 'dynamics_penalty' not in df and \
+           self.run_module in ('bptt_wgan', 'bptt_cwgan', 'bptt_moments'):
+            # In the earlier versions of BPTT-based GANs/MM, the
+            # column 'rate_penalty' is used to store
+            # 'dynamics_penalty', so that the plotting function can be
+            # re-used.  Now that 'rate_penalty' really is rate
+            # penalty, the old column has to be renamed:
+            df.rename(columns={'rate_penalty': 'dynamics_penalty'},
+                      inplace=True)
+            warnings.warn(
+                'rate_penalty is renamed dynamics_penalty since that was how'
+                ' bptt_wgan/bptt_cwgan/bptt_moments used to work.')
+        self.insert_epoch_column(df)
+        return df
 
     def insert_epoch_column(self, df):
         if 'disc_step' in df.columns:

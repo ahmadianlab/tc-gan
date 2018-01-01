@@ -52,21 +52,31 @@ class DataStoreLoader1(object):
         with h5py.File(str(self.directory.joinpath(fname)), 'r') as file:
             return structured_array_to_dataframe(file[name])
 
+    def default_load(self, name):
+        csv_name = name + '.csv'
+        if self.directory.joinpath(csv_name).exists():
+            return self.read_csv(csv_name)
+
+        dedicated_fname = name + '.hdf5'
+        if self.directory.joinpath(dedicated_fname).exists():
+            return self.read_hdf5(dedicated_fname, name)
+
+        hdf5f_name = 'store.hdf5'
+        if self.directory.joinpath(hdf5f_name).exists():
+            return self.read_hdf5(hdf5f_name, name)
+
+        filenames = [csv_name, dedicated_fname, hdf5f_name]
+        raise RuntimeError('None of {} exists in directory {}'
+                           .format(filenames, self.directory))
+
     def load(self, name):
         try:
             loader = getattr(self, 'load_' + name)
         except AttributeError:
-            csv_name = name + '.csv'
-            if self.directory.joinpath(csv_name).exists():
-                return self.read_csv(csv_name)
-
-            dedicated_fname = name + '.hdf5'
-            if self.directory.joinpath(dedicated_fname).exists():
-                return self.read_hdf5(dedicated_fname, name)
-
-            return self.read_hdf5('store.hdf5', name)
+            pass
         else:
             return loader()
+        return self.default_load(name)
 
     def load_truth(self):
         return np.load(self.directory.joinpath('truth.npy'))

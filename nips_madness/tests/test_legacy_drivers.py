@@ -190,6 +190,7 @@ class GenFakeUpdateResults(BaseFakeUpdateResults):
         'model_info.rejections',
         'model_info.unused',
         'rate_penalty',
+        'dynamics_penalty',
     )
     size = len(fields)
 

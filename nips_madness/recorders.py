@@ -54,6 +54,8 @@ class UpdateResult(SimpleNamespace):
 
     """
 
+    dynamics_penalty = np.nan
+
 
 class BaseRecorder(object):
 
@@ -120,7 +122,8 @@ class LearningRecorder(HDF5Recorder):
         ('gradient_time', 'double'),
         ('model_convergence', 'uint32'),
         ('model_unused', 'uint32'),
-        ('rate_penalty', 'double')
+        ('rate_penalty', 'double'),
+        ('dynamics_penalty', 'double'),
     ])
 
     def record(self, gen_step, update_result):
@@ -134,6 +137,7 @@ class LearningRecorder(HDF5Recorder):
             update_result.model_info.rejections,
             update_result.model_info.unused,
             update_result.rate_penalty,
+            update_result.dynamics_penalty,
         ])
 
     @classmethod
@@ -147,6 +151,7 @@ class MMLearningRecorder(HDF5Recorder):
     dtype = np.dtype([
         ('step', 'uint32'),
         ('loss', 'double'),
+        ('rate_penalty', 'double'),
         ('dynamics_penalty', 'double'),
         ('train_time', 'double'),
     ])
@@ -155,6 +160,7 @@ class MMLearningRecorder(HDF5Recorder):
         self._saverow([
             gen_step,
             update_result.loss,
+            update_result.rate_penalty,
             update_result.dynamics_penalty,
             update_result.train_time,
         ])

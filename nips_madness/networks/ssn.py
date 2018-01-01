@@ -321,6 +321,10 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
 
     Attributes
     ----------
+    rate_penalty : Theano scalar expression
+        :math:`\mathtt{mean}_{b,i,t} \mathtt{ReLU}(r_{b,i}(t) - \theta)`
+    rate_penalty_threshold : `theano.tensor.scalar`
+        :math:`\theta` of above
     dynamics_penalty : Theano scalar expression
         :math:`\mathtt{mean}_{b,i,t} (r_{b,i}(t) - r_{b,i}(t - \Delta t))^2`
 
@@ -329,6 +333,23 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     @abc.abstractmethod
     def __init__(self):
         pass
+
+    @property
+    def inputs(self):
+        if self.include_rate_penalty:
+            return (self.zs, self.rate_penalty_threshold)
+        else:
+            return (self.zs,)
+
+    @property
+    def outputs(self):
+        outputs = (self.dynamics_penalty,)
+        if self.include_rate_penalty:
+            outputs += (self.rate_penalty,)
+        if self.include_time_avg:
+            return outputs + (self.time_avg,)
+        else:
+            return outputs
 
     def _setup_layers(self, ssn, shape, unroll_scan):
         shape_sym = shape
@@ -375,33 +396,38 @@ class AbstractEulerSSNModel(BaseComponent, abc.ABC):
     num_neurons = property(lambda self: self.stimulator.num_neurons)
 
     @property
-    def _input_names(self):
+    def solver_inputs(self):
+        return tuple(v for v in self.inputs
+                     if v is not self.rate_penalty_threshold)
+
+    @property
+    def solver_input_names(self):
         return collect_names(['', 'stimulator_'],
-                             [self.inputs, self.stimulator.inputs])
+                             [self.solver_inputs, self.stimulator.inputs])
 
     @cached_property
     def compute_trajectories_impl(self):
         return theano_function(
-            self.inputs + self.stimulator.inputs,
+            self.solver_inputs + self.stimulator.inputs,
             self.all_trajectories,
         )
 
     def compute_trajectories(self, rng=None, **kwargs):
         kwargs = maybe_mixin_noise(self, rng, kwargs)
-        values = [kwargs.pop(k) for k in self._input_names]
+        values = [kwargs.pop(k) for k in self.solver_input_names]
         assert not kwargs
         return self.compute_trajectories_impl(*values)
 
     @cached_property
     def compute_time_avg_impl(self):
         return theano_function(
-            self.inputs + self.stimulator.inputs,
+            self.solver_inputs + self.stimulator.inputs,
             self.time_avg,
         )
 
     def compute_time_avg(self, rng=None, **kwargs):
         kwargs = maybe_mixin_noise(self, rng, kwargs)
-        values = [kwargs.pop(k) for k in self._input_names]
+        values = [kwargs.pop(k) for k in self.solver_input_names]
         assert not kwargs
         return self.compute_time_avg_impl(*values)
 
@@ -440,10 +466,13 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
     def __init__(self, stimulator, ssn,
                  unroll_scan=False,
                  skip_steps=None, seqlen=None,
+                 include_rate_penalty=True,
                  include_time_avg=False):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+        self.include_rate_penalty = include_rate_penalty
+        self.include_time_avg = include_time_avg
 
         self.ext = ssn.ext
         # num_tcdom = "batch dimension" when using Lasagne:
@@ -466,11 +495,12 @@ class MapCloneEulerSSNModel(AbstractEulerSSNModel):
         self.dynamics_penalty.name = 'dynamics_penalty'
         # TODO: find if assigning a name to an expression is a valid usecase
 
-        self.inputs = (self.zs,)
-        if include_time_avg:
-            self.outputs = (self.dynamics_penalty, self.time_avg)
-        else:
-            self.outputs = (self.dynamics_penalty,)
+        from lasagne.nonlinearities import rectify
+        self.rate_penalty_threshold \
+            = threshold = theano.tensor.scalar('rate_penalty_threshold')
+        rate_penalty = rectify(rs - threshold).mean()
+        self.rate_penalty = self._map_clone(rate_penalty).mean()
+        self.rate_penalty.name = 'rate_penalty'
 
     zmat = property(lambda self: self.l_ssn.ssn.zmat)
 
@@ -568,10 +598,12 @@ class EulerSSNModel(AbstractEulerSSNModel):
     def __init__(self, stimulator, ssn,
                  unroll_scan=False,
                  skip_steps=None, seqlen=None,
+                 include_rate_penalty=True,
                  include_time_avg=False):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+        self.include_rate_penalty = include_rate_penalty
         self.include_time_avg = include_time_avg
 
         num_neurons = self.stimulator.num_neurons
@@ -594,16 +626,11 @@ class EulerSSNModel(AbstractEulerSSNModel):
         self.dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
         self.dynamics_penalty.name = 'dynamics_penalty'
 
-    @property
-    def inputs(self):
-        return (self.zs,)
-
-    @property
-    def outputs(self):
-        if self.include_time_avg:
-            return (self.dynamics_penalty, self.time_avg)
-        else:
-            return (self.dynamics_penalty,)
+        from lasagne.nonlinearities import rectify
+        self.rate_penalty_threshold \
+            = threshold = theano.tensor.scalar('rate_penalty_threshold')
+        self.rate_penalty = rectify(rs - threshold).mean()
+        self.rate_penalty.name = 'rate_penalty'
 
     @property
     def all_trajectories(self):
@@ -731,7 +758,8 @@ class HeteroInEulerSSNModel(EulerSSNModel):
 
     @property
     def inputs(self):
-        return (self.zs, self.stimulator.zs_in)
+        return (self.stimulator.zs_in,) + \
+            super(HeteroInEulerSSNModel, self).inputs
 
     def gen_noise(self, rng, **kwargs):
         noise = super(HeteroInEulerSSNModel, self).gen_noise(rng, **kwargs)

@@ -29,6 +29,7 @@ DEFAULT_PARAMS = dict(
     **new_JDS
 )
 del DEFAULT_PARAMS['sample_sites']
+del DEFAULT_PARAMS['gen']
 
 
 class FixedTimeTuningCurveSampler(object):
@@ -49,6 +50,7 @@ class FixedTimeTuningCurveSampler(object):
             # Stimulator:
             num_tcdom=len(bandwidths) * len(contrasts),
             num_sites=num_sites,
+            include_rate_penalty=False,
             # Prober:
             probes=probes_from_stim_space(norm_probes, num_sites,
                                           include_inhibitory_neurons),
@@ -141,6 +143,8 @@ class FixedTimeTuningCurveSampler(object):
                     learner.num_sites,
                     learner.include_inhibitory_neurons)
                 gen_config['probes'] = probes
+
+            gen_config['include_rate_penalty'] = False
 
             # Pass gen_config as keyword arguments, to make sure all
             # of them are used up.  Pass `override` as config to

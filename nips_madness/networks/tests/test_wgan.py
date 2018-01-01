@@ -17,6 +17,8 @@ TEST_PARAMS = dict(
         S_min=1e-3,
         S_max=10,
         dynamics_cost=1,
+        rate_cost=100,
+        rate_penalty_threshold=200,
     ),
     disc=dict(
         layers=[],
@@ -111,6 +113,7 @@ def normalize_to_gen_config_common(config):
             sample_sites, num_sites, include_inhibitory_neurons)
 
     config.setdefault('unroll_scan', False)
+    config.setdefault('include_rate_penalty', True)
     config.setdefault('include_time_avg', False)
     config.setdefault('ssn_type', 'default')
     config.setdefault('ssn_impl', 'default')

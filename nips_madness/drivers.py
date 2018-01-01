@@ -307,7 +307,8 @@ class BPTTWGANDriver(GANDriver):
                         SSsolve_time=info.gen_time,
                         gradient_time=info.disc_time,
                         model_info=ssnode.null_FixedPointsInfo,
-                        rate_penalty=disc_info.dynamics_penalty,
+                        rate_penalty=disc_info.rate_penalty,
+                        dynamics_penalty=disc_info.dynamics_penalty,
                         # For BPTTcWGANDriver:
                         info=info,
                         disc_info=disc_info,

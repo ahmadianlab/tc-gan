@@ -24,6 +24,7 @@ TEST_PARAMS = dict(
 del TEST_PARAMS['bandwidths']
 del TEST_PARAMS['contrasts']
 del TEST_PARAMS['sample_sites']
+del TEST_PARAMS['gen']
 
 
 def emit_tcg_for_test(**kwargs):

@@ -54,6 +54,10 @@ DEFAULT_PARAMS = dict(
     seqlen=1200,
     batchsize=1,
     skip_steps=1000,
+    gen=dict(
+        rate_cost=0.01,
+        rate_penalty_threshold=200.0,
+    ),
 )
 
 
@@ -211,12 +215,13 @@ class CriticTrainer(BaseTrainer):
 
 class GeneratorTrainer(BaseTrainer):
 
-    def __init__(self, gen, disc, dynamics_cost,
+    def __init__(self, gen, disc, dynamics_cost, rate_cost,
                  J_min, J_max, D_min, D_max, S_min, S_max,
                  updater):
         self.target = self.gen = gen
         self.disc = disc
         self.dynamics_cost = dynamics_cost
+        self.rate_cost = rate_cost
         self.J_min = J_min
         self.J_max = J_max
         self.D_min = D_min
@@ -231,6 +236,7 @@ class GeneratorTrainer(BaseTrainer):
         disc = self.disc
         self.loss = - disc.get_output(gen.get_output()).mean()
         self.loss += self.dynamics_cost * gen.model.dynamics_penalty
+        self.loss += self.rate_cost * gen.model.rate_penalty
         self.inputs = gen.inputs
 
     def clip_params(self, updates):
@@ -254,13 +260,14 @@ class GeneratorTrainer(BaseTrainer):
 
 class HeteroInGeneratorTrainer(GeneratorTrainer):
 
-    def __init__(self, gen, disc, dynamics_cost,
+    def __init__(self, gen, disc, dynamics_cost, rate_cost,
                  J_min, J_max, D_min, D_max, S_min, S_max,
                  updater,
                  V_min=0, V_max=1):
         self.target = self.gen = gen
         self.disc = disc
         self.dynamics_cost = dynamics_cost
+        self.rate_cost = rate_cost
         self.J_min = J_min
         self.J_max = J_max
         self.D_min = D_min
@@ -292,6 +299,7 @@ class BPTTWassersteinGAN(BaseComponent):
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
                  bandwidths, contrasts,
                  include_inhibitory_neurons,
+                 rate_penalty_threshold,
                  critic_iters_init, critic_iters, lipschitz_cost,
                  seed=0):
         self.gen = gen
@@ -313,6 +321,8 @@ class BPTTWassersteinGAN(BaseComponent):
         # As of writing, this variable is not required for learning.
         # This is only used from `sample_sites` property which is only
         # used from bptt_wgan.learn.
+
+        self.rate_penalty_threshold = rate_penalty_threshold
 
     batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)
@@ -359,6 +369,7 @@ class BPTTWassersteinGAN(BaseComponent):
             rng=self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,
             stimulator_contrasts=self.stimulator_contrasts,
+            model_rate_penalty_threshold=self.rate_penalty_threshold,
         )
 
     def train_discriminator(self, info):
@@ -376,6 +387,7 @@ class BPTTWassersteinGAN(BaseComponent):
         info.accuracy = self.disc.accuracy(xg, xd)
         info.gen_out = gen_out
         info.dynamics_penalty = gen_out.model_dynamics_penalty
+        info.rate_penalty = gen_out.model_rate_penalty
         info.xd = xd
         info.xg = xg
         info.xp = xp
@@ -389,6 +401,7 @@ class BPTTWassersteinGAN(BaseComponent):
                 rng=self.rng,
                 stimulator_bandwidths=self.stimulator_bandwidths,
                 stimulator_contrasts=self.stimulator_contrasts,
+                model_rate_penalty_threshold=self.rate_penalty_threshold,
             )
 
         info.gen_forward_time = self.gen_forward_watch.sum()
@@ -428,7 +441,9 @@ def make_gan(config):
     """make_gan(config: dict) -> (GAN, dict)
     Initialize a GAN given `config` and return unconsumed part of `config`.
     """
-    return _make_gan_from_kwargs(**dict(DEFAULT_PARAMS, **config))
+    kwargs = dict(DEFAULT_PARAMS, **config)
+    kwargs['gen'] = dict(DEFAULT_PARAMS['gen'], **config.get('gen', {}))
+    return _make_gan_from_kwargs(**kwargs)
 
 
 def _make_gan_from_kwargs(
@@ -440,6 +455,7 @@ def _make_gan_from_kwargs(
                                     include_inhibitory_neurons)
     if 'V0' in rest:
         rest['V'] = rest.pop('V0')
+    rate_penalty_threshold = rest['gen'].pop('rate_penalty_threshold')  # FIXME
     gen, rest = make_tuning_curve_generator(
         rest,
         consume_union=consume_union,
@@ -472,4 +488,5 @@ def _make_gan_from_kwargs(
     return BPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
         include_inhibitory_neurons=include_inhibitory_neurons,
+        rate_penalty_threshold=rate_penalty_threshold,
         **rest)

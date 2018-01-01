@@ -17,7 +17,9 @@ from .ssn import make_tuning_curve_generator, maybe_mixin_noise, is_heteroin
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
     moment_weight_type='mean',
+    **DEFAULT_PARAMS['gen']
 )
+del DEFAULT_PARAMS['gen']
 
 MOMENT_WEIGHT_TYPES = ('mean', 'ew_mean', 'ew_relative')
 r"""
@@ -189,11 +191,12 @@ class MMGeneratorTrainer(BaseTrainer):
 
     """
 
-    def __init__(self, gen, dynamics_cost,
+    def __init__(self, gen, dynamics_cost, rate_cost,
                  J_min, J_max, D_min, D_max, S_min, S_max,
                  updater):
         self.target = self.gen = gen
         self.dynamics_cost = dynamics_cost
+        self.rate_cost = rate_cost
         self.J_min = J_min
         self.J_max = J_max
         self.D_min = D_min
@@ -217,6 +220,7 @@ class MMGeneratorTrainer(BaseTrainer):
 
         self.loss = (self.moment_weights * diff).mean()
         self.loss += self.dynamics_cost * self.gen.model.dynamics_penalty
+        self.loss += self.rate_cost * gen.model.rate_penalty
         self.loss.name = 'loss'
 
     def clip_params(self, updates):
@@ -236,6 +240,7 @@ class MMGeneratorTrainer(BaseTrainer):
         outputs = [
             self.loss,
             self.gen.model.dynamics_penalty,
+            self.gen.model.rate_penalty,
             self.gen_moments,
         ]
         with log_timing("compiling {}.train".format(self.__class__.__name__)):
@@ -251,12 +256,13 @@ class MMGeneratorTrainer(BaseTrainer):
 
 class HeteroInMMGeneratorTrainer(MMGeneratorTrainer):
 
-    def __init__(self, gen, dynamics_cost,
+    def __init__(self, gen, dynamics_cost, rate_cost,
                  J_min, J_max, D_min, D_max, S_min, S_max,
                  updater,
                  V_min=0, V_max=1):
         self.target = self.gen = gen
         self.dynamics_cost = dynamics_cost
+        self.rate_cost = rate_cost
         self.J_min = J_min
         self.J_max = J_max
         self.D_min = D_min
@@ -329,6 +335,7 @@ class BPTTMomentMatcher(BaseComponent):
     def __init__(self, gen, gen_trainer, bandwidths, contrasts,
                  lam, moment_weights_regularization,
                  include_inhibitory_neurons,
+                 rate_penalty_threshold,
                  moment_weight_type,
                  seed=0):
         self.gen = gen
@@ -346,6 +353,8 @@ class BPTTMomentMatcher(BaseComponent):
 
         self.include_inhibitory_neurons = include_inhibitory_neurons
         # See: BPTTWassersteinGAN
+
+        self.rate_penalty_threshold = rate_penalty_threshold
 
     batchsize = property(lambda self: self.gen.batchsize)
     num_neurons = property(lambda self: self.gen.num_neurons)
@@ -399,10 +408,12 @@ class BPTTMomentMatcher(BaseComponent):
         with self.train_watch:
             (info.loss,
              info.dynamics_penalty,
+             info.rate_penalty,
              info.gen_moments) = self.gen_trainer.train(
                 rng=self.rng,
                 stimulator_bandwidths=self.stimulator_bandwidths,
                 stimulator_contrasts=self.stimulator_contrasts,
+                model_rate_penalty_threshold=self.rate_penalty_threshold,
                 moment_weights=self.moment_weights,
                 data_moments=self.data_moments,
              )

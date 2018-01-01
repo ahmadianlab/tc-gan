@@ -410,6 +410,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
                  bandwidths, contrasts, norm_probes,
                  e_ratio, include_inhibitory_neurons,
+                 rate_penalty_threshold,
                  num_models, probes_per_model,
                  critic_iters_init, critic_iters, lipschitz_cost,
                  seed=0):
@@ -423,6 +424,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         self.norm_probes = np.asarray(norm_probes)
         self.e_ratio = e_ratio
         self.include_inhibitory_neurons = include_inhibitory_neurons
+        self.rate_penalty_threshold = rate_penalty_threshold
         self.num_models = num_models
         self.probes_per_model = probes_per_model
 
@@ -457,7 +459,10 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         )
 
     def gen_forward(self, batch):
-        return self.gen.forward(rng=self.rng, **batch.gen_kwargs)
+        return self.gen.forward(
+            rng=self.rng,
+            model_rate_penalty_threshold=self.rate_penalty_threshold,
+            **batch.gen_kwargs)
 
     def train_discriminator(self, info):
         batch = self.next_minibatch()  # ConditionalMinibatch
@@ -480,6 +485,7 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         info.accuracy = self.disc.accuracy(xg, cg, xd, cd)
         info.gen_out = gen_out
         info.dynamics_penalty = gen_out.model_dynamics_penalty
+        info.rate_penalty = gen_out.model_rate_penalty
         info.xd = xd
         info.xg = xg
         info.xp = xp
@@ -492,7 +498,10 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
     def train_generator(self, info, batch):
         gen_kwargs = batch.gen_kwargs
         with self.gen_train_watch:
-            info.gen_loss = self.gen_trainer.train(rng=self.rng, **gen_kwargs)
+            info.gen_loss = self.gen_trainer.train(
+                rng=self.rng,
+                model_rate_penalty_threshold=self.rate_penalty_threshold,
+                **gen_kwargs)
 
         info.gen_forward_time = self.gen_forward_watch.sum()
         info.gen_time = self.gen_train_watch.sum() + info.gen_forward_time
@@ -519,7 +528,9 @@ def make_gan(config):
     """make_gan(config: dict) -> (GAN, dict)
     Initialize a GAN given `config` and return unconsumed part of `config`.
     """
-    return _make_gan_from_kwargs(**dict(DEFAULT_PARAMS, **config))
+    kwargs = dict(DEFAULT_PARAMS, **config)
+    kwargs['gen'] = dict(DEFAULT_PARAMS['gen'], **config.get('gen', {}))
+    return _make_gan_from_kwargs(**kwargs)
 
 
 def _make_gan_from_kwargs(
@@ -530,6 +541,7 @@ def _make_gan_from_kwargs(
         **rest):
     if 'V0' in rest:
         rest['V'] = rest.pop('V0')
+    rate_penalty_threshold = rest['gen'].pop('rate_penalty_threshold')  # FIXME
     gen, rest = make_tuning_curve_generator(
         rest,
         consume_union=consume_union,
@@ -567,4 +579,5 @@ def _make_gan_from_kwargs(
     return ConditionalBPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
         num_models=num_models, probes_per_model=probes_per_model,
+        rate_penalty_threshold=rate_penalty_threshold,
         **rest)

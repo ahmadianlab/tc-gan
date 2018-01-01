@@ -173,6 +173,7 @@ def test_compare_with_sample_tuning_curves(
         assert zs.shape == (gan.num_models, gen.num_neurons, gen.num_neurons)
         gen_kwargs = batch.gen_kwargs
         gen_kwargs['prober_model_ids'] = model_ids  # [1]_
+        gen_kwargs['model_rate_penalty_threshold'] = 200
         gen_out = gen.forward(model_zs=zs, **gen_kwargs)
         xd = batch.tuning_curves          # tuning curves from dataset
         xg = gen_out.prober_tuning_curve  # tuning curves from generator

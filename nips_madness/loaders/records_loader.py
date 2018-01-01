@@ -5,11 +5,12 @@ import warnings
 import numpy as np
 import pandas
 
+from ..core import consume_config
 from ..networks.ssn import concat_flat
 from ..networks.utils import gridify_tc_samples, sampled_tc_axes
 from ..utils import cached_property
 from .datastore_loader import get_datastore
-from .run_configs import get_run_config, guess_run_module
+from .run_configs import get_run_config, guess_run_module, parse_gen_param_name
 
 
 def cached_record(name):
@@ -136,6 +137,54 @@ class BaseRecords(object):
 
     def flatten_gen_params(self):
         return self.generator.loc[:, self.param_element_names].as_matrix()
+
+    def gen_params_at(self, gen_step):
+        """Get generator parameter at `gen_step` as a `dict`."""
+        data = self.generator.iloc[gen_step]  # assuming index==gen_step
+        params = {}
+        for name in self.param_element_names:
+            array_name, index = parse_gen_param_name(name)
+            if index:
+                if array_name not in params:
+                    params[array_name] = np.zeros((2,) * len(index))
+                params[array_name][index] = data[name]
+            else:
+                params[name] = data[name]
+        return params
+
+    def make_sampler(self, gen_step=-1, **kwargs):
+        """
+        Get a `.FixedTimeTuningCurveSampler` based on run-time configuration.
+
+        Parameters
+        ----------
+        gen_step : int
+            Generator step from which generator parameter is taken.
+            Default to the last step.  See also `gen_params_at`.
+        kwargs : dict
+            Passed to `.FixedTimeTuningCurveSampler.consume_kwargs`.
+
+        """
+        from ..networks.fixed_time_sampler import FixedTimeTuningCurveSampler
+        from ..networks.wgan import DEFAULT_PARAMS
+        config = {k: DEFAULT_PARAMS[k] for k in [
+            # Let's hard-code minimum required keys so that it is easy
+            # to notice backward incompatible changes:
+            'num_sites', 'smoothness', 'k', 'n',
+            'tau_E', 'tau_I', 'dt', 'io_type',
+        ]}
+        config['seed'] = 0
+        config.update(self.rc.dict)
+        config.update(self.gen_params_at(gen_step))
+        config.update(
+            norm_probes=self.rc.norm_probes,
+            batchsize=self.rc.batchsize,
+        )
+        config.update(kwargs)
+        sampler, _ = consume_config(
+            FixedTimeTuningCurveSampler.consume_kwargs,
+            config, **kwargs)
+        return sampler
 
     def truth_grid(self):
         """

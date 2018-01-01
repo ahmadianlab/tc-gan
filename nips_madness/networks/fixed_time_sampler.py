@@ -2,6 +2,7 @@ import numpy as np
 
 from ..lasagne_toppings.rechack import largerrecursionlimit
 from .ssn import make_tuning_curve_generator
+from .utils import gridify_tc_samples
 from .wgan import (
     DEFAULT_PARAMS, grid_stimulator_inputs, probes_from_stim_space,
 )
@@ -105,6 +106,35 @@ class FixedTimeTuningCurveSampler(object):
         for contrast in self.contrasts:
             for bandwidth in self.bandwidths:
                 yield dict(contrast=contrast, bandwidth=bandwidth)
+
+    @property
+    def include_inhibitory_neurons(self):
+        return any(self.gen.probes >= self.gen.num_sites)
+
+    @property
+    def _norm_probes(self):
+        probes = [p for p in self.gen.probes if p < self.gen.num_sites]
+        xs = np.array(probes) / (self.gen.num_sites - 1)
+        return 2 * xs - 1
+
+    def tc_samples_as_grid(self, data):
+        return gridify_tc_samples(
+            data,
+            num_contrasts=len(self.contrasts),
+            num_bandwidths=len(self.bandwidths),
+            num_cell_types=int(self.include_inhibitory_neurons) + 1,
+            num_probes=len(self.gen.probes)
+        )
+
+    def tc_samples_as_dataframe(self, data):
+        from ..loaders.records_loader import tc_samples_as_dataframe
+        return tc_samples_as_dataframe(
+            data,
+            contrasts=self.contrasts,
+            bandwidths=self.bandwidths,
+            cell_types=[0, 1] if self.include_inhibitory_neurons else [0],
+            norm_probes=self._norm_probes,
+        )
 
     def prepare(self):
         """ Force compile Theano functions. """

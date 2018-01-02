@@ -61,11 +61,11 @@ class DataStoreLoader1(object):
         if self.directory.joinpath(dedicated_fname).exists():
             return self.read_hdf5(dedicated_fname, name)
 
-        hdf5f_name = 'store.hdf5'
-        if self.directory.joinpath(hdf5f_name).exists():
-            return self.read_hdf5(hdf5f_name, name)
+        hdf5_fname = 'store.hdf5'
+        if self.directory.joinpath(hdf5_fname).exists():
+            return self.read_hdf5(hdf5_fname, name)
 
-        filenames = [csv_name, dedicated_fname, hdf5f_name]
+        filenames = [csv_name, dedicated_fname, hdf5_fname]
         raise RuntimeError('None of {} exists in directory {}'
                            .format(filenames, self.directory))
 

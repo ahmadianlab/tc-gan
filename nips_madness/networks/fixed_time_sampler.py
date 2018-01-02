@@ -144,6 +144,12 @@ class FixedTimeTuningCurveSampler(object):
                                   self.gen.model.seqlen):
             self.gen.prepare()
 
+    def __repr__(self):
+        return '<{}: {} samples {} bandwidths {} contrasts {} probes>'.format(
+            type(self).__name__,
+            self.batchsize, len(self.bandwidths), len(self.contrasts),
+            len(self.gen.probes))
+
     @classmethod
     def from_learner(cls, learner, **override):
         """
@@ -209,6 +215,16 @@ class TuningCurves(object):
         from ..analyzers.plot_gridified_truth import plot_gridified_truth
         return plot_gridified_truth(self.as_dataframe(), **kwargs)
 
+    def __repr__(self):
+        points = (len(self.sampler.bandwidths) *
+                  len(self.sampler.contrasts) *
+                  len(self.sampler.gen.probes))
+        return ('<{}: {} samples {} points;'
+                ' min={:.1f} max={:.1f}>'
+                .format(type(self).__name__, self.sampler.batchsize, points,
+                        self.data.min(),
+                        self.data.max()))
+
 
 class Trajectories(object):
 
@@ -216,9 +232,21 @@ class Trajectories(object):
         self.data = data
         self.sampler = sampler
 
+    dt = property(lambda self: self.sampler.gen.model.dt)
+    seqlen = property(lambda self: self.sampler.gen.model.seqlen)
+
     def plot(self, **kwargs):
         from ..plotters.trajectory import plot_trajectory
         return plot_trajectory(self.data, self.sampler, **kwargs)
+
+    def __repr__(self):
+        conds = len(self.sampler.bandwidths) * len(self.sampler.contrasts)
+        time = self.seqlen * self.dt
+        return ('<{}: {} samples {} conditions; max time: {}>'
+                .format(type(self).__name__,
+                        self.sampler.batchsize,
+                        conds,
+                        time))
 
 
 def add_arguments(parser, exclude=()):

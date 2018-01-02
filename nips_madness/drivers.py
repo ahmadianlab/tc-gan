@@ -6,6 +6,7 @@ import numpy as np
 
 from . import execution
 from . import ssnode
+from .core import BaseComponent
 from .lasagne_toppings import param_file
 from .recorders import LearningRecorder, GenParamRecorder, \
     FlexGenParamRecorder, \
@@ -334,7 +335,7 @@ class BPTTcWGANDriver(BPTTWGANDriver):
             = ConditionalTuningCurveStatsRecorder.from_driver(self)
 
 
-class MomentMatchingDriver(object):
+class MomentMatchingDriver(BaseComponent):
 
     # TODO: refactor out common code with GANDriver
 

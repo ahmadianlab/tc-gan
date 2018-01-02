@@ -152,19 +152,9 @@ def make_parser():
     return parser
 
 
-def init_driver(
-        datastore,
-        iterations, quiet, gen_moments_record_interval,
-        **run_config):
-
+def init_driver(**run_config):
     mmatcher, rest = make_moment_matcher(run_config)
-    driver = MomentMatchingDriver(
-        mmatcher, datastore,
-        iterations=iterations,
-        gen_moments_record_interval=gen_moments_record_interval,
-        quiet=quiet,
-    )
-
+    driver, rest = MomentMatchingDriver.consume_kwargs(mmatcher, **rest)
     return dict(driver=driver,
                 **rest)
 

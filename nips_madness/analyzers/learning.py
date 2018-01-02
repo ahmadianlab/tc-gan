@@ -368,7 +368,7 @@ def plot_learning(rec, title_params=None):
     # http://matplotlib.org/gallery/subplots_axes_and_figures/fahrenheit_celsius_scales.html
     # https://github.com/matplotlib/matplotlib/issues/7161#issuecomment-249620393
 
-    fig.suptitle(rec.pretty_spec(title_params))
+    fig.suptitle(rec.pretty_spec(title_params, tex=True))
     return SimpleNamespace(
         fig=fig,
         axes=axes,

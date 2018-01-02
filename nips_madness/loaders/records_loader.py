@@ -57,6 +57,55 @@ def tc_samples_as_dataframe(data, rc=None, **kwargs):
     return df
 
 
+def prettify_rc_key(key, tex):
+    if key in ('J0', 'D0', 'S0', 'V0') and tex:
+        return '${}_0$'.format(key[0])
+    if key == 'lam' and tex:
+        return r'$\lambda$'
+    if key.startswith('true_ssn_options.'):
+        subkey = key[len('true_ssn_options.'):]
+        if subkey in ('J', 'D', 'S', 'V'):
+            if tex:
+                return r'${}^{{\mathtt{{true}}}}$'.format(subkey)
+        return '*{}'.format(subkey)
+    return key
+
+
+def prettify_rc_value(value, tex):
+    try:
+        array = np.array(value)
+        assert array.ndim in (1, 2)
+        singleton, = set(array.flat)
+    except Exception:
+        pass
+    else:
+        return singleton
+
+    return value
+
+
+def prettify_rc_key_value(key, value, tex=False):
+    r"""
+    Prettify `key`-`value` pair for `.BaseRecords.pretty_spec`
+
+    >>> prettify_rc_key_value('spam', 'egg')
+    'spam=egg'
+    >>> prettify_rc_key_value('S0', 1, tex=True)
+    '$S_0$=1'
+    >>> prettify_rc_key_value('true_ssn_options.V', 0.5, tex=True)
+    '$V^{\\mathtt{true}}$=0.5'
+    >>> prettify_rc_key_value('spam', [[0, 0], [0, 0]])
+    'spam=0'
+    >>> prettify_rc_key_value('spam', [[0, 1], [2, 3]])
+    'spam=[[0, 1], [2, 3]]'
+
+    """
+    if key == 'moment_weight_type':
+        return value + '-mom.'
+    return '{}={}'.format(prettify_rc_key(key, tex),
+                          prettify_rc_value(value, tex))
+
+
 class BaseRecords(object):
 
     def __init__(self, datastore, info, rc):
@@ -219,10 +268,11 @@ class BaseRecords(object):
     def spec_header(self):
         return self.rc.gan_type
 
-    def pretty_spec(self, keys=None):
+    def pretty_spec(self, keys=None, tex=False):
         if keys is None:
             keys = []
-        spec = ' '.join('{}={}'.format(k, self.rc[k]) for k in keys)
+        spec = ' '.join(prettify_rc_key_value(k, self.rc[k], tex=tex)
+                        for k in keys)
         return '{}: {}'.format(self.spec_header, spec)
 
 

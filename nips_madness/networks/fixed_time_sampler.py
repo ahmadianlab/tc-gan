@@ -1,6 +1,7 @@
 import numpy as np
 
 from ..lasagne_toppings.rechack import largerrecursionlimit
+from ..utils import make_progressbar
 from .ssn import make_tuning_curve_generator
 from .utils import gridify_tc_samples
 from .wgan import (
@@ -85,7 +86,16 @@ class FixedTimeTuningCurveSampler(object):
         )
         if raw:
             return out
-        return TuningCurves(out, self)
+        return TuningCurves.from_raw(out, self)
+
+    def sample(self, repeat=1, progress=False):
+        """Sample `.batchsize` * `repeat` tuning curves."""
+        out_list = []
+        bar = make_progressbar(quiet=not progress)
+        for _ in bar(range(repeat)):
+            out = self.forward(raw=True)
+            out_list.append(out.prober_tuning_curve)
+        return TuningCurves(np.concatenate(out_list), self)
 
     def compute_trajectories(self, raw=False):
         trajectories = self.gen.model.compute_trajectories(
@@ -194,8 +204,12 @@ class FixedTimeTuningCurveSampler(object):
 
 class TuningCurves(object):
 
-    def __init__(self, raw, sampler):
-        self.data = raw.prober_tuning_curve
+    @classmethod
+    def from_raw(cls, raw, sampler):
+        return cls(raw.prober_tuning_curve, sampler, raw=raw)
+
+    def __init__(self, data, sampler, raw=None):
+        self.data = data
         self.raw = raw
         self.sampler = sampler
 
@@ -221,7 +235,9 @@ class TuningCurves(object):
                   len(self.sampler.gen.probes))
         return ('<{}: {} samples {} points;'
                 ' min={:.1f} max={:.1f}>'
-                .format(type(self).__name__, self.sampler.batchsize, points,
+                .format(type(self).__name__,
+                        len(self.data),
+                        points,
                         self.data.min(),
                         self.data.max()))
 

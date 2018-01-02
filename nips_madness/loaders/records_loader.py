@@ -296,6 +296,10 @@ class BaseRecords(object):
                         for k in keys)
         return '{}: {}'.format(self.spec_header, spec)
 
+    def plot(self, **kwargs):
+        from ..analyzers.learning import plot_learning
+        return plot_learning(self, **kwargs)
+
 
 class GANRecords(BaseRecords):
 
@@ -347,6 +351,10 @@ class MomentMatchingRecords(BaseRecords):
         df.loc[:, 'epoch'] = self.rc.step_to_epoch(step)
 
     spec_header = 'MM'
+
+    def plot(self, **kwargs):
+        from ..analyzers.mm_learning import plot_mm_learning
+        return plot_mm_learning(self, **kwargs)
 
 
 def get_datastore_path(path):

@@ -3,7 +3,6 @@ from unittest import mock
 
 import numpy as np
 import pandas
-import pytest
 
 from ...networks.utils import gridified_tc_axes
 from ..records_loader import BaseRecords, MomentMatchingRecords

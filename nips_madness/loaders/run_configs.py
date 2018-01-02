@@ -274,6 +274,15 @@ class BPTTcWGANRunConfig(BaseWGANRunConfig):
 
 class BPTTMomentsRunConfig(BaseRunConfig):
 
+    @property
+    def num_mom_conds(self):
+        """
+        Number of conditions in which moments are evaluated.
+        """
+        return (self.n_bandwidths * self.n_contrasts *
+                len(self.cell_types) * len(self.norm_probes))
+    # See also: [[../networks/moment_matching.py::num_mom_conds]]
+
     def step_to_epoch(self, step):
         return step * self.batchsize / self.datasize
 

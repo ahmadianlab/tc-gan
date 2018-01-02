@@ -10,6 +10,7 @@ from .lasagne_toppings import param_file
 from .recorders import LearningRecorder, GenParamRecorder, \
     FlexGenParamRecorder, \
     DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
+    GenMomentsRecorder, \
     ConditionalTuningCurveStatsRecorder, UpdateResult
 
 logger = getLogger(__name__)
@@ -345,14 +346,12 @@ class MomentMatchingDriver(object):
 
     def pre_loop(self):
         self.learning_recorder = MMLearningRecorder.from_driver(self)
+        self.gen_moments_recorder = GenMomentsRecorder.from_driver(self)
         self.generator_recorder = FlexGenParamRecorder.from_driver(self)
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
-
-        self.datastore.tables.saverow(
-            'gen_moments.csv',
-            list(update_result.gen_moments.flat))
+        self.gen_moments_recorder.record(gen_step, update_result)
 
         jj, dd, ss = self.generator_recorder.record(gen_step)
 

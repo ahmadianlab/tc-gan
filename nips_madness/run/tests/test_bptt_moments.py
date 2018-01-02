@@ -27,12 +27,16 @@ def single_g_step(args):
     ['--include-inhibitory-neurons'],
 ])
 def test_single_g_step_slowtest(args, cleancwd):
-    test_bptt_wgan.test_single_g_step_slowtest(
+    rec = test_bptt_wgan.test_single_g_step_slowtest(
         args, cleancwd,
         single_g_step=single_g_step,
         script_file=bptt_moments.__file__,
         learning_names=recorders.MMLearningRecorder.dtype.names,
     )
+
+    assert rec.rc.num_mom_conds \
+        == len(rec.gen_moments['mean'].columns) \
+        == len(rec.gen_moments['var'].columns)
 
 
 @pytest.mark.parametrize('args, config', [

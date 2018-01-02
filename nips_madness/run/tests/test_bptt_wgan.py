@@ -73,6 +73,8 @@ def test_single_g_step_slowtest(
         assert rec.param_array_names == ['J', 'D', 'S']
     assert rec.param_element_names == flat_param_names[ssn_type]
 
+    return rec
+
 
 @pytest.mark.parametrize('args, config', [
     ([], dict(ssn_type='heteroin')),

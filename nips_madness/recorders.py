@@ -170,6 +170,32 @@ class MMLearningRecorder(HDF5Recorder):
         return cls.make(driver.datastore, quiet=driver.quiet)
 
 
+class GenMomentsRecorder(HDF5Recorder):
+
+    tablename = 'gen_moments'
+
+    def __init__(self, datastore, num_mom_conds):
+        super(GenMomentsRecorder, self).__init__(datastore)
+        self.num_mom_conds = num_mom_conds
+
+        self.dtype = np.dtype([
+            ('step', 'uint32'),
+        ] + [
+            ('mean_{}'.format(i), 'double') for i in range(num_mom_conds)
+        ] + [
+            ('var_{}'.format(i), 'double') for i in range(num_mom_conds)
+        ])
+
+    def record(self, gen_step, update_result):
+        self._saverow([gen_step] + list(update_result.gen_moments.flat))
+    # gen_moments is calculated in
+    # [[./networks/moment_matching.py::^def sample_moments]]
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, driver.mmatcher.num_mom_conds)
+
+
 class DiscLearningRecorder(HDF5Recorder):
 
     tablename = 'disc_learning'

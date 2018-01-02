@@ -360,6 +360,13 @@ class BPTTMomentMatcher(BaseComponent):
     num_neurons = property(lambda self: self.gen.num_neurons)
 
     @property
+    def num_mom_conds(self):
+        """
+        Number of conditions in which moments are evaluated.
+        """
+        return self.gen.num_tcdom * len(self.gen.probes)
+
+    @property
     def sample_sites(self):
         probes = list(self.gen.prober.probes)
         if self.include_inhibitory_neurons:

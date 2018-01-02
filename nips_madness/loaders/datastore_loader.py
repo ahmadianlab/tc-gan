@@ -92,14 +92,39 @@ class DataStoreLoader1(object):
     # See: [[../drivers.py::TC_mean.csv]]
 
     def load_gen_moments(self):
-        gen_moments = self.read_csv('gen_moments.csv', header=None)
+        """
+        Load gen_moments.csv or gen_moments table stored in store.hdf5.
+        """
+
+        # Loading raw gen_moments table. --- Not using default_load(),
+        # since header=None has to be passed to read_csv().
+        if self.directory.joinpath('gen_moments.csv').exists():
+            gen_moments = self.read_csv('gen_moments.csv', header=None)
+        else:
+            gen_moments = self.read_hdf5('store.hdf5', 'gen_moments')
+
+        # Removing 'step' column first so that it's easy to use
+        # MultiIndex.from_tuples().
+        # TODO: Don't use gen_moments.pop('step')
+        try:
+            step = gen_moments.pop('step')
+        except KeyError:
+            step = np.arange(len(gen_moments))
+        else:
+            num_mom_conds = len(gen_moments.columns) // 2
+            assert list(gen_moments.columns) == [
+                'mean_{}'.format(i) for i in range(num_mom_conds)
+            ] + [
+                'var_{}'.format(i) for i in range(num_mom_conds)
+            ]
+
         gen_moments.columns = pandas.MultiIndex.from_tuples([
             (key, i) for key in ['mean', 'var']
             for i in range(len(gen_moments.columns) // 2)
         ])
-        gen_moments['step'] = np.arange(len(gen_moments))
+        gen_moments['step'] = step
         return gen_moments
-    # See: [[../drivers.py::gen_moments.csv]] which saves gen_moments.flat
+    # See: [[../recorders.py::GenMomentsRecorder]] which saves gen_moments.flat
     # of [[../networks/moment_matching.py::self.gen_moments]] which, in turn,
     # is calculated from [[../networks/moment_matching.py::sample_moments]]
 

@@ -13,6 +13,7 @@ def single_g_step(args):
         '--WGAN_n_critic0', '1',
         '--seqlen', '4',
         '--skip-steps', '2',
+        '--tc-stats-record-interval', '1',
     ] + args)
 
 

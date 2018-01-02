@@ -16,6 +16,10 @@ from .recorders import LearningRecorder, GenParamRecorder, \
 logger = getLogger(__name__)
 
 
+def is_at_interval(step, interval):
+    return interval > 0 and step % interval == 0
+
+
 def net_isfinite(layer):
     return all(np.isfinite(arr).all() for arr in
                lasagne.layers.get_all_param_values(layer))
@@ -99,8 +103,7 @@ class GANDriver(object):
         self.learning_recorder.record(gen_step, update_result)
         jj, dd, ss = self.generator_recorder.record(gen_step)
 
-        if self.disc_param_save_interval > 0 \
-                and gen_step % self.disc_param_save_interval == 0:
+        if is_at_interval(gen_step, self.disc_param_save_interval):
             param_file.dump(
                 self.gan.discriminator,
                 self.datastore.path('disc_param',
@@ -320,7 +323,9 @@ class BPTTWGANDriver(GANDriver):
 class BPTTcWGANDriver(BPTTWGANDriver):
 
     def post_update(self, gen_step, update_result):
-        self.tuning_curve_recorder.record(gen_step, update_result.disc_info)
+        if is_at_interval(gen_step, self.tc_stats_record_interval):
+            self.tuning_curve_recorder.record(gen_step,
+                                              update_result.disc_info)
         super(BPTTcWGANDriver, self).post_update(gen_step, update_result)
 
     def pre_loop(self):

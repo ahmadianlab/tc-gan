@@ -40,6 +40,11 @@ def make_parser():
         coordinate").  0 means the center of the network.
         (default:%(default)s)''')
 
+    parser.add_argument(
+        '--tc-stats-record-interval', default=100, type=int,
+        help='''Save tuning curve statistics for each given
+        generator step. -1 means to never save.''')
+
     bptt_wgan.add_bptt_common_options(parser)
     plain_gan.add_learning_options(parser)
     parser.set_defaults(
@@ -50,7 +55,7 @@ def make_parser():
 
 def init_driver(
         datastore,
-        iterations, quit_JDS_threshold, quiet,
+        iterations, quit_JDS_threshold, quiet, tc_stats_record_interval,
         disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         layers,
@@ -64,6 +69,7 @@ def init_driver(
     driver = BPTTcWGANDriver(
         gan, datastore,
         iterations=iterations, quiet=quiet,
+        tc_stats_record_interval=tc_stats_record_interval,
         disc_param_save_interval=disc_param_save_interval,
         disc_param_template=disc_param_template,
         disc_param_save_on_error=disc_param_save_on_error,

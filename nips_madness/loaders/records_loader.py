@@ -68,6 +68,23 @@ def prettify_rc_key(key, tex):
             if tex:
                 return r'${}^{{\mathtt{{true}}}}$'.format(subkey)
         return '*{}'.format(subkey)
+    if key.startswith('disc_reg_'):  # e.g., disc_reg_l2_decay
+        subkey = key[len('disc_reg_'):]
+        try:
+            prefix, suffix = subkey.split('_')
+        except ValueError:
+            pass
+        else:
+            if prefix in ('l1', 'l2') and tex:
+                return r'$\ell_{}^{{\mathtt{{{}}}}}$'.format(prefix[1], suffix)
+        return subkey
+    if key.startswith('gen_'):
+        subkey = key[len('gen_'):]
+        if subkey in ('dynamics_cost', 'rate_cost'):
+            return subkey
+    if key.startswith('num_'):
+        subkey = key[len('num_'):]
+        return '#{}'.format(subkey)
     return key
 
 
@@ -94,10 +111,14 @@ def prettify_rc_key_value(key, value, tex=False):
     '$S_0$=1'
     >>> prettify_rc_key_value('true_ssn_options.V', 0.5, tex=True)
     '$V^{\\mathtt{true}}$=0.5'
+    >>> prettify_rc_key_value('disc_reg_l2_decay', 0.1, tex=True)
+    '$\\ell_2^{\\mathtt{decay}}$=0.1'
     >>> prettify_rc_key_value('spam', [[0, 0], [0, 0]])
     'spam=0'
     >>> prettify_rc_key_value('spam', [[0, 1], [2, 3]])
     'spam=[[0, 1], [2, 3]]'
+    >>> prettify_rc_key_value('gen_rate_cost', 1)
+    'rate_cost=1'
 
     """
     if key == 'moment_weight_type':

@@ -278,3 +278,7 @@ def add_arguments(parser, exclude=()):
             '--{}'.format(key.replace('_', '-')),
             type=argtype, default=val,
             help='SSN parameter')
+
+
+def make_sampler(**kwargs):
+    return FixedTimeTuningCurveSampler.from_dict(kwargs)

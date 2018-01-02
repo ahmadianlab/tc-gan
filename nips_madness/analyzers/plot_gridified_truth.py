@@ -95,7 +95,7 @@ def plot_gridified_truth(truth_df,
         fig.tight_layout()
     return SimpleNamespace(
         lines=lines,
-        ax=ax,
+        axes=axes,
         fig=fig,
     )
 

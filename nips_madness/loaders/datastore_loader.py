@@ -52,10 +52,10 @@ class DataStoreLoader1(object):
         with h5py.File(str(self.directory.joinpath(fname)), 'r') as file:
             return structured_array_to_dataframe(file[name])
 
-    def default_load(self, name):
+    def default_load(self, name, csv_kw={}):
         csv_name = name + '.csv'
         if self.directory.joinpath(csv_name).exists():
-            return self.read_csv(csv_name)
+            return self.read_csv(csv_name, **csv_kw)
 
         dedicated_fname = name + '.hdf5'
         if self.directory.joinpath(dedicated_fname).exists():
@@ -95,13 +95,8 @@ class DataStoreLoader1(object):
         """
         Load gen_moments.csv or gen_moments table stored in store.hdf5.
         """
-
-        # Loading raw gen_moments table. --- Not using default_load(),
-        # since header=None has to be passed to read_csv().
-        if self.directory.joinpath('gen_moments.csv').exists():
-            gen_moments = self.read_csv('gen_moments.csv', header=None)
-        else:
-            gen_moments = self.read_hdf5('store.hdf5', 'gen_moments')
+        gen_moments = self.default_load('gen_moments',
+                                        csv_kw=dict(header=None))
 
         # Removing 'step' column first so that it's easy to use
         # MultiIndex.from_tuples().

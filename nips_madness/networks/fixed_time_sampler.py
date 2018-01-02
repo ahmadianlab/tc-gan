@@ -77,23 +77,25 @@ class FixedTimeTuningCurveSampler(object):
     num_sites = property(lambda self: self.gen.num_sites)
     batchsize = property(lambda self: self.gen.batchsize)
 
-    def forward(self, full_output=False):
+    def forward(self, raw=False):
         out = self.gen.forward(
             self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,
             stimulator_contrasts=self.stimulator_contrasts,
         )
-        if full_output:
+        if raw:
             return out
-        return out.prober_tuning_curve
+        return TuningCurves(out, self)
 
-    def compute_trajectories(self):
+    def compute_trajectories(self, raw=False):
         trajectories = self.gen.model.compute_trajectories(
             rng=self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,
             stimulator_contrasts=self.stimulator_contrasts,
         )
-        return trajectories
+        if raw:
+            return trajectories
+        return Trajectories(trajectories, self)
 
     def timepoints(self):
         dt = self.gen.model.dt
@@ -182,6 +184,42 @@ class FixedTimeTuningCurveSampler(object):
 
             config['gen'] = gen
         return cls(**config)
+
+
+class TuningCurves(object):
+
+    def __init__(self, raw, sampler):
+        self.data = raw.prober_tuning_curve
+        self.raw = raw
+        self.sampler = sampler
+
+    def __getattr__(self, key):
+        try:
+            super(TuningCurves, self).__getattr__(key)
+        except AttributeError:
+            return getattr(self.raw, key)
+
+    def as_dataframe(self):
+        return self.sampler.tc_samples_as_dataframe(self.data)
+
+    def as_grid(self):
+        return self.sampler.tc_samples_as_grid(self.data)
+
+    def plot(self, **kwargs):
+        from ..analyzers.plot_gridified_truth import plot_gridified_truth
+        return plot_gridified_truth(self.as_dataframe(), **kwargs)
+
+
+class Trajectories(object):
+
+    def __init__(self, data, sampler):
+        self.data = data
+        self.sampler = sampler
+
+    def plot(self, i_batch=0, **kwargs):
+        from ..plotters.trajectory import plot_trajectory
+        trajectories = self.data[i_batch]
+        return plot_trajectory(trajectories, self.sampler, **kwargs)
 
 
 def add_arguments(parser, exclude=()):

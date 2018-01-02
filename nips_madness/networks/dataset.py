@@ -107,7 +107,7 @@ def dataset_by_fixedtime(
         for i in range(repeat):
             with utils.log_timing('sampler.forward() ({}/{})'
                                   .format(i + 1, repeat)):
-                out = sampler.forward(full_output=True)
+                out = sampler.forward(raw=True)
             dynamics_penalty_list.append(out.model_dynamics_penalty)
             data_list.append(out.prober_tuning_curve)
     data = np.concatenate(data_list)

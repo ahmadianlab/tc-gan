@@ -215,11 +215,15 @@ class BaseRecords(object):
             warnings.warn('Loading legacy GAN data is not well tested!')
         return cls(datastore, info, rc)
 
+    @property
+    def spec_header(self):
+        return self.rc.gan_type
+
     def pretty_spec(self, keys=None):
         if keys is None:
             keys = []
-        spec = ' '.join('{}={}'.format(k, getattr(self.rc, k)) for k in keys)
-        return '{}: {}'.format(self.rc.gan_type, spec)
+        spec = ' '.join('{}={}'.format(k, self.rc[k]) for k in keys)
+        return '{}: {}'.format(self.spec_header, spec)
 
 
 class GANRecords(BaseRecords):
@@ -271,11 +275,7 @@ class MomentMatchingRecords(BaseRecords):
             return
         df.loc[:, 'epoch'] = self.rc.step_to_epoch(step)
 
-    def pretty_spec(self, keys=None):
-        if keys is None:
-            keys = []
-        spec = ' '.join('{}={}'.format(k, getattr(self.rc, k)) for k in keys)
-        return 'MM: {}'.format(spec)
+    spec_header = 'MM'
 
 
 def get_datastore_path(path):

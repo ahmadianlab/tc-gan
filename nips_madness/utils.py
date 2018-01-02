@@ -395,6 +395,44 @@ def subdict_by_prefix(flat, prefix, key=None):
     return nested
 
 
+def iteritemsdeep(dct):
+    """
+    Works like ``dict.iteritems`` but iterate over all descendant items
+
+    >>> dct = dict(a=1, b=2, c=dict(d=3, e=4))
+    >>> sorted(iteritemsdeep(dct))
+    [(('a',), 1), (('b',), 2), (('c', 'd'), 3), (('c', 'e'), 4)]
+
+    """
+    for (key, val) in dct.items():
+        if isinstance(val, dict):
+            for (key_child, val_child) in iteritemsdeep(val):
+                yield ((key,) + key_child, val_child)
+        else:
+            yield ((key,), val)
+# Taken from dictsdiff.core
+
+
+def getdeep(dct, key):
+    """
+    Get deeply nested value of a dict-like object `dct`.
+
+    >>> dct = {'a': {'b': {'c': 1}}}
+    >>> getdeep(dct, 'a.b.c')
+    1
+    >>> getdeep(dct, 'a.b.d')
+    Traceback (most recent call last):
+      ...
+    KeyError: 'd'
+
+    """
+    if not isinstance(key, tuple):
+        key = key.split('.')
+    for k in key[:-1]:
+        dct = dct[k]
+    return dct[key[-1]]
+
+
 def param_module(path):
     if path.lower().endswith(('.yaml', '.yml')):
         import yaml

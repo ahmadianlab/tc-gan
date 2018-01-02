@@ -1,6 +1,9 @@
+from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
+
+from ..utils import iteritemsdeep, getdeep
 
 
 def parse_gen_param_name(name):
@@ -38,7 +41,7 @@ def guess_run_module(info):
     return Path(script_file).stem
 
 
-class BaseRunConfig(object):
+class BaseRunConfig(Mapping):
 
     is_legacy = False
 
@@ -54,6 +57,18 @@ class BaseRunConfig(object):
             return self.dict[name]
         except KeyError:
             raise AttributeError(name)
+
+    def items(self):
+        return (('.'.join(key), val) for key, val in iteritemsdeep(self.dict))
+
+    def __iter__(self):
+        return (key for key, _ in self.items())
+
+    def __len__(self):
+        return sum(1 for _ in iter(self))
+
+    def __getitem__(self, key):
+        return getdeep(self.dict, key)
 
     @property
     def datasize(self):

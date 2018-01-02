@@ -3,9 +3,10 @@ from unittest import mock
 
 import numpy as np
 import pandas
+import pytest
 
 from ...networks.utils import gridified_tc_axes
-from ..records_loader import BaseRecords
+from ..records_loader import BaseRecords, MomentMatchingRecords
 
 
 def fake_base_records():
@@ -47,3 +48,26 @@ def test_truth_grid_vs_df():
 
     via_df = grid_df.as_matrix().reshape(grid.shape)
     np.testing.assert_equal(via_df, grid)
+
+
+def test_pretty_spec_base():
+    class RC(dict):
+        gan_type = 'WGAN'
+
+    rec = BaseRecords(
+        datastore=None,
+        info=None,
+        rc=RC(alpha=1, beta=2),
+    )
+    actual = rec.pretty_spec(['alpha', 'beta'])
+    assert actual == 'WGAN: alpha=1 beta=2'
+
+
+def test_pretty_spec_moment_matching():
+    rec = MomentMatchingRecords(
+        datastore=None,
+        info=None,
+        rc={'alpha': 1, 'beta': 2},
+    )
+    actual = rec.pretty_spec(['alpha', 'beta'])
+    assert actual == 'MM: alpha=1 beta=2'

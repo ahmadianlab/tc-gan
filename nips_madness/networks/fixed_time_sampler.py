@@ -216,10 +216,9 @@ class Trajectories(object):
         self.data = data
         self.sampler = sampler
 
-    def plot(self, i_batch=0, **kwargs):
+    def plot(self, **kwargs):
         from ..plotters.trajectory import plot_trajectory
-        trajectories = self.data[i_batch]
-        return plot_trajectory(trajectories, self.sampler, **kwargs)
+        return plot_trajectory(self.data, self.sampler, **kwargs)
 
 
 def add_arguments(parser, exclude=()):

@@ -1,7 +1,8 @@
 from matplotlib import pyplot
 
 
-def plot_trajectory(trajectories, sampler):
+def plot_trajectory(trajectories, sampler, i_batch=0):
+    trajectories = trajectories[i_batch]
     nrows = len(trajectories)
     fig, axes = pyplot.subplots(
         nrows=nrows,

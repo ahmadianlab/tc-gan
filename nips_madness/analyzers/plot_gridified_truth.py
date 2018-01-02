@@ -6,6 +6,14 @@ import numpy as np
 from ..utils import make_progressbar, add_arguments_from_function
 
 
+def format_key_value(key, value):
+    if key in ('norm_probe', 'bandwidth'):
+        return '{}={}'.format(key, '{:.4f}'.format(value).rstrip('0'))
+    elif key == 'cell_type':
+        return 'exc.' if value == 0 else 'inh.'
+    return '{}={}'.format(key, value)
+
+
 def plot_gridified_truth(truth_df,
                          col='cell_type', row='norm_probe',
                          hue='contrast', x='bandwidth', y='rate',
@@ -54,14 +62,15 @@ def plot_gridified_truth(truth_df,
                     ys = ys[:, :downsample_to]
                 lines[i, j, k] = ax.plot(
                     xs, ys, color=next(colors_iter),
-                    label='{}={}'.format(hue, hue_val),
+                    label=format_key_value(hue, hue_val),
                     linewidth=linewidth, alpha=alpha)
 
                 next(bar_it)
 
             row_val = idx[irow]
             col_val = idx[icol]
-            ax.set_title('{}={} | {}={}'.format(row, row_val, col, col_val))
+            ax.set_title('{} | {}'.format(format_key_value(row, row_val),
+                                          format_key_value(col, col_val)))
 
     # "Close" progress bar:
     try:

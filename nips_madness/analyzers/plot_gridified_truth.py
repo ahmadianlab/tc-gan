@@ -11,7 +11,8 @@ def plot_gridified_truth(truth_df,
                          hue='contrast', x='bandwidth', y='rate',
                          downsample_to=None, legend_ax_idx=(-1, 0),
                          size=2, linewidth=0.1, alpha=0.5,
-                         colors=None, title=None, tight_layout=False):
+                         colors=None, title=None, tight_layout=False,
+                         progress=False):
 
     icol = truth_df.columns.names.index(col)
     irow = truth_df.columns.names.index(row)
@@ -28,7 +29,8 @@ def plot_gridified_truth(truth_df,
 
     xs = truth_df.columns.levels[ixax]
     lines = np.zeros((nrows, ncols, nhues), dtype=object)
-    bar_it = iter(make_progressbar()(range(nrows * ncols * nhues)))
+    bar = make_progressbar(quiet=not progress)
+    bar_it = iter(bar(range(nrows * ncols * nhues)))
     for i in range(nrows):
         for j in range(ncols):
             ax = axes[i, j]
@@ -100,7 +102,11 @@ def cli_plot_gridified_truth(logpath, title_params, **kwargs):
 def main(args=None):
     from .basecli import make_base_parser, call_cli
     parser = make_base_parser(description=__doc__)
-    add_arguments_from_function(parser, plot_gridified_truth)
+    parser.add_argument(
+        '--quiet', '--no-progress', dest='progress',
+        action='store_false', default=True)
+    add_arguments_from_function(parser, plot_gridified_truth,
+                                exclude=['progress'])
     call_cli(cli_plot_gridified_truth, parser.parse_args(args))
 
 

@@ -524,10 +524,12 @@ def default_arguments(func):
     )
 
 
-def add_arguments_from_function(parser, func, help=None, **kwargs):
+def add_arguments_from_function(parser, func, help=None, exclude=[], **kwargs):
     if help is None:
         help = '{} parameters'.format(func.__name__)
     for key, val in default_arguments(func).items():
+        if key in exclude:
+            continue
         if isinstance(val, (str, float, int)):
             argtype = type(val)
         else:

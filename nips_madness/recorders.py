@@ -173,6 +173,7 @@ class MMLearningRecorder(HDF5Recorder):
 class GenMomentsRecorder(HDF5Recorder):
 
     tablename = 'gen_moments'
+    dedicated = True
 
     def __init__(self, datastore, num_mom_conds):
         super(GenMomentsRecorder, self).__init__(datastore)

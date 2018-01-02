@@ -93,7 +93,7 @@ class DataStoreLoader1(object):
 
     def load_gen_moments(self):
         """
-        Load gen_moments.csv or gen_moments table stored in store.hdf5.
+        Load gen_moments.csv or gen_moments table stored in the HDF5 file.
         """
         gen_moments = self.default_load('gen_moments',
                                         csv_kw=dict(header=None))

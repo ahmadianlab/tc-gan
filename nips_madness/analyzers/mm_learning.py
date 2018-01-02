@@ -7,14 +7,27 @@ import numpy as np
 from .learning import plot_gen_params, gen_param_smape
 
 
-def plot_loss(rec, ax=None):
+def plot_loss(rec, ax=None, yscale_rate_penalty='log'):
     if ax is None:
         _, ax = pyplot.subplots()
 
-    ax.plot('epoch', 'loss', label='loss', data=rec.learning)
+    lines = ax.plot('epoch', 'loss', label='loss', data=rec.learning)
     ax.set_yscale('log')
 
-    ax.legend(loc='best')
+    for key in ['rate_penalty', 'dynamics_penalty']:
+        if key in rec.learning:
+            color = 'C1'
+            ax_rate_penalty = ax.twinx()
+            lines += ax_rate_penalty.plot(
+                'epoch', key, data=rec.learning,
+                label=key, color=color, alpha=0.8)
+            ax_rate_penalty.tick_params('y', colors=color)
+            ax_rate_penalty.set_yscale(yscale_rate_penalty)
+            break
+
+    ax.legend(
+        lines, [l.get_label() for l in lines],
+        loc='best')
 
 
 def plot_moments(rec, moment, ax=None):

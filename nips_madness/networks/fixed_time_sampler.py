@@ -219,6 +219,14 @@ class TuningCurves(object):
         except AttributeError:
             return getattr(self.raw, key)
 
+    def extend(self, tc):
+        # TODO: test TuningCurves.extend or remove it
+        if tc.sampler is not self.sampler:
+            raise ValueError('Combining two TCs from different samplers'
+                             ' is not supported.')
+        self.data = np.concatenate([self.data, tc.data])
+        self.raw = None
+
     def as_dataframe(self):
         return self.sampler.tc_samples_as_dataframe(self.data)
 

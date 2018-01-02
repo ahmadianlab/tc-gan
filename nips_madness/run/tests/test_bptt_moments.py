@@ -15,6 +15,7 @@ def single_g_step(args):
         '--n_bandwidths', '1',
         '--seqlen', '4',
         '--skip-steps', '2',
+        '--gen-moments-record-interval', '1',
     ] + args)
 
 

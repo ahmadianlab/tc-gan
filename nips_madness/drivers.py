@@ -339,11 +339,13 @@ class MomentMatchingDriver(object):
     # TODO: refactor out common code with GANDriver
 
     def __init__(self, mmatcher, datastore, iterations, quiet,
+                 gen_moments_record_interval,
                  quit_JDS_threshold=-1):
         self.mmatcher = mmatcher
         self.datastore = datastore
         self.iterations = iterations
         self.quiet = quiet
+        self.gen_moments_record_interval = gen_moments_record_interval
         self.quit_JDS_threshold = quit_JDS_threshold
 
     # For compatibility with GenParamRecorder:
@@ -356,7 +358,8 @@ class MomentMatchingDriver(object):
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
-        self.gen_moments_recorder.record(gen_step, update_result)
+        if is_at_interval(gen_step, self.gen_moments_record_interval):
+            self.gen_moments_recorder.record(gen_step, update_result)
 
         jj, dd, ss = self.generator_recorder.record(gen_step)
 

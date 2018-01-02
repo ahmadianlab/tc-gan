@@ -58,6 +58,10 @@ def make_parser():
     parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
+    parser.add_argument(
+        '--gen-moments-record-interval', default=100, type=int,
+        help='''Save tuning curve moments for each given
+        generator step. -1 means to never save.''')
 
     # Generator
     parser.add_argument(
@@ -150,13 +154,14 @@ def make_parser():
 
 def init_driver(
         datastore,
-        iterations, quiet,
+        iterations, quiet, gen_moments_record_interval,
         **run_config):
 
     mmatcher, rest = make_moment_matcher(run_config)
     driver = MomentMatchingDriver(
         mmatcher, datastore,
         iterations=iterations,
+        gen_moments_record_interval=gen_moments_record_interval,
         quiet=quiet,
     )
 

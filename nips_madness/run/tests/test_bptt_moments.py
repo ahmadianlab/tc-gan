@@ -5,9 +5,6 @@ import pytest
 from . import test_bptt_wgan
 from .. import bptt_moments
 from ... import recorders
-from ...loaders import load_records
-from ...networks.tests.test_tuning_curve import flat_param_names
-from .test_gan import load_json
 
 
 def single_g_step(args):

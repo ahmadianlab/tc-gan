@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 import collections
 import itertools
 
@@ -6,9 +5,10 @@ import lasagne
 import numpy as np
 
 from .networks.ssn import concat_flat
+from .utils import Namespace
 
 
-class UpdateResult(SimpleNamespace):
+class UpdateResult(Namespace):
     """
     Result of a generator update.
 
@@ -32,7 +32,7 @@ class UpdateResult(SimpleNamespace):
         ``(NZ, NB * len(sample_sites))`` if `track_offset_identity` is
         set to true or otherwise ``(NZ * len(sample_sites), NB)``.
         See `make_WGAN_functions` and  `make_RGAN_functions`.
-    model_info : `.FixedPointsInfo` or `.SimpleNamespace`
+    model_info : `.FixedPointsInfo` or `.Namespace`
         An object with attribute `rejections` and `unused` which are
         the sum of the value in the same field of all
         `.FixedPointsInfo` objects returned by `.find_fixed_points`

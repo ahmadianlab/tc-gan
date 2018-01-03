@@ -20,7 +20,6 @@ managing numeric data, and looping through the learning argorithm.
 
 """
 
-from types import SimpleNamespace
 import itertools
 
 import lasagne
@@ -32,7 +31,7 @@ from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..lasagne_toppings.rechack import largerrecursionlimit
 from ..utils import (
     cached_property, cartesian_product, random_minibatches, StopWatch,
-    theano_function, log_timing,
+    theano_function, log_timing, Namespace,
 )
 from .ssn import make_tuning_curve_generator, maybe_mixin_noise, is_heteroin
 
@@ -415,11 +414,11 @@ class BPTTWassersteinGAN(BaseComponent):
         self.disc_train_watch = StopWatch()
 
         for disc_step in range(critic_iters):
-            info = SimpleNamespace(is_discriminator=True, gen_step=gen_step,
-                                   disc_step=disc_step)
+            info = Namespace(is_discriminator=True, gen_step=gen_step,
+                             disc_step=disc_step)
             yield self.train_discriminator(info)
 
-        info = SimpleNamespace(is_discriminator=False, gen_step=gen_step)
+        info = Namespace(is_discriminator=False, gen_step=gen_step)
         yield self.train_generator(info)
 
     def learning(self):

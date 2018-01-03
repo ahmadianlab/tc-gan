@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 import itertools
 
 import numpy as np
@@ -8,7 +7,7 @@ from ..core import BaseComponent
 from ..gradient_expressions.utils import sample_sites_from_stim_space
 from ..lasagne_toppings.rechack import largerrecursionlimit
 from ..utils import (
-    cached_property, StopWatch,
+    cached_property, StopWatch, Namespace,
     theano_function, log_timing, asarray,
 )
 from .wgan import DEFAULT_PARAMS, BaseTrainer, grid_stimulator_inputs
@@ -431,7 +430,7 @@ class BPTTMomentMatcher(BaseComponent):
     def learning(self):
         for step in itertools.count():
             self.train_watch = StopWatch()
-            info = SimpleNamespace(step=step)
+            info = Namespace(step=step)
             yield self.train_generator(info)
 
 

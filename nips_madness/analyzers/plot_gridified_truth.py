@@ -1,9 +1,7 @@
-from types import SimpleNamespace
-
 from matplotlib import pyplot
 import numpy as np
 
-from ..utils import make_progressbar, add_arguments_from_function
+from ..utils import make_progressbar, add_arguments_from_function, Namespace
 
 
 def format_key_value(key, value):
@@ -93,7 +91,7 @@ def plot_gridified_truth(truth_df,
         fig.suptitle(title)
     if tight_layout:
         fig.tight_layout()
-    return SimpleNamespace(
+    return Namespace(
         lines=lines,
         axes=axes,
         fig=fig,

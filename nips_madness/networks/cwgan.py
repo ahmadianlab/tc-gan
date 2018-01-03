@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import lasagne
 import numpy as np
 import theano
@@ -10,7 +8,7 @@ from ..evaluator import MagicEvaluator
 from ..gradient_expressions.utils import sample_sites_from_stim_space_impl
 from ..utils import (
     cached_property, cartesian_product, theano_function, StopWatch,
-    as_randomstate,
+    as_randomstate, Namespace,
 )
 from .wgan import (
     BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, emit_generator_trainer,
@@ -514,13 +512,13 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         self.disc_train_watch = StopWatch()
 
         for disc_step in range(critic_iters):
-            info = SimpleNamespace(is_discriminator=True, gen_step=gen_step,
-                                   disc_step=disc_step)
+            info = Namespace(is_discriminator=True, gen_step=gen_step,
+                             disc_step=disc_step)
             info = self.train_discriminator(info)
             yield info
         batch = info.batch
 
-        info = SimpleNamespace(is_discriminator=False, gen_step=gen_step)
+        info = Namespace(is_discriminator=False, gen_step=gen_step)
         yield self.train_generator(info, batch)
 
 

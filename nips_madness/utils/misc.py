@@ -199,3 +199,41 @@ def add_arguments_from_function(parser, func, help=None, exclude=[], **kwargs):
             '--{}'.format(key.replace('_', '-')),
             type=argtype, default=val, help=help,
             **kwargs)
+
+
+class Namespace(object):
+
+    """
+    Like `types.SimpleNamespace` but less verbose.
+
+    >>> ns = Namespace(a=1, b=2, c=3)
+    >>> ns
+    <Namespace[3]: a b c>
+    >>> ns.a
+    1
+    >>> Namespace(**{'a{:02}'.format(i): 0 for i in range(20)})
+    <Namespace[20]: a00 a01 a02 a03 a04 a05 a06 a07 a08 a09 ...>
+
+    """
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __eq__(self, other):
+        if not isinstance(other, Namespace):
+            return NotImplemented
+        return vars(self) == vars(other)
+
+    def __contains__(self, key):
+        return key in self.__dict__
+
+    def __repr__(self):
+        keys = sorted(self.__dict__)
+        limit = 10
+        if len(keys) > limit:
+            keys = keys[:limit] + ['...']
+
+        return '<{}[{}]: {}>'.format(
+            type(self).__name__,
+            len(self.__dict__),
+            ' '.join(keys))

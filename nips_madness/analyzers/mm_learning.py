@@ -1,9 +1,9 @@
-from types import SimpleNamespace
 import itertools
 
 from matplotlib import pyplot
 import numpy as np
 
+from ..utils import Namespace
 from .learning import plot_gen_params, gen_param_smape
 
 
@@ -122,7 +122,7 @@ def plot_mm_learning(rec, title_params=None):
     # https://github.com/matplotlib/matplotlib/issues/7161#issuecomment-249620393
 
     fig.suptitle(rec.pretty_spec(title_params, tex=True))
-    return SimpleNamespace(
+    return Namespace(
         fig=fig,
         axes=axes,
         axes_upper=axes_upper,

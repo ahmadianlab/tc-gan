@@ -1,23 +1,14 @@
 import itertools
-import multiprocessing
 
 import numpy as np
 import pytest
 
-from ..utils import cpu_count, random_minibatches
+from ..numerics import random_minibatches
 
 
 def take(n, iterable):
     "Return first n items of the iterable as a list"
     return list(itertools.islice(iterable, n))
-
-
-def test_cpu_count():
-    assert cpu_count(_environ={'OMP_NUM_THREADS': '-1'}) == -1
-    assert cpu_count(_environ={'SLURM_CPUS_PER_TASK': '-3'}) == -3
-    assert cpu_count(_environ={'SLURM_JOB_ID': None}) == 1
-    assert cpu_count(_environ={'PBS_NUM_PPN': '-5'}) == -5
-    assert cpu_count(_environ={}) == multiprocessing.cpu_count()
 
 
 def test_random_minibatches_batchsize_too_large():

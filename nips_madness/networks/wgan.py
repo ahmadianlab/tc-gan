@@ -57,6 +57,9 @@ DEFAULT_PARAMS = dict(
         rate_cost=0.01,
         rate_penalty_threshold=200.0,
     ),
+    disc=dict(
+        rate_penalty_bound=-1.0,
+    ),
 )
 
 
@@ -300,6 +303,7 @@ class BPTTWassersteinGAN(BaseComponent):
                  include_inhibitory_neurons,
                  rate_penalty_threshold,
                  critic_iters_init, critic_iters, lipschitz_cost,
+                 disc_rate_penalty_bound,
                  seed=0):
         self.gen = gen
         self.disc = disc
@@ -309,6 +313,7 @@ class BPTTWassersteinGAN(BaseComponent):
         self.critic_iters_init = critic_iters_init
         self.critic_iters = critic_iters
         self.lipschitz_cost = lipschitz_cost
+        self.disc_rate_penalty_bound = disc_rate_penalty_bound
         self.rng = np.random.RandomState(seed)
 
         self.bandwidths = bandwidths
@@ -378,12 +383,7 @@ class BPTTWassersteinGAN(BaseComponent):
             gen_out = self.gen_forward()
         xg = gen_out.prober_tuning_curve
         xp = eps * xd + (1 - eps) * xg
-        with self.disc_train_watch:
-            info.disc_loss = self.disc_trainer.train(
-                xg, xd, xp, self.lipschitz_cost,
-            )
 
-        info.accuracy = self.disc.accuracy(xg, xd)
         info.gen_out = gen_out
         info.dynamics_penalty = gen_out.model_dynamics_penalty
         info.rate_penalty = gen_out.model_rate_penalty
@@ -391,6 +391,20 @@ class BPTTWassersteinGAN(BaseComponent):
         info.xg = xg
         info.xp = xp
         info.gen_time = self.gen_forward_watch.times[-1]
+
+        bound = self.disc_rate_penalty_bound
+        if bound > 0 and gen_out.model_rate_penalty > bound:
+            info.disc_loss = np.nan
+            info.accuracy = np.nan
+            info.disc_time = np.nan
+            return info
+
+        with self.disc_train_watch:
+            info.disc_loss = self.disc_trainer.train(
+                xg, xd, xp, self.lipschitz_cost,
+            )
+
+        info.accuracy = self.disc.accuracy(xg, xd)
         info.disc_time = self.disc_train_watch.times[-1]
         return info
 
@@ -442,6 +456,7 @@ def make_gan(config):
     """
     kwargs = dict(DEFAULT_PARAMS, **config)
     kwargs['gen'] = dict(DEFAULT_PARAMS['gen'], **config.get('gen', {}))
+    kwargs['disc'] = dict(DEFAULT_PARAMS['disc'], **config.get('disc', {}))
     return _make_gan_from_kwargs(**kwargs)
 
 
@@ -455,6 +470,7 @@ def _make_gan_from_kwargs(
     if 'V0' in rest:
         rest['V'] = rest.pop('V0')
     rate_penalty_threshold = rest['gen'].pop('rate_penalty_threshold')  # FIXME
+    disc_rate_penalty_bound = rest['disc'].pop('rate_penalty_bound')  # FIXME
     gen, rest = make_tuning_curve_generator(
         rest,
         consume_union=consume_union,
@@ -488,4 +504,5 @@ def _make_gan_from_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
         include_inhibitory_neurons=include_inhibitory_neurons,
         rate_penalty_threshold=rate_penalty_threshold,
+        disc_rate_penalty_bound=disc_rate_penalty_bound,
         **rest)

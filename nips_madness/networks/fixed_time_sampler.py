@@ -32,6 +32,7 @@ DEFAULT_PARAMS = dict(
 )
 del DEFAULT_PARAMS['sample_sites']
 del DEFAULT_PARAMS['gen']
+del DEFAULT_PARAMS['disc']
 
 
 class FixedTimeTuningCurveSampler(object):

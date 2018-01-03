@@ -19,6 +19,7 @@ DEFAULT_PARAMS = dict(
     **DEFAULT_PARAMS['gen']
 )
 del DEFAULT_PARAMS['gen']
+del DEFAULT_PARAMS['disc']
 
 MOMENT_WEIGHT_TYPES = ('mean', 'ew_mean', 'ew_relative')
 r"""

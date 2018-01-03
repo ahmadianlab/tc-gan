@@ -17,6 +17,7 @@ def make_ssn(model_config):
     kwds.pop('sample_sites', None)
     kwds.pop('batchsize', None)
     kwds.pop('gen', None)
+    kwds.pop('disc', None)
     stimulator, kwds = BandwidthContrastStimulator.consume_kwargs(**kwds)
     model, kwds = EulerSSNModel.consume_kwargs(stimulator, **kwds)
     assert not kwds

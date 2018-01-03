@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.pardir,
                                                 os.path.pardir)))
 
 try:
-    from nips_madness.utils import git_revision
+    from nips_madness.execution import git_revision
     gitrev = git_revision()
 except:
     gitrev = 'master'

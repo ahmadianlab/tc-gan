@@ -1,6 +1,8 @@
 from logging import getLogger
 import json
 import os
+import subprocess
+import sys
 
 import lasagne
 import numpy
@@ -9,6 +11,7 @@ import theano
 from . import utils
 
 logger = getLogger(__name__)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 class KnownError(Exception):
@@ -40,6 +43,54 @@ def makedirs_exist_ok(name):
     except OSError as err:
         if err.errno != 17:
             raise
+
+
+def get_meta_info(packages=[]):
+    return dict(
+        repository=dict(
+            revision=git_revision(),
+            is_clean=git_is_clean(),
+        ),
+        python=sys.executable,
+        packages={p.__name__: p.__version__ for p in packages},
+        argv=sys.argv,
+        environ=relevant_environ(),
+    )
+
+
+def git_revision():
+    return git_output(['git', 'rev-parse', 'HEAD']).rstrip()
+
+
+def git_is_clean():
+    return git_output(['git', 'status', '--short',
+                       '--untracked-files=no']).strip() == ''
+
+
+def relevant_environ(_environ=os.environ):
+    """relevant_environ() -> dict
+    Extract relevant environment variables and return as a `dict`.
+    """
+    def subenv(prefix):
+        return {k: _environ[k] for k in _environ if k.startswith(prefix)}
+
+    environ = {k: _environ[k] for k in [
+        'PATH', 'LD_LIBRARY_PATH', 'LIBRARY_PATH', 'CPATH',
+        'HOST', 'USER',
+    ] if k in _environ}
+    environ.update(subenv('SLURM'))
+    environ.update(subenv('PBS'))
+    environ.update(subenv('OMP'))
+    environ.update(subenv('MKL'))
+    environ.update(subenv('THEANO'))
+    return environ
+
+
+def git_output(args):
+    return subprocess.check_output(
+        args,
+        cwd=PROJECT_ROOT,
+        universal_newlines=True)
 
 
 class DataTables(object):
@@ -263,7 +314,7 @@ def pre_learn(
 
     makedirs_exist_ok(datastore)
 
-    meta_info = utils.get_meta_info(packages=packages)
+    meta_info = get_meta_info(packages=packages)
     with open(os.path.join(datastore, 'info.json'), 'w') as fp:
         json.dump(dict(
             run_config=run_config,

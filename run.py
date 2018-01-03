@@ -47,7 +47,7 @@ def run_module(module, arguments, use_pdb, use_pudb, pidfile,
         print('Module', module, 'do not have main function.')
         return 1
     if assert_repo_is_clean:
-        from nips_madness.utils import git_is_clean
+        from nips_madness.execution import git_is_clean
         if not git_is_clean():
             print('Repository is not clean.')
             return 3

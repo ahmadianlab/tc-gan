@@ -6,8 +6,6 @@ from logging import getLogger
 import inspect
 import multiprocessing
 import os
-import subprocess
-import sys
 import time
 import warnings
 
@@ -15,55 +13,6 @@ import numpy as np
 import theano
 
 logger = getLogger(__name__)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
-
-def get_meta_info(packages=[]):
-    return dict(
-        repository=dict(
-            revision=git_revision(),
-            is_clean=git_is_clean(),
-        ),
-        python=sys.executable,
-        packages={p.__name__: p.__version__ for p in packages},
-        argv=sys.argv,
-        environ=relevant_environ(),
-    )
-
-
-def git_revision():
-    return git_output(['git', 'rev-parse', 'HEAD']).rstrip()
-
-
-def git_is_clean():
-    return git_output(['git', 'status', '--short',
-                       '--untracked-files=no']).strip() == ''
-
-
-def git_output(args):
-    return subprocess.check_output(
-        args,
-        cwd=PROJECT_ROOT,
-        universal_newlines=True)
-
-
-def relevant_environ(_environ=os.environ):
-    """relevant_environ() -> dict
-    Extract relevant environment variables and return as a `dict`.
-    """
-    def subenv(prefix):
-        return {k: _environ[k] for k in _environ if k.startswith(prefix)}
-
-    environ = {k: _environ[k] for k in [
-        'PATH', 'LD_LIBRARY_PATH', 'LIBRARY_PATH', 'CPATH',
-        'HOST', 'USER',
-    ] if k in _environ}
-    environ.update(subenv('SLURM'))
-    environ.update(subenv('PBS'))
-    environ.update(subenv('OMP'))
-    environ.update(subenv('MKL'))
-    environ.update(subenv('THEANO'))
-    return environ
 
 
 def make_progressbar(quiet=False, **kwds):

@@ -447,7 +447,7 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     return ax
 
 
-def analyze_learning(logpath, title_params):
+def analyze_learning(logpath, title_params, downsample_to):
     """
     Load learning records from `logpath` and plot them in a figure.
     """
@@ -455,19 +455,22 @@ def analyze_learning(logpath, title_params):
     rec = load_records(logpath)
     if rec.run_module == 'bptt_moments':
         from .mm_learning import plot_mm_learning
-        return plot_mm_learning(rec, title_params)
+        return plot_mm_learning(rec, title_params, downsample_to)
     else:
-        return plot_learning(rec, title_params)
+        return plot_learning(rec, title_params, downsample_to)
 
 
-def cli_analyze_learning(logpath, title_params):
-    arts = analyze_learning(logpath, title_params)
+def cli_analyze_learning(*args, **kwargs):
+    arts = analyze_learning(*args, **kwargs)
     return arts.fig
 
 
 def main(args=None):
     from .basecli import make_base_parser, call_cli
     parser = make_base_parser(description=__doc__)
+    parser.add_argument(
+        '--downsample-to', type=int, default=None, metavar='<num>',
+        help='Down-sample records to have at least <num> data points.')
     call_cli(cli_analyze_learning, parser.parse_args(args))
 
 

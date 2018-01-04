@@ -300,6 +300,14 @@ class BaseRecords(object):
         from ..analyzers.learning import plot_learning
         return plot_learning(self, **kwargs)
 
+    def load_all(self):
+        """Force loading all records."""
+        for name in dir(self):
+            if name == 'tc_stats':  # FIXME: don't do it
+                # See: [[./datastore_loader.py::load_tc_stats]]
+                continue
+            getattr(self, name)
+
 
 class GANRecords(BaseRecords):
 

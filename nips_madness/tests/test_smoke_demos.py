@@ -14,3 +14,10 @@ def test_smoke_slowtest(module, args):
     demo = importlib.import_module('.' + module, demos.__name__)
     demo.main(args)
     pyplot.close('all')
+
+
+@pytest.mark.parametrize('module, args', [
+    ('plot_ssnode_trajectory', ['--plot-fp']),
+])
+def test_smoke(module, args):
+    test_smoke_slowtest(module, args)

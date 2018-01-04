@@ -175,6 +175,21 @@ def objectpath(obj):
     return obj.__module__ + '.' + obj.__name__
 
 
+def add_arguments_from_dict(parser, dct, exclude=[],
+                            help='(default: %(default)s)', **kwargs):
+    for key, val in dct.items():
+        if key in exclude:
+            continue
+        if isinstance(val, (str, float, int)):
+            argtype = type(val)
+        else:
+            argtype = eval
+        parser.add_argument(
+            '--{}'.format(key.replace('_', '-')),
+            type=argtype, default=val, help=help,
+            **kwargs)
+
+
 class Namespace(object):
 
     """

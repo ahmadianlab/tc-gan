@@ -4,22 +4,23 @@ from matplotlib import pyplot
 import numpy as np
 
 from ..utils import Namespace
-from .learning import plot_gen_params, gen_param_smape
+from .learning import plot_gen_params, gen_param_smape, maybe_downsample_to
 
 
-def plot_loss(rec, ax=None, yscale_rate_penalty='log'):
+def plot_loss(rec, ax=None, downsample_to=None, yscale_rate_penalty='log'):
     if ax is None:
         _, ax = pyplot.subplots()
 
-    lines = ax.plot('epoch', 'loss', label='loss', data=rec.learning)
+    df = maybe_downsample_to(downsample_to, rec.learning)
+    lines = ax.plot('epoch', 'loss', label='loss', data=df)
     ax.set_yscale('log')
 
     for key in ['rate_penalty', 'dynamics_penalty']:
-        if key in rec.learning:
+        if key in df:
             color = 'C1'
             ax_rate_penalty = ax.twinx()
             lines += ax_rate_penalty.plot(
-                'epoch', key, data=rec.learning,
+                'epoch', key, data=df,
                 label=key, color=color, alpha=0.8)
             ax_rate_penalty.tick_params('y', colors=color)
             ax_rate_penalty.set_yscale(yscale_rate_penalty)
@@ -30,11 +31,12 @@ def plot_loss(rec, ax=None, yscale_rate_penalty='log'):
         loc='best')
 
 
-def plot_moments(rec, moment, ax=None):
+def plot_moments(rec, moment, ax=None, downsample_to=None):
     if ax is None:
         _, ax = pyplot.subplots()
 
-    ax.plot('epoch', moment, data=rec.gen_moments, linewidth=0.1)
+    ax.plot('epoch', moment, linewidth=0.1,
+            data=maybe_downsample_to(downsample_to, rec.gen_moments))
     ax.set_yscale('log')
 
     ax.text(0.05, 0.95,
@@ -53,7 +55,7 @@ def moments_smape(rec):
     return 200 * np.nanmean(np.abs(num / den), axis=1)
 
 
-def plot_mm_smape(rec, ax=None, colors=0,
+def plot_mm_smape(rec, ax=None, downsample_to=None, colors=0,
                   ylim=(0, 200)):
     """
     Plot sMPAE of mean TC and generator parameter.
@@ -71,10 +73,12 @@ def plot_mm_smape(rec, ax=None, colors=0,
     else:
         colors = iter(colors)
 
-    ax.plot(rec.gen_moments['epoch'], moments_smape(rec),
+    ax.plot(maybe_downsample_to(downsample_to, rec.gen_moments['epoch']),
+            maybe_downsample_to(downsample_to, moments_smape(rec)),
             color=next(colors),
             label='Mom. sMAPE')
-    ax.plot(rec.generator['epoch'], gen_param_smape(rec),
+    ax.plot(maybe_downsample_to(downsample_to, rec.generator['epoch']),
+            maybe_downsample_to(downsample_to, gen_param_smape(rec)),
             color=next(colors),
             label='G param. sMAPE')
 
@@ -84,21 +88,22 @@ def plot_mm_smape(rec, ax=None, colors=0,
         ax.set_ylim(ylim)
 
 
-def plot_mm_learning(rec, title_params=None):
+def plot_mm_learning(rec, title_params=None, downsample_to=None):
+    common = dict(downsample_to=downsample_to)
     is_heteroin = rec.rc.ssn_type in ('heteroin', 'deg-heteroin')
     fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))
 
-    plot_loss(rec, axes[0, 0])
-    plot_mm_smape(rec, ax=axes[0, 2])
+    plot_loss(rec, axes[0, 0], **common)
+    plot_mm_smape(rec, ax=axes[0, 2], **common)
 
     if is_heteroin:
-        plot_gen_params(rec, axes=[axes[0, 1]] + list(axes[1, :]))
+        plot_gen_params(rec, axes=[axes[0, 1]] + list(axes[1, :]), **common)
     else:
-        plot_gen_params(rec, axes=axes[1, :])
+        plot_gen_params(rec, axes=axes[1, :], **common)
     plot_gen_params(rec, axes=axes[2, :], param_array_names=['J', 'D', 'S'],
-                    yscale='log', legend=False, ylim=False)
+                    yscale='log', legend=False, ylim=False, **common)
 
     for ax in axes[-1]:
         ax.set_xlabel('epoch')

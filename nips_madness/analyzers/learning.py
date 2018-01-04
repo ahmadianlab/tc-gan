@@ -7,6 +7,14 @@ import numpy as np
 from ..utils import Namespace
 
 
+def maybe_downsample_to(downsample_to, x):
+    if downsample_to:
+        stride = len(x) // downsample_to
+        if stride > 1:
+            return x[::stride]
+    return x
+
+
 def clip_ymax(ax, ymax, ymin=0):
     if ax.get_ylim()[1] > ymax:
         ax.set_ylim(ymin, ymax)
@@ -32,7 +40,7 @@ def gen_param_smape(rec):
                  rec.flatten_gen_params())
 
 
-def plot_data_smape(rec, ax=None, colors=0,
+def plot_data_smape(rec, ax=None, downsample_to=None, colors=0,
                     ylim=(0, 200)):
     """
     Plot sMPAE of mean TC and generator parameter.
@@ -50,11 +58,12 @@ def plot_data_smape(rec, ax=None, colors=0,
     else:
         colors = iter(colors)
 
-    ax.plot(rec.TC_mean['epoch'], smape(rec.TC_mean['gen'],
-                                        rec.TC_mean['data']),
+    TC_mean = maybe_downsample_to(downsample_to, rec.TC_mean)
+    ax.plot(TC_mean['epoch'], smape(TC_mean['gen'], TC_mean['data']),
             color=next(colors),
             label='TC sMAPE')
-    ax.plot(rec.generator['epoch'], gen_param_smape(rec),
+    ax.plot(maybe_downsample_to(downsample_to, rec.generator['epoch']),
+            maybe_downsample_to(downsample_to, gen_param_smape(rec)),
             color=next(colors),
             label='G param. sMAPE')
 
@@ -131,6 +140,7 @@ def name_to_tex(name):
 
 
 def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
+                    downsample_to=None,
                     param_array_names=None):
     """
     Plot evolution of generator parameters.
@@ -155,7 +165,8 @@ def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
             raise ValueError('Needs {} axes; {} given.'
                              .format(len(param_array_names), len(axes)))
 
-    epoch = rec.generator['epoch']
+    generator = maybe_downsample_to(downsample_to, rec.generator)
+    epoch = generator['epoch']
 
     arts = {}
     arts['gen_lines'] = gen_lines = {}
@@ -171,7 +182,7 @@ def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
                 color=color)
             gen_lines[name] = ax.plot(
                 epoch,
-                rec.generator[name],
+                generator[name],
                 label=name_to_tex(name),
                 color=color)
 
@@ -190,7 +201,7 @@ def plot_gen_params(rec, axes=None, yscale=None, legend=True, ylim=True,
     return arts
 
 
-def plot_gan_cost_and_rate_penalty(rec, ax=None,
+def plot_gan_cost_and_rate_penalty(rec, ax=None, downsample_to=None,
                                    ymax_dacc=1, ymin_dacc=-0.05,
                                    yscale_dacc='symlog',
                                    yscale_rate_penalty='log'):
@@ -207,6 +218,7 @@ def plot_gan_cost_and_rate_penalty(rec, ax=None,
     if ax is None:
         _, ax = pyplot.subplots()
     df = rec.learning
+    df = maybe_downsample_to(downsample_to, df)
 
     color = 'C0'
     if rec.rc.is_WGAN:
@@ -269,7 +281,7 @@ def disc_param_stats_to_pretty_label(name):
 
 
 def plot_disc_param_stats(
-        rec, ax=None, logy=True,
+        rec, ax=None, logy=True, downsample_to=None,
         legend=dict(loc='center left', ncol='auto', fontsize='small',
                     handlelength=0.5, columnspacing=0.4),
         legend_max_rows=7,
@@ -286,7 +298,7 @@ def plot_disc_param_stats(
     if ax is None:
         _, ax = pyplot.subplots()
     param_names = rec.disc_param_stats_names
-    rec.disc_param_stats.plot(
+    maybe_downsample_to(downsample_to, rec.disc_param_stats).plot(
         'epoch', param_names, logy=logy, legend=False, ax=ax, **kwargs)
 
     for line in ax.get_lines():
@@ -305,7 +317,7 @@ def plot_disc_param_stats(
         leg.set_frame_on(True)
 
 
-def plot_learning(rec, title_params=None):
+def plot_learning(rec, title_params=None, downsample_to=None):
     """
     Plot various GAN learning records are plotted in 4x3 axes.
 
@@ -314,7 +326,8 @@ def plot_learning(rec, title_params=None):
     rec : `.GANRecords`
 
     """
-    df = rec.learning.copy()
+    common = dict(downsample_to=downsample_to)
+    df = maybe_downsample_to(downsample_to, rec.learning).copy()
     fig, axes = pyplot.subplots(nrows=4, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 8))
@@ -327,7 +340,7 @@ def plot_learning(rec, title_params=None):
     else:
         df.plot('epoch', ['Gloss', 'Dloss'], **plot_kwargs)
 
-    plot_gan_cost_and_rate_penalty(rec, ax=axes[0, 1])
+    plot_gan_cost_and_rate_penalty(rec, ax=axes[0, 1], **common)
 
     df.plot('epoch', ['SSsolve_time', 'gradient_time'], ax=axes[1, 0],
             logy=True)
@@ -337,16 +350,16 @@ def plot_learning(rec, title_params=None):
     ax_loss = axes[0, 0]
     ax_loss.set_yscale('symlog')
 
-    plot_data_smape(rec, ax=axes[0, 2], colors=2)
+    plot_data_smape(rec, ax=axes[0, 2], colors=2, **common)
 
-    plot_disc_param_stats(rec, ax=axes[1, 2])
+    plot_disc_param_stats(rec, ax=axes[1, 2], **common)
 
     if is_heteroin:
-        plot_gen_params(rec, axes=[axes[1, 1]] + list(axes[2, :]))
+        plot_gen_params(rec, axes=[axes[1, 1]] + list(axes[2, :]), **common)
     else:
-        plot_gen_params(rec, axes=axes[2, :])
+        plot_gen_params(rec, axes=axes[2, :], **common)
     plot_gen_params(rec, axes=axes[3, :], param_array_names=['J', 'D', 'S'],
-                    yscale='log', legend=False, ylim=False)
+                    yscale='log', legend=False, ylim=False, **common)
 
     for ax in axes[-1]:
         ax.set_xlabel('epoch')

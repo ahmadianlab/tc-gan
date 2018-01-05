@@ -1,6 +1,6 @@
 import argparse
 
-from ..utils import csv_line
+from ..utils import csv_line, log_timing
 
 
 class CustomFormatter(argparse.RawDescriptionHelpFormatter,
@@ -37,5 +37,6 @@ def call_cli(func, ns):
         if show:
             pyplot.show()
         if figpath:
-            fig.savefig(figpath)
+            with log_timing('fig.savefig()'):
+                fig.savefig(figpath)
     return wrapper(**vars(ns))

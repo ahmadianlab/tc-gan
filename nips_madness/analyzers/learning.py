@@ -4,7 +4,7 @@ from matplotlib import pyplot
 import matplotlib
 import numpy as np
 
-from ..utils import Namespace
+from ..utils import Namespace, log_timing
 
 
 def maybe_downsample_to(downsample_to, x):
@@ -447,17 +447,22 @@ def plot_tuning_curve_evo(data, epochs=None, ax=None, cmap='inferno_r',
     return ax
 
 
-def analyze_learning(logpath, title_params, downsample_to):
+def analyze_learning(logpath, title_params, downsample_to, force_load):
     """
     Load learning records from `logpath` and plot them in a figure.
     """
     from ..loaders import load_records
     rec = load_records(logpath)
+    if force_load:
+        with log_timing('{}.load_all()'.format(rec)):
+            rec.load_all()
     if rec.run_module == 'bptt_moments':
         from .mm_learning import plot_mm_learning
-        return plot_mm_learning(rec, title_params, downsample_to)
+        with log_timing('plot_mm_learning()'):
+            return plot_mm_learning(rec, title_params, downsample_to)
     else:
-        return plot_learning(rec, title_params, downsample_to)
+        with log_timing('plot_learning()'):
+            return plot_learning(rec, title_params, downsample_to)
 
 
 def cli_analyze_learning(*args, **kwargs):
@@ -468,6 +473,10 @@ def cli_analyze_learning(*args, **kwargs):
 def main(args=None):
     from .basecli import make_base_parser, call_cli
     parser = make_base_parser(description=__doc__)
+    parser.add_argument(
+        '--force-load', action='store_true',
+        help='Run rec.load_all() before plot.  Useful for benchmarking'
+        ' (with --log-level=DEBUG).')
     parser.add_argument(
         '--downsample-to', type=int, default=None, metavar='<num>',
         help='Down-sample records to have at least <num> data points.')

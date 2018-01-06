@@ -337,6 +337,7 @@ def do_learning(learn, run_config, extra_info={}, preprocess=None,
     `datastore` is an instance of `DataStore` object.
 
     """
+    logger.info('PID: %d', os.getpid())
     run_config = pre_learn(packages=packages, extra_info=extra_info,
                            preprocess=preprocess,
                            **run_config)

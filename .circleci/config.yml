@@ -3,6 +3,12 @@ jobs:
   build:
     docker:
       - image: continuumio/miniconda3
+        environment:
+          # Setting this "workaround" here since otherwise even
+          # theano-cache doesn't work.
+          # See: https://circleci.com/bb/gbarello/nips_madness/165
+          #      https://github.com/Theano/Theano/issues/6499m
+          MKL_THREADING_LAYER: GNU
 
     working_directory: ~/repo
 

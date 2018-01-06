@@ -83,6 +83,7 @@ def relevant_environ(_environ=os.environ):
     environ.update(subenv('OMP'))
     environ.update(subenv('MKL'))
     environ.update(subenv('THEANO'))
+    environ.update(subenv('GPU'))  # especially, GPU_DEVICE_ORDINAL
     return environ
 
 

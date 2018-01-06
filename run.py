@@ -28,6 +28,15 @@ which pip
 which conda
 pip freeze > pip-freeze.txt
 conda list --prefix "{project_root}/env" --export > conda-list.txt
+
+nvidia-smi --format=csv \
+--query-gpu=index,count,pci.bus_id,uuid,driver_version \
+> nvidia-smi-gpu.csv || rm nvidia-smi-gpu.csv
+
+nvidia-smi --format=csv \
+--query-compute-apps=gpu_name,gpu_bus_id,gpu_serial,gpu_uuid,pid,process_name \
+> nvidia-smi-compute-apps.csv || nvidia-smi-compute-apps.csv
+
 '''
 
 

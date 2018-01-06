@@ -1,3 +1,5 @@
+from logging import getLogger
+
 import lasagne
 import numpy as np
 import theano
@@ -15,6 +17,8 @@ from .wgan import (
 )
 from .ssn import TuningCurveGenerator, make_tuning_curve_generator
 from .utils import gridify_tc_samples
+
+logger = getLogger(__name__)
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -527,10 +531,24 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
                              disc_step=disc_step)
             info = self.train_discriminator(info)
             yield info
+        disc_info = info
         batch = info.batch
 
         info = Namespace(is_discriminator=False, gen_step=gen_step)
-        yield self.train_generator(info, batch)
+        info = self.train_generator(info, batch)
+
+        logger.debug(
+            '[Loss] Acc: %-9.3g D: %-9.3g G: %-9.3g'
+            ' [Time] Fwd: %.3g D: %.3g G: %.3g',
+            disc_info.accuracy,
+            disc_info.disc_loss,
+            info.gen_loss,
+            self.gen_forward_watch.mean(),
+            self.disc_train_watch.mean(),
+            self.gen_train_watch.mean(),
+        )
+
+        yield info
 
 
 def make_gan(config):

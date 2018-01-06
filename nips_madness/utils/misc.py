@@ -51,6 +51,12 @@ class StopWatch(object):
     def sum(self):
         return sum(self.times)
 
+    def mean(self):
+        samples = len(self.times)
+        if samples:
+            return self.sum() / samples
+        return float('nan')
+
 
 @contextmanager
 def log_timing(opname='Operation', logger=logger):

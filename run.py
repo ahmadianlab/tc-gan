@@ -60,6 +60,13 @@ def run_module(module, arguments, use_pdb, use_pudb, pidfile,
         if not git_is_clean():
             print('Repository is not clean.')
             return 3
+
+    # Make sure that (1) Theano is imported so that this process
+    # is included in the following execution of nvidia-smi and (2)
+    # GPU is logged via Python:
+    from nips_madness.utils import log_theano_info
+    log_theano_info()
+
     if record_env:
         subprocess.check_call(
             record_env_script_template.format(project_root=here),

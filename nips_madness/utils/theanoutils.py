@@ -1,5 +1,9 @@
+from logging import getLogger
+
 import numpy as np
 import theano
+
+logger = getLogger(__name__)
 
 
 def theano_function(*args, **kwds):
@@ -67,3 +71,9 @@ def theano_info():
     return dict(
         gpuarray=theano_gpuarray_info(),
     )
+
+
+def log_theano_info():
+    gpu_info = theano_gpuarray_info()
+    for key in sorted(gpu_info):
+        logger.info('GPU (%s): %r', key, gpu_info[key])

@@ -41,3 +41,29 @@ def asarray(arrays):
         return theano.tensor.as_tensor_variable(arrays)
     else:
         return np.asarray(arrays)
+
+
+def gpu_context_to_dict(c):
+    def jsonable(v):
+        if isinstance(v, bytes):
+            return v.decode()
+        return v
+
+    names = set(dir(c)) & {'bin_id', 'dev', 'devname', 'kind', 'pcibusid'}
+    return {n: jsonable(getattr(c, n)) for n in names}
+
+
+def theano_gpuarray_info():
+    """
+    Return information of GPUs used by Theano as a JSON'able dictionary.
+    """
+    return {
+        k: gpu_context_to_dict(c)
+        for k, c in theano.gpuarray.init_dev.devmap.items()
+    }
+
+
+def theano_info():
+    return dict(
+        gpuarray=theano_gpuarray_info(),
+    )

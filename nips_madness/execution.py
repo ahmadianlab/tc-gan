@@ -55,6 +55,7 @@ def get_meta_info(packages=[]):
         packages={p.__name__: p.__version__ for p in packages},
         argv=sys.argv,
         environ=relevant_environ(),
+        theano=utils.theano_info(),
     )
 
 

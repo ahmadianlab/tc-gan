@@ -101,6 +101,15 @@ def prettify_rc_value(value, tex):
     return value
 
 
+def prettify_layers(layers):
+    if len(set(layers)) == 1:
+        return '{}x{}'.format(layers[0], len(layers))
+    elif len(layers) == 0:
+        return '()'
+    else:
+        return ','.join(map(str, layers))
+
+
 def prettify_rc_key_value(key, value, tex=False):
     r"""
     Prettify `key`-`value` pair for `.BaseRecords.pretty_spec`
@@ -119,10 +128,18 @@ def prettify_rc_key_value(key, value, tex=False):
     'spam=[[0, 1], [2, 3]]'
     >>> prettify_rc_key_value('gen_rate_cost', 1)
     'rate_cost=1'
+    >>> prettify_rc_key_value('disc_layers', [16, 16, 16])
+    'disc_layers=16x3'
+    >>> prettify_rc_key_value('disc_layers', [16, 32])
+    'disc_layers=16,32'
+    >>> prettify_rc_key_value('disc_layers', [])
+    'disc_layers=()'
 
     """
     if key == 'moment_weight_type':
         return value + '-mom.'
+    if key == 'disc_layers':
+        return '{}={}'.format(key, prettify_layers(value))
     return '{}={}'.format(prettify_rc_key(key, tex),
                           prettify_rc_value(value, tex))
 

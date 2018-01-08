@@ -1,4 +1,6 @@
+from getpass import getuser
 from logging import getLogger
+from socket import gethostname
 import json
 import os
 import subprocess
@@ -57,6 +59,8 @@ def get_meta_info(packages=[]):
         environ=relevant_environ(),
         theano=utils.theano_info(),
         pid=os.getpid(),
+        hostname=gethostname(),
+        username=getuser(),
     )
 
 
@@ -78,7 +82,7 @@ def relevant_environ(_environ=os.environ):
 
     environ = {k: _environ[k] for k in [
         'PATH', 'LD_LIBRARY_PATH', 'LIBRARY_PATH', 'CPATH',
-        'HOST', 'USER',
+        'HOST', 'HOSTNAME', 'USER', 'USERNAME',
     ] if k in _environ}
     environ.update(subenv('SLURM'))
     environ.update(subenv('PBS'))

@@ -56,6 +56,7 @@ def get_meta_info(packages=[]):
         argv=sys.argv,
         environ=relevant_environ(),
         theano=utils.theano_info(),
+        pid=os.getpid(),
     )
 
 

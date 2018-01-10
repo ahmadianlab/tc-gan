@@ -31,6 +31,9 @@ class DataStoreLoader1(object):
     def __init__(self, directory):
         self.directory = Path(directory)
 
+    def __repr__(self):
+        return '{}({!r})'.format(type(self).__name__, str(self.directory))
+
     @contextmanager
     def open_if_not(self, file_or_name, *args, **kwargs):
         if hasattr(file_or_name, 'read'):

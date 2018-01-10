@@ -151,6 +151,9 @@ class BaseRecords(object):
         self.info = info
         self.rc = rc
 
+    def __repr__(self):
+        return '<{}: {}>'.format(type(self).__name__, self.datastore)
+
     @property
     def data_version(self):
         return self.info.get('extra_info', {}).get('data_version', 0)

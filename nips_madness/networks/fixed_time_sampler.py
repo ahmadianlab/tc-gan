@@ -37,6 +37,13 @@ del DEFAULT_PARAMS['disc']
 
 class FixedTimeTuningCurveSampler(object):
 
+    """
+    Tuning curve sampler (a convenient generator wrapper).
+
+    * Use `.sample` (or `.forward`) to generate tuning curves.
+    * Use `.compute_trajectories` to generate trajectories of SSNs.
+    """
+
     @classmethod
     def from_dict(cls, dct):
         self, rest = cls.consume_kwargs(**dict(DEFAULT_PARAMS, **dct))
@@ -80,6 +87,18 @@ class FixedTimeTuningCurveSampler(object):
     batchsize = property(lambda self: self.gen.batchsize)
 
     def forward(self, raw=False):
+        """
+        A convenient way to call `.TuningCurveGenerator.forward`.
+
+        Returns
+        -------
+        `TuningCurves` or a named tuple.
+            If ``raw=False`` (default), it return a `TuningCurves`
+            which wraps tuning curve data and its metadata.
+            If ``raw=True``, it returns a named tuple `gen.OutType
+            <.TuningCurveGenerator.OutType>`.
+
+        """
         out = self.gen.forward(
             self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,
@@ -90,7 +109,20 @@ class FixedTimeTuningCurveSampler(object):
         return TuningCurves.from_raw(out, self)
 
     def sample(self, repeat=1, progress=False):
-        """Sample `.batchsize` * `repeat` tuning curves."""
+        """
+        Sample `.batchsize` * `repeat` tuning curves.
+
+        Parameters
+        ----------
+        repeat : int
+            This method calls `.forward` method `repeat` times.
+        progress : bool
+            Show progress bar if true.
+
+        Returns
+        -------
+        TuningCurves
+        """
         out_list = []
         bar = make_progressbar(quiet=not progress)
         for _ in bar(range(repeat)):
@@ -99,6 +131,17 @@ class FixedTimeTuningCurveSampler(object):
         return TuningCurves(np.concatenate(out_list), self)
 
     def compute_trajectories(self, raw=False):
+        """
+        Simulate SSNs and return their trajectories.
+
+        Returns
+        -------
+        `Trajectories` or a `numpy.ndarray`.
+            If ``raw=False`` (default), it return a `Trajectories`
+            which wraps trajectory data and its metadata.
+            If ``raw=True``, it returns raw trajectories data as
+            `numpy.ndarray`.
+        """
         trajectories = self.gen.model.compute_trajectories(
             rng=self.rng,
             stimulator_bandwidths=self.stimulator_bandwidths,
@@ -205,6 +248,15 @@ class FixedTimeTuningCurveSampler(object):
 
 class TuningCurves(object):
 
+    """
+    Tuning curves and metadata.
+
+    **Utility methods**:
+
+    * Conversion: `.as_dataframe`, `.as_grid`
+    * Plotting: `.plot`
+    """
+
     @classmethod
     def from_raw(cls, raw, sampler):
         return cls(raw.prober_tuning_curve, sampler, raw=raw)
@@ -229,12 +281,27 @@ class TuningCurves(object):
         self.raw = None
 
     def as_dataframe(self):
+        """
+        Convert tuning curves to a `pandas.DataFrame`.
+
+        It calls `.tc_samples_as_dataframe`.
+        """
         return self.sampler.tc_samples_as_dataframe(self.data)
 
     def as_grid(self):
+        """
+        Convert tuning curves to a ``ndim=5`` array.
+
+        It calls `.gridify_tc_samples`.
+        """
         return self.sampler.tc_samples_as_grid(self.data)
 
     def plot(self, **kwargs):
+        """
+        Simply call `.analyzers.plot_gridified_truth.plot_gridified_truth`.
+
+        .. todo: rename `.plot_gridified_truth`
+        """
         from ..analyzers.plot_gridified_truth import plot_gridified_truth
         return plot_gridified_truth(self.as_dataframe(), **kwargs)
 
@@ -253,6 +320,14 @@ class TuningCurves(object):
 
 class Trajectories(object):
 
+    """
+    SSN trajectories and metadata.
+
+    **Utility methods**:
+
+    * Plotting: `.plot`
+    """
+
     def __init__(self, data, sampler):
         self.data = data
         self.sampler = sampler
@@ -261,6 +336,7 @@ class Trajectories(object):
     seqlen = property(lambda self: self.sampler.gen.model.seqlen)
 
     def plot(self, **kwargs):
+        """Simply call `.plotters.trajectory.plot_trajectory`."""
         from ..plotters.trajectory import plot_trajectory
         return plot_trajectory(self.data, self.sampler, **kwargs)
 

@@ -146,6 +146,74 @@ def prettify_rc_key_value(key, value, tex=False):
 
 class BaseRecords(object):
 
+    """
+    Learning record (log) of a learner (GAN or moment-matching).
+
+    **Records / Tables**.  The following attributes can be used to
+    access the record as a `pandas.DataFrame` or `numpy.ndarray`.
+    Some attributes are available only in specific learner type.
+
+    .. attribute:: truth
+
+       `numpy.ndarray` --- A "raw" array of dataset ("true" tuning
+       curves).  Use `.truth_grid` or `.truth_df` to access it in a
+       more structured format.
+       (see also: `.DataStoreLoader1.load_truth`)
+
+    .. attribute:: generator
+
+       `pandas.DataFrame` --- Generator parameters at each generator
+       update step.
+       (See also: `~.recorders.FlexGenParamRecorder`)
+
+    .. attribute:: learning
+
+       `pandas.DataFrame` --- Learning statistics such as losses and
+       penalties.
+       (See also: `~.recorders.LearningRecorder`,
+       `~.recorders.MMLearningRecorder`)
+
+    .. attribute:: TC_mean
+
+       `pandas.DataFrame` (GANs only) --- Minibatch-mean of tuning
+       curves.
+
+    .. attribute:: disc_param_stats
+
+       `pandas.DataFrame` (GANs only) --- Statistics (normalized
+       norms) of the discriminator parameters for each discriminator
+       steps.
+       (See also: `~.recorders.DiscParamStatsRecorder`)
+
+    .. attribute:: disc_learning
+
+       `pandas.DataFrame` (GANs only) --- Similar to `.learning` but
+       for each discriminator steps.
+       (See also: `~.recorders.DiscLearningRecorder`)
+
+    .. attribute:: tc_stats
+
+       `pandas.DataFrame` (cGANs only) ---
+       (See also: `~.recorders.ConditionalTuningCurveStatsRecorder`)
+
+    .. attribute:: gen_moments
+
+       `pandas.DataFrame` (moment-matching only) --- Moments
+       calculated from TCs of the generator at each learning steps.
+       (See also: `~.recorders.GenMomentsRecorder`)
+
+
+    **Utility methods**:
+
+    * Creating generator at a certain learning stage:
+      `.make_sampler`, `.gen_params_at`
+
+    * Plotting: `.plot`
+    """
+    # Note: Those attributes are documented in the base class so that
+    # they are available with rec? in IPython and I don't like copying
+    # documents for shared attributes to all child classes.
+
     def __init__(self, datastore, info, rc):
         self.datastore = datastore
         self.info = info
@@ -217,6 +285,23 @@ class BaseRecords(object):
         return element_to_array_names(self.param_element_names)
 
     def flatten_true_params(self, ndim=1):
+        """
+        Get the true (target) generator parameter.
+
+        Parameters
+        ----------
+        ndim : int
+
+        Returns
+        -------
+        numpy.ndarray
+            Its shape is ``(len(self.param_element_names),)`` by
+            default (``ndim=1``) and is
+            ``(1, len(self.param_element_names))`` if ``ndim=2``.  The
+            latter ``ndim=2`` version returns an array that can be
+            broadcast to match the shape of the array from
+            `.flatten_gen_params`.
+        """
         assert ndim in (1, 2)
         params = concat_flat(map(self.rc.get_true_param,
                                  self.param_array_names))
@@ -226,10 +311,39 @@ class BaseRecords(object):
         return params
 
     def flatten_gen_params(self):
+        """
+        Get a sequence of generator parameters across generator updates.
+
+        Returns
+        -------
+        numpy.ndarray
+            shape: ``(len(self.generator), len(self.param_element_names))``
+        """
         return self.generator.loc[:, self.param_element_names].as_matrix()
 
     def gen_params_at(self, gen_step):
-        """Get generator parameter at `gen_step` as a `dict`."""
+        """
+        Get generator parameter at `gen_step` as a `dict`.
+
+        Suppose `rec` is a record loader (an instance of this class)
+        and `sampler` is a `.FixedTimeTuningCurveSampler` (which may
+        be created by `.make_sampler`).  You can set the parameter of
+        the generator of the one at `gen_step` in the record by::
+
+          sampler.gen.set_params(rec.gen_params_at(gen_step))
+
+        Parameters
+        ----------
+        gen_step : int
+            Generator update step from which parameter value is taken.
+            Negative value allowed; -1 means the end result.
+
+        Returns
+        -------
+        params : dict
+            A mapping from array name (`str`) of the parameter (e.g.,
+            ``'J'``) to a `numpy.ndarray` or a scalar.
+        """
         data = self.generator.iloc[gen_step]  # assuming index==gen_step
         params = {}
         for name in self.param_element_names:
@@ -246,6 +360,9 @@ class BaseRecords(object):
         """
         Get a `.FixedTimeTuningCurveSampler` based on run-time configuration.
 
+        To set the parameters to the generator (sampler) already
+        created, use `.gen_params_at` (see its docstring).
+
         Parameters
         ----------
         gen_step : int
@@ -253,7 +370,6 @@ class BaseRecords(object):
             Default to the last step.  See also `gen_params_at`.
         kwargs : dict
             Passed to `.FixedTimeTuningCurveSampler.consume_kwargs`.
-
         """
         from ..networks.fixed_time_sampler import FixedTimeTuningCurveSampler
         from ..networks.wgan import DEFAULT_PARAMS
@@ -317,6 +433,7 @@ class BaseRecords(object):
         return '{}: {}'.format(self.spec_header, spec)
 
     def plot(self, **kwargs):
+        """Simply call `.analyzers.learning.plot_learning`."""
         from ..analyzers.learning import plot_learning
         return plot_learning(self, **kwargs)
 
@@ -381,6 +498,7 @@ class MomentMatchingRecords(BaseRecords):
     spec_header = 'MM'
 
     def plot(self, **kwargs):
+        """Simply call `.analyzers.mm_learning.plot_mm_learning`."""
         from ..analyzers.mm_learning import plot_mm_learning
         return plot_mm_learning(self, **kwargs)
 
@@ -412,6 +530,11 @@ module_records_map = {
 
 
 def load_records(path):
+    """
+    Load learning records from `path`.
+
+    The filename part of `path` is ignored.
+    """
     datastore_path = get_datastore_path(path)
     info = load_info(datastore_path)
     run_module = guess_run_module(info)

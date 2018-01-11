@@ -223,6 +223,12 @@ class DataStore(object):
         with open(self.path(filename), 'w') as fp:
             json.dump(obj, fp)
 
+    def save_exit_reason(self, reason, good, **kwargs):
+        logger.info('Recording reason=%s (%s) in exit.json',
+                    reason, 'good' if good else 'bad')
+        self.dump_json(dict(reason=reason, good=good, **kwargs), 'exit.json')
+        logger.info('exit.json is created.')
+
     def flush_all(self):
         self.tables.flush_all()
         self.h5.flush_all()

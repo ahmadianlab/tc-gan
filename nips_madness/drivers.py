@@ -1,5 +1,6 @@
 from logging import getLogger
 import collections
+import contextlib
 
 import lasagne
 import numpy as np
@@ -24,6 +25,36 @@ def is_at_interval(step, interval):
 def net_isfinite(layer):
     return all(np.isfinite(arr).all() for arr in
                lasagne.layers.get_all_param_values(layer))
+
+
+@contextlib.contextmanager
+def recording_exit_reason(datastore):
+    try:
+        yield
+    except KeyboardInterrupt:
+        datastore.save_exit_reason(
+            reason='keyboard_interrupt',
+            good=False,
+        )
+        logger.info('Re-raising...')
+        raise
+    except execution.KnownError:
+        raise
+    except Exception as err:
+        exception = str(err)
+        logger.info('Unknown exception: %s', exception)
+        datastore.save_exit_reason(
+            reason='uncaught_exception',
+            good=False,
+            exception=exception,
+        )
+        logger.info('Re-raising...')
+        raise
+    else:
+        datastore.save_exit_reason(
+            reason='end_of_iteration',
+            good=True,
+        )
 
 
 class GANDriver(object):
@@ -119,12 +150,6 @@ class GANDriver(object):
             quit_JDS_threshold=self.quit_JDS_threshold,
         )
 
-    def post_loop(self):
-        self.datastore.dump_json(dict(
-            reason='end_of_iteration',
-            good=True,
-        ), 'exit.json')
-
     def iterate(self, update_func):
         """
         Iteratively call `update_func` for `.iterations` times.
@@ -148,10 +173,10 @@ class GANDriver(object):
 
         self.pre_loop()
         logger.info('%s: start iterations', self.__class__.__name__)
-        for gen_step in range(self.iterations):
-            self.post_update(gen_step, update_func(gen_step))
+        with recording_exit_reason(self.datastore):
+            for gen_step in range(self.iterations):
+                self.post_update(gen_step, update_func(gen_step))
         logger.info('%s: maximum iterations reached', self.__class__.__name__)
-        self.post_loop()
 
 
 def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
@@ -373,12 +398,6 @@ class MomentMatchingDriver(BaseComponent):
             quit_JDS_threshold=self.quit_JDS_threshold,
         )
 
-    def post_loop(self):
-        self.datastore.dump_json(dict(
-            reason='end_of_iteration',
-            good=True,
-        ), 'exit.json')
-
     def iterate(self, update_func):
         """
         Iteratively call `update_func` for `.iterations` times.
@@ -395,10 +414,10 @@ class MomentMatchingDriver(BaseComponent):
         """
         self.pre_loop()
         logger.info('%s: start iterations', self.__class__.__name__)
-        for gen_step in range(self.iterations):
-            self.post_update(gen_step, update_func(gen_step))
+        with recording_exit_reason(self.datastore):
+            for gen_step in range(self.iterations):
+                self.post_update(gen_step, update_func(gen_step))
         logger.info('%s: maximum iterations reached', self.__class__.__name__)
-        self.post_loop()
 
     def run(self, learner):
         learning_it = learner.learning()

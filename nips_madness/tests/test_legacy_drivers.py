@@ -3,6 +3,7 @@ from __future__ import print_function
 from types import SimpleNamespace
 from unittest import mock
 import collections
+import functools
 import io
 
 import lasagne
@@ -12,7 +13,7 @@ import pytest
 from .. import drivers
 from .. import execution
 from .. import recorders
-from ..execution import DataTables
+from ..execution import DataTables, DataStore
 from ..lasagne_toppings import param_file
 from ..run.gan import init_driver
 from ..ssnode import DEFAULT_PARAMS
@@ -83,6 +84,9 @@ def fake_datastore():
     tables = DataTables(None)   # `directory` ignored since `_open` is patched
     tables._open = dspath
     datastore.tables.saverow.side_effect = tables.saverow
+
+    datastore.save_exit_reason = functools.partial(DataStore.save_exit_reason,
+                                                   datastore)
 
     # For debugging:
     datastore._tables = tables

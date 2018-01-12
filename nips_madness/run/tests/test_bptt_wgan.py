@@ -48,6 +48,7 @@ def test_single_g_step_slowtest(
 
     with pytest.warns(None) as warned:
         rec = load_records(str(datastore_path))
+        rec.load_all()
     assert len(warned) == 0
 
     learning_df = rec.learning

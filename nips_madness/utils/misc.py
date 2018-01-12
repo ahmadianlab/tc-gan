@@ -59,11 +59,11 @@ class StopWatch(object):
 
 
 @contextmanager
-def log_timing(opname='Operation', logger=logger):
+def log_timing(opname='Operation', log=logger.info):
     pre = time.time()
     yield
     t = time.time() - pre
-    logger.info('%s took %s seconds', opname, t)
+    log('%s took %s seconds', opname, t)
 
 
 def csv_line(value_parser):

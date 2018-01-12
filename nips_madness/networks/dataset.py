@@ -103,10 +103,12 @@ def dataset_by_fixedtime(
 
     data_list = []
     dynamics_penalty_list = []
-    with utils.log_timing('sampler.forward() x{}'.format(repeat)):
+    with utils.log_timing('sampler.forward() x{}'.format(repeat),
+                          log=logger.info):
         for i in range(repeat):
             with utils.log_timing('sampler.forward() ({}/{})'
-                                  .format(i + 1, repeat)):
+                                  .format(i + 1, repeat),
+                                  log=logger.debug):
                 out = sampler.forward(raw=True)
             dynamics_penalty_list.append(out.model_dynamics_penalty)
             data_list.append(out.prober_tuning_curve)

@@ -10,10 +10,11 @@ from . import ssnode
 from .core import BaseComponent
 from .lasagne_toppings import param_file
 from .recorders import LearningRecorder, GenParamRecorder, \
-    FlexGenParamRecorder, \
+    LegacyLearningRecorder, FlexGenParamRecorder, \
     DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
     GenMomentsRecorder, \
-    ConditionalTuningCurveStatsRecorder, UpdateResult
+    ConditionalTuningCurveStatsRecorder
+from .utils import Namespace
 
 logger = getLogger(__name__)
 
@@ -74,7 +75,7 @@ class GANDriver(object):
     """
 
     def make_learning_recorder(self):
-        return LearningRecorder.from_driver(self)
+        return LegacyLearningRecorder.from_driver(self)
 
     def make_generator_recorder(self):
         return GenParamRecorder.from_driver(self)
@@ -297,6 +298,9 @@ class WGANDiscLossLimiter(object):
 class BPTTWGANDriver(GANDriver):
     # TODO: don't rely on GANDriver
 
+    def make_learning_recorder(self):
+        return LearningRecorder.from_driver(self)
+
     def make_generator_recorder(self):
         return FlexGenParamRecorder.from_driver(self)
 
@@ -328,21 +332,8 @@ class BPTTWGANDriver(GANDriver):
                                                   gen_mean + data_mean)
 
                     # If not info.is_discriminator, then the generator
-                    # step was just taken.  Let's return a result that
-                    # GANDriver understands.
-                    return UpdateResult(
-                        Gloss=info.gen_loss,
-                        Dloss=disc_info.disc_loss,
-                        Daccuracy=disc_info.accuracy,
-                        SSsolve_time=info.gen_time,
-                        gradient_time=info.disc_time,
-                        model_info=ssnode.null_FixedPointsInfo,
-                        rate_penalty=disc_info.rate_penalty,
-                        dynamics_penalty=disc_info.dynamics_penalty,
-                        # For BPTTcWGANDriver:
-                        info=info,
-                        disc_info=disc_info,
-                    )
+                    # step was just taken.
+                    return Namespace(info=info, disc_info=disc_info)
                 # See: [[./recorders.py::def record.*update_result]]
 
 

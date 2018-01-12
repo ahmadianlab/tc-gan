@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -5,13 +6,35 @@ import pytest
 from .. import recorders
 from ..networks.simple_discriminator import make_net
 from ..networks.tests.test_tuning_curve import emit_tcg_for_test
-from .test_legacy_drivers import GenFakeUpdateResults
+from .test_legacy_drivers import BaseFakeUpdateResults
+
+
+class GenFakeInfo(BaseFakeUpdateResults):
+    fields = (  # See: [[../recorders.py::class LearningRecorder]]
+        'gen_loss',
+        'disc_loss',
+        'accuracy',
+        'gen_forward_time',
+        'gen_train_time',
+        'disc_time',
+        'rate_penalty',
+        'dynamics_penalty',
+    )
+    size = len(fields)
+
+    def make_result(self):
+        result_dict = dict(zip(
+            self.fields,
+            super(GenFakeInfo, self).make_result(),
+        ))
+        info = SimpleNamespace(**result_dict)
+        return SimpleNamespace(info=info, disc_info=info)
 
 
 class FakeLearningRecords(object):
 
     def __init__(self):
-        self.results = GenFakeUpdateResults()
+        self.results = GenFakeInfo()
 
     def send_record(self, rec):
         rec.record(0, self.results.new())

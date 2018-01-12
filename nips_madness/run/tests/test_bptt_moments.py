@@ -29,7 +29,8 @@ def test_single_g_step_slowtest(args, cleancwd):
         args, cleancwd,
         single_g_step=single_g_step,
         script_file=bptt_moments.__file__,
-        learning_names=recorders.MMLearningRecorder.dtype.names,
+        learning_names=(list(recorders.MMLearningRecorder.dtype.names) +
+                        ['epoch']),
     )
 
     assert rec.rc.num_mom_conds \

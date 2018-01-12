@@ -452,6 +452,32 @@ class GANRecords(BaseRecords):
     disc_param_stats = cached_record('disc_param_stats')
     disc_learning = cached_record('disc_learning')
 
+    @cached_property
+    def learning(self):
+        # The following works fine, unless there are some exceptions
+        # below.  The cache in self.__dict__['learning'] would be
+        # stored even if there are some exceptions and accessing
+        # self.learning second time would succeed.  This is bad.
+        #
+        #   df = super(GANRecords, self).learning
+        #
+        # So, to avoid contaminating self.__dict__, let's call
+        # un-cached version here:
+        df = super(GANRecords, type(self)).learning.func(self)
+
+        # TODO: Instead of adding 'SSsolve_time' and 'gradient_time'
+        # columns to df from the new data format, add 'gen_time' and
+        # 'disc_time' in the old formats.  This has to be done after
+        # fixing the analyzers/plotters.
+
+        if 'SSsolve_time' not in df:
+            df['SSsolve_time'] = df['gen_train_time'] + df['gen_forward_time']
+
+        if 'gradient_time' not in df:
+            df['gradient_time'] = df['disc_time']
+
+        return df
+
     @property
     def disc_param_stats_names(self):
         return [name for name in self.disc_param_stats.columns

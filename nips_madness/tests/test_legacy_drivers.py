@@ -20,7 +20,7 @@ from ..ssnode import DEFAULT_PARAMS
 
 
 class CSVLearningRecorder(recorders.CSVRecorder,
-                          recorders.LearningRecorder):
+                          recorders.LegacyLearningRecorder):
     pass
 
 

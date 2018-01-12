@@ -35,7 +35,8 @@ def test_single_g_step_slowtest(
         args, cleancwd,
         single_g_step=single_g_step,
         script_file=bptt_wgan.__file__,
-        learning_names=recorders.LearningRecorder.dtype.names):
+        learning_names=(list(recorders.LearningRecorder.dtype.names) +
+                        ['epoch', 'SSsolve_time', 'gradient_time'])):
     datastore_name = 'results'
     single_g_step(args + ['--datastore', datastore_name])
     datastore_path = cleancwd.join(datastore_name)
@@ -52,7 +53,7 @@ def test_single_g_step_slowtest(
     assert len(warned) == 0
 
     learning_df = rec.learning
-    desired = list(learning_names) + ['epoch']
+    desired = list(learning_names)
     assert list(learning_df.columns) == desired
     assert len(learning_df) == 1
 

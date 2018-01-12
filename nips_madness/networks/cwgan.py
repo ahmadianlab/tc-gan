@@ -517,7 +517,8 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
                 **gen_kwargs)
 
         info.gen_forward_time = self.gen_forward_watch.sum()
-        info.gen_time = self.gen_train_watch.sum() + info.gen_forward_time
+        info.gen_train_time = self.gen_train_watch.sum()
+        info.gen_time = info.gen_train_time + info.gen_forward_time
         info.disc_time = self.disc_train_watch.sum()
         return info
 

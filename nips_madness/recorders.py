@@ -118,27 +118,29 @@ class LearningRecorder(HDF5Recorder):
         ('Gloss', 'double'),
         ('Dloss', 'double'),
         ('Daccuracy', 'double'),
-        ('SSsolve_time', 'double'),
-        ('gradient_time', 'double'),
-        ('model_convergence', 'uint32'),
-        ('model_unused', 'uint32'),
+        ('gen_forward_time', 'double'),
+        ('gen_train_time', 'double'),
+        ('disc_time', 'double'),
         ('rate_penalty', 'double'),
         ('dynamics_penalty', 'double'),
     ])
 
     def record(self, gen_step, update_result):
+        info = update_result.info
+        disc_info = update_result.disc_info
         self._saverow([
             gen_step,
-            update_result.Gloss,
-            update_result.Dloss,
-            update_result.Daccuracy,
-            update_result.SSsolve_time,
-            update_result.gradient_time,
-            update_result.model_info.rejections,
-            update_result.model_info.unused,
-            update_result.rate_penalty,
-            update_result.dynamics_penalty,
+            info.gen_loss,               # Gloss
+            disc_info.disc_loss,         # Dloss
+            disc_info.accuracy,          # Daccuracy
+            info.gen_forward_time,
+            info.gen_train_time,
+            info.disc_time,
+            disc_info.rate_penalty,
+            disc_info.dynamics_penalty,
         ])
+    # TODO: the quantities from disc_info.* should be a mean across
+    # critic_iters or removed from here as it's also in disc_learning.
 
     @classmethod
     def from_driver(cls, driver):
@@ -358,3 +360,38 @@ class ConditionalTuningCurveStatsRecorder(HDF5Recorder):
     def from_driver(cls, driver):
         num_bandwidths = len(driver.gan.bandwidths)
         return cls.make(driver.datastore, num_bandwidths)
+
+
+class LegacyLearningRecorder(HDF5Recorder):
+
+    tablename = 'learning'
+    dtype = np.dtype([
+        ('gen_step', 'uint32'),
+        ('Gloss', 'double'),
+        ('Dloss', 'double'),
+        ('Daccuracy', 'double'),
+        ('SSsolve_time', 'double'),
+        ('gradient_time', 'double'),
+        ('model_convergence', 'uint32'),
+        ('model_unused', 'uint32'),
+        ('rate_penalty', 'double'),
+        ('dynamics_penalty', 'double'),
+    ])
+
+    def record(self, gen_step, update_result):
+        self._saverow([
+            gen_step,
+            update_result.Gloss,
+            update_result.Dloss,
+            update_result.Daccuracy,
+            update_result.SSsolve_time,
+            update_result.gradient_time,
+            update_result.model_info.rejections,
+            update_result.model_info.unused,
+            update_result.rate_penalty,
+            update_result.dynamics_penalty,
+        ])
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, quiet=driver.quiet)

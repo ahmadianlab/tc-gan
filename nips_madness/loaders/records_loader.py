@@ -437,6 +437,11 @@ class BaseRecords(object):
         from ..analyzers.learning import plot_learning
         return plot_learning(self, **kwargs)
 
+    def plot_smape(self, **kwargs):
+        """Simply call `.analyzers.learning.plot_data_smape`."""
+        from ..analyzers.learning import plot_data_smape
+        return plot_data_smape(self, **kwargs)
+
     def load_all(self):
         """Force loading all records."""
         for name in dir(self):
@@ -527,6 +532,11 @@ class MomentMatchingRecords(BaseRecords):
         """Simply call `.analyzers.mm_learning.plot_mm_learning`."""
         from ..analyzers.mm_learning import plot_mm_learning
         return plot_mm_learning(self, **kwargs)
+
+    def plot_smape(self, **kwargs):
+        """Simply call `.analyzers.mm_learning.plot_mm_smape`."""
+        from ..analyzers.mm_learning import plot_mm_smape
+        return plot_mm_smape(self, **kwargs)
 
 
 def get_datastore_path(path):

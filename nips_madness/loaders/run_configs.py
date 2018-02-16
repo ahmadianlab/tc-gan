@@ -304,6 +304,10 @@ class BPTTMomentsRunConfig(BaseRunConfig):
     def epoch_to_step(self, epoch):
         return epoch / self.batchsize * self.datasize
 
+    @property
+    def gen_learning_rate(self):
+        return self.learning_rate
+
 
 module_class_map = {
     'bptt_wgan': BPTTWGANRunConfig,

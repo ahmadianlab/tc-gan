@@ -1,11 +1,13 @@
+import copy
+
 import numpy
-import numpy as np
 import pytest
 
 from ... import ssnode
 from ...utils import report_allclose_tols
-from ..bptt_gan import DEFAULT_PARAMS, grid_stimulator_inputs
+from ..fixed_time_sampler import new_JDS
 from ..ssn import BandwidthContrastStimulator, EulerSSNModel
+from ..wgan import DEFAULT_PARAMS, grid_stimulator_inputs
 
 
 def make_ssn(model_config):
@@ -14,24 +16,14 @@ def make_ssn(model_config):
     kwds.pop('contrasts', None)
     kwds.pop('sample_sites', None)
     kwds.pop('batchsize', None)
+    kwds.pop('gen', None)
+    kwds.pop('disc', None)
     stimulator, kwds = BandwidthContrastStimulator.consume_kwargs(**kwds)
     model, kwds = EulerSSNModel.consume_kwargs(stimulator, **kwds)
     assert not kwds
     return model
 
-
-def _JDS_for_test():
-    # Original SSN parameters:
-    J = np.array([[.0957, .0638], [.1197, .0479]])
-    D = np.array([[.7660, .5106], [.9575, .3830]])
-    S = np.array([[.6667, .2], [1.333, .2]]) / 8
-
-    # More stable parameters:
-    D_new = D / 2
-    J_new = J + D / 2 - D_new / 2
-    return dict(J=J_new, D=D_new, S=S)
-
-JDS = _JDS_for_test()
+JDS = copy.deepcopy(new_JDS)
 
 
 @pytest.mark.parametrize('num_sites, batchsize', [
@@ -73,7 +65,9 @@ def test_compare_with_ssnode(num_sites, batchsize,
 
     # time_avg.shape: (batchsize, num_tcdom, 2N)
     time_avg = model.compute_time_avg(
-        zs, stimulator_bandwidths, stimulator_contrasts)
+        zs=zs,
+        stimulator_bandwidths=stimulator_bandwidths,
+        stimulator_contrasts=stimulator_contrasts)
 
     report_allclose_tols(time_avg, ssnode_fps,
                          rtols=[1e-2, 1e-3, 5e-4, 1e-4],

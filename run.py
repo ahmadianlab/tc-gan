@@ -28,10 +28,19 @@ which pip
 which conda
 pip freeze > pip-freeze.txt
 conda list --prefix "{project_root}/env" --export > conda-list.txt
+
+nvidia-smi --format=csv \
+--query-gpu=index,count,pci.bus_id,uuid,driver_version \
+> nvidia-smi-gpu.csv || rm nvidia-smi-gpu.csv
+
+nvidia-smi --format=csv \
+--query-compute-apps=gpu_name,gpu_bus_id,gpu_serial,gpu_uuid,pid,process_name \
+> nvidia-smi-compute-apps.csv || nvidia-smi-compute-apps.csv
+
 '''
 
 
-def run_module(module, arguments, use_pdb, use_pudb,
+def run_module(module, arguments, use_pdb, use_pudb, pidfile,
                assert_repo_is_clean,
                record_env, mpl_style,
                log_level, log_format, log_datefmt):
@@ -47,10 +56,17 @@ def run_module(module, arguments, use_pdb, use_pudb,
         print('Module', module, 'do not have main function.')
         return 1
     if assert_repo_is_clean:
-        from nips_madness.utils import git_is_clean
+        from nips_madness.execution import git_is_clean
         if not git_is_clean():
             print('Repository is not clean.')
             return 3
+
+    # Make sure that (1) Theano is imported so that this process
+    # is included in the following execution of nvidia-smi and (2)
+    # GPU is logged via Python:
+    from nips_madness.utils import log_theano_info
+    log_theano_info()
+
     if record_env:
         subprocess.check_call(
             record_env_script_template.format(project_root=here),
@@ -60,6 +76,9 @@ def run_module(module, arguments, use_pdb, use_pudb,
     if mpl_style:
         import matplotlib
         matplotlib.style.use(mpl_style)
+    if pidfile:
+        with open(pidfile, 'w') as file:
+            file.write(str(os.getpid()))
     try:
         loaded.main(arguments)
     except Exception as err:
@@ -95,6 +114,9 @@ def main(args=None):
     parser.add_argument(
         'arguments', nargs='*',
         help="arguments passed to module's main function")
+    parser.add_argument(
+        '--pidfile',
+        help='Path to which PID of this process is written.')
     parser.add_argument(
         '--log-level', default='INFO',
         choices='CRITICAL ERROR WARNING INFO DEBUG NOTSET'.split(),

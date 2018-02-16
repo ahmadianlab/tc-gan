@@ -1,11 +1,14 @@
-from types import SimpleNamespace
+import collections
 import itertools
 
 import lasagne
 import numpy as np
 
+from .networks.ssn import concat_flat
+from .utils import Namespace
 
-class UpdateResult(SimpleNamespace):
+
+class UpdateResult(Namespace):
     """
     Result of a generator update.
 
@@ -29,7 +32,7 @@ class UpdateResult(SimpleNamespace):
         ``(NZ, NB * len(sample_sites))`` if `track_offset_identity` is
         set to true or otherwise ``(NZ * len(sample_sites), NB)``.
         See `make_WGAN_functions` and  `make_RGAN_functions`.
-    model_info : `.FixedPointsInfo` or `.SimpleNamespace`
+    model_info : `.FixedPointsInfo` or `.Namespace`
         An object with attribute `rejections` and `unused` which are
         the sum of the value in the same field of all
         `.FixedPointsInfo` objects returned by `.find_fixed_points`
@@ -51,6 +54,8 @@ class UpdateResult(SimpleNamespace):
 
     """
 
+    dynamics_penalty = np.nan
+
 
 class BaseRecorder(object):
 
@@ -58,12 +63,9 @@ class BaseRecorder(object):
         self.datastore = datastore
         self.quiet = quiet
 
-    def _saverow(self, row):
-        assert len(row) == len(self.column_names)
-        self.datastore.tables.saverow(self.filename, row, echo=not self.quiet)
-
-    def write_header(self):
-        self._saverow(self.column_names)
+    @property
+    def column_names(self):
+        return self.dtype.names
 
     def record(self, *row):
         self._saverow(row)
@@ -79,7 +81,23 @@ class BaseRecorder(object):
         return cls.make(driver.datastore)
 
 
+class CSVRecorder(BaseRecorder):
+
+    @property
+    def filename(self):
+        return self.tablename + '.csv'
+
+    def _saverow(self, row):
+        assert len(row) == len(self.column_names)
+        self.datastore.tables.saverow(self.filename, row, echo=not self.quiet)
+
+    def write_header(self):
+        self._saverow(self.column_names)
+
+
 class HDF5Recorder(BaseRecorder):
+
+    dedicated = False
 
     def _saverow(self, row):
         typed_row = np.array(tuple(row), dtype=self.dtype)
@@ -88,50 +106,63 @@ class HDF5Recorder(BaseRecorder):
                                          echo=not self.quiet)
 
     def write_header(self):
-        self.datastore.h5.tables.create_table(self.tablename, self.dtype)
-
-    @property
-    def column_names(self):
-        return self.dtype.names
+        self.datastore.h5.tables.create_table(self.tablename, self.dtype,
+                                              dedicated=self.dedicated)
 
 
-class LearningRecorder(BaseRecorder):
+class LearningRecorder(HDF5Recorder):
 
-    filename = "learning.csv"
-    column_names = (
-        "gen_step", "Gloss", "Dloss", "Daccuracy", "SSsolve_time",
-        "gradient_time", "model_convergence", "model_unused",
-        "rate_penalty")
+    tablename = 'learning'
+    dtype = np.dtype([
+        ('gen_step', 'uint32'),
+        ('Gloss', 'double'),
+        ('Dloss', 'double'),
+        ('Daccuracy', 'double'),
+        ('gen_forward_time', 'double'),
+        ('gen_train_time', 'double'),
+        ('disc_time', 'double'),
+        ('rate_penalty', 'double'),
+        ('dynamics_penalty', 'double'),
+    ])
 
     def record(self, gen_step, update_result):
+        info = update_result.info
+        disc_info = update_result.disc_info
         self._saverow([
             gen_step,
-            update_result.Gloss,
-            update_result.Dloss,
-            update_result.Daccuracy,
-            update_result.SSsolve_time,
-            update_result.gradient_time,
-            update_result.model_info.rejections,
-            update_result.model_info.unused,
-            update_result.rate_penalty,
+            info.gen_loss,               # Gloss
+            disc_info.disc_loss,         # Dloss
+            disc_info.accuracy,          # Daccuracy
+            info.gen_forward_time,
+            info.gen_train_time,
+            info.disc_time,
+            disc_info.rate_penalty,
+            disc_info.dynamics_penalty,
         ])
+    # TODO: the quantities from disc_info.* should be a mean across
+    # critic_iters or removed from here as it's also in disc_learning.
 
     @classmethod
     def from_driver(cls, driver):
         return cls.make(driver.datastore, quiet=driver.quiet)
 
 
-class MMLearningRecorder(BaseRecorder):
+class MMLearningRecorder(HDF5Recorder):
 
-    filename = "learning.csv"
-    column_names = (
-        "step", "loss", "dynamics_penalty", "train_time",
-    )
+    tablename = 'learning'
+    dtype = np.dtype([
+        ('step', 'uint32'),
+        ('loss', 'double'),
+        ('rate_penalty', 'double'),
+        ('dynamics_penalty', 'double'),
+        ('train_time', 'double'),
+    ])
 
     def record(self, gen_step, update_result):
         self._saverow([
             gen_step,
             update_result.loss,
+            update_result.rate_penalty,
             update_result.dynamics_penalty,
             update_result.train_time,
         ])
@@ -141,14 +172,46 @@ class MMLearningRecorder(BaseRecorder):
         return cls.make(driver.datastore, quiet=driver.quiet)
 
 
-class DiscLearningRecorder(BaseRecorder):
+class GenMomentsRecorder(HDF5Recorder):
 
-    filename = 'disc_learning.csv'
-    column_names = (
-        'gen_step', 'disc_step', 'Dloss', 'Daccuracy',
-        'SSsolve_time', 'gradient_time',
-        "model_convergence", "model_unused",
-    )
+    tablename = 'gen_moments'
+    dedicated = True
+
+    def __init__(self, datastore, num_mom_conds):
+        super(GenMomentsRecorder, self).__init__(datastore)
+        self.num_mom_conds = num_mom_conds
+
+        self.dtype = np.dtype([
+            ('step', 'uint32'),
+        ] + [
+            ('mean_{}'.format(i), 'double') for i in range(num_mom_conds)
+        ] + [
+            ('var_{}'.format(i), 'double') for i in range(num_mom_conds)
+        ])
+
+    def record(self, gen_step, update_result):
+        self._saverow([gen_step] + list(update_result.gen_moments.flat))
+    # gen_moments is calculated in
+    # [[./networks/moment_matching.py::^def sample_moments]]
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, driver.mmatcher.num_mom_conds)
+
+
+class DiscLearningRecorder(HDF5Recorder):
+
+    tablename = 'disc_learning'
+    dtype = np.dtype([
+        ('gen_step', 'uint32'),
+        ('disc_step', 'uint32'),
+        ('Dloss', 'double'),
+        ('Daccuracy', 'double'),
+        ('SSsolve_time', 'double'),
+        ('gradient_time', 'double'),
+        ('model_convergence', 'uint32'),
+        ('model_unused', 'uint32'),
+    ])
 
 
 def _genparam_names():
@@ -162,13 +225,21 @@ def _genparam_names():
             [J('EE'), J('EI')],
             [J('IE'), J('II')],
         ])
-    return tuple(np.concatenate([names('J'), names('D'), names('S')]).flat)
+    return tuple(concat_flat([names('J'), names('D'), names('S')]))
 
 
-class GenParamRecorder(BaseRecorder):
+def gen_param_dtype(names):
+    return [
+        ('gen_step', 'uint32'),
+    ] + [
+        (n, 'double') for n in names
+    ]
 
-    filename = 'generator.csv'
-    column_names = ('gen_step',) + _genparam_names()
+
+class GenParamRecorder(HDF5Recorder):
+
+    tablename = 'generator'
+    dtype = np.dtype(gen_param_dtype(_genparam_names()))
 
     def __init__(self, datastore, gan):
         self.gan = gan
@@ -185,19 +256,45 @@ class GenParamRecorder(BaseRecorder):
         return cls.make(driver.datastore, driver.gan)
 
 
-class DiscParamStatsRecorder(BaseRecorder):
+class FlexGenParamRecorder(GenParamRecorder):
+    """
+    Flexible version of `GenParamRecorder` with ssn_type=heteroin support.
+    """
 
-    filename = 'disc_param_stats.csv'
+    def __init__(self, *args, **kwargs):
+        super(FlexGenParamRecorder, self).__init__(*args, **kwargs)
+
+        self.dtype = np.dtype(gen_param_dtype(
+            self.gan.gen.get_flat_param_names()))
+
+    def record(self, gen_step):
+        self._saverow([gen_step] + list(self.gan.gen.get_flat_param_values()))
+        return self.gan.get_gen_param()  # for compatibility  # TODO: remove!
+
+
+class DiscParamStatsRecorder(HDF5Recorder):
+
+    tablename = 'disc_param_stats'
 
     def __init__(self, datastore, discriminator):
         self.discriminator = discriminator
         super(DiscParamStatsRecorder, self).__init__(datastore)
 
         params = lasagne.layers.get_all_params(discriminator, trainable=True)
-        self.column_names = tuple(['gen_step', 'disc_step'] + [
-            '{}.nnorm'.format(p.name)  # Normalized NORM
-            for p in params
+        self.dtype = np.dtype([
+            ('gen_step', 'uint32'),
+            ('disc_step', 'uint32'),
+        ] + [
+            (name, 'double')
+            for name in self.disc_param_unique_names(p.name for p in params)
         ])
+
+    @staticmethod
+    def disc_param_unique_names(names):
+        counter = collections.Counter()
+        for n in names:
+            yield '{}.nnorm.{}'.format(n, counter[n])  # Normalized NORM
+            counter[n] += 1
 
     def record(self, gen_step, disc_step):
         nnorms = [
@@ -217,6 +314,7 @@ class DiscParamStatsRecorder(BaseRecorder):
 class ConditionalTuningCurveStatsRecorder(HDF5Recorder):
 
     tablename = "tc_stats"
+    dedicated = True
 
     def __init__(self, datastore, num_bandwidths):
         super(ConditionalTuningCurveStatsRecorder, self).__init__(datastore)
@@ -262,3 +360,38 @@ class ConditionalTuningCurveStatsRecorder(HDF5Recorder):
     def from_driver(cls, driver):
         num_bandwidths = len(driver.gan.bandwidths)
         return cls.make(driver.datastore, num_bandwidths)
+
+
+class LegacyLearningRecorder(HDF5Recorder):
+
+    tablename = 'learning'
+    dtype = np.dtype([
+        ('gen_step', 'uint32'),
+        ('Gloss', 'double'),
+        ('Dloss', 'double'),
+        ('Daccuracy', 'double'),
+        ('SSsolve_time', 'double'),
+        ('gradient_time', 'double'),
+        ('model_convergence', 'uint32'),
+        ('model_unused', 'uint32'),
+        ('rate_penalty', 'double'),
+        ('dynamics_penalty', 'double'),
+    ])
+
+    def record(self, gen_step, update_result):
+        self._saverow([
+            gen_step,
+            update_result.Gloss,
+            update_result.Dloss,
+            update_result.Daccuracy,
+            update_result.SSsolve_time,
+            update_result.gradient_time,
+            update_result.model_info.rejections,
+            update_result.model_info.unused,
+            update_result.rate_penalty,
+            update_result.dynamics_penalty,
+        ])
+
+    @classmethod
+    def from_driver(cls, driver):
+        return cls.make(driver.datastore, quiet=driver.quiet)

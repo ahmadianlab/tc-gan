@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.pardir,
                                                 os.path.pardir)))
 
 try:
-    from nips_madness.utils import git_revision
+    from nips_madness.execution import git_revision
     gitrev = git_revision()
 except:
     gitrev = 'master'
@@ -194,11 +194,13 @@ texinfo_documents = [
 # -- Inter-Sphinx ----------------------------------------------------------
 
 intersphinx_mapping = {
-    'python': ('http://docs.python.org/', None),
+    'python': ('http://docs.python.org/3/', None),
     'numpy': ('http://docs.scipy.org/doc/numpy/', None),
     'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
     'matplotlib': ('http://matplotlib.org/', None),
     'pandas': ('http://pandas.pydata.org/pandas-docs/stable/', None),
+    'theano': ('http://deeplearning.net/software/theano/', None),
+    'lasagne': ('http://lasagne.readthedocs.io/en/latest/', None),
 }
 
 

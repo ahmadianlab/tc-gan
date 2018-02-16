@@ -5,7 +5,8 @@
 *.csv
 *.sh.*
 *~
-/.cache
+.cache
+.ipynb_checkpoints
 /prof
 python
 taka

@@ -9,7 +9,7 @@ from . import gan as plain_gan
 from .. import utils
 from ..drivers import BPTTcWGANDriver
 from ..networks.cwgan import make_gan
-from .bptt_wgan import learn
+from .bptt_wgan import learn, do_learning
 
 logger = getLogger(__name__)
 
@@ -37,8 +37,13 @@ def make_parser():
         default=[0], type=utils.csv_line(float),
         help='''"Normalized" probes, i.e., locations (offsets) of
         neurons to be sampled from SSN in [-1, 1] space ("bandwidth
-        coordinate").  0 means the center of thenetwork.
+        coordinate").  0 means the center of the network.
         (default:%(default)s)''')
+
+    parser.add_argument(
+        '--tc-stats-record-interval', default=100, type=int,
+        help='''Save tuning curve statistics for each given
+        generator step. -1 means to never save.''')
 
     bptt_wgan.add_bptt_common_options(parser)
     plain_gan.add_learning_options(parser)
@@ -50,7 +55,7 @@ def make_parser():
 
 def init_driver(
         datastore,
-        iterations, quit_JDS_threshold, quiet,
+        iterations, quit_JDS_threshold, quiet, tc_stats_record_interval,
         disc_param_save_interval, disc_param_template,
         disc_param_save_on_error,
         layers,
@@ -64,6 +69,7 @@ def init_driver(
     driver = BPTTcWGANDriver(
         gan, datastore,
         iterations=iterations, quiet=quiet,
+        tc_stats_record_interval=tc_stats_record_interval,
         disc_param_save_interval=disc_param_save_interval,
         disc_param_template=disc_param_template,
         disc_param_save_on_error=disc_param_save_on_error,
@@ -82,8 +88,8 @@ def main(args=None):
     # init_driver.  See also: [[../execution.py::layers_str]]
     ns.layers = ns.disc_layers
 
-    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver,
-                          script_file=__file__)
+    do_learning(learn, vars(ns), init_driver=init_driver,
+                script_file=__file__)
 
 
 if __name__ == '__main__':

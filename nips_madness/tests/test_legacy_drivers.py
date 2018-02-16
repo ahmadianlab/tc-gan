@@ -3,19 +3,55 @@ from __future__ import print_function
 from types import SimpleNamespace
 from unittest import mock
 import collections
+import functools
 import io
 
 import lasagne
 import numpy as np
 import pytest
 
-from .. import lasagne_param_file
 from .. import drivers
 from .. import execution
-from ..execution import DataTables
-from ..recorders import LearningRecorder
+from .. import recorders
+from ..execution import DataTables, DataStore
+from ..lasagne_toppings import param_file
 from ..run.gan import init_driver
 from ..ssnode import DEFAULT_PARAMS
+
+
+class CSVLearningRecorder(recorders.CSVRecorder,
+                          recorders.LegacyLearningRecorder):
+    pass
+
+
+class CSVGenParamRecorder(recorders.CSVRecorder,
+                          recorders.GenParamRecorder):
+    pass
+
+
+class CSVDiscParamStatsRecorder(recorders.CSVRecorder,
+                                recorders.DiscParamStatsRecorder):
+    pass
+
+
+class CSVDiscLearningRecorder(recorders.CSVRecorder,
+                              recorders.DiscLearningRecorder):
+    pass
+
+
+class LegacyGANDriverWithCSV(drivers.GANDriver):
+
+    def make_learning_recorder(self):
+        return CSVLearningRecorder.from_driver(self)
+
+    def make_generator_recorder(self):
+        return CSVGenParamRecorder.from_driver(self)
+
+    def make_discparamstats_recorder(self):
+        return CSVDiscParamStatsRecorder.from_driver(self)
+
+    def make_disclearning_recorder(self):
+        return CSVDiscLearningRecorder.from_driver(self)
 
 
 class FakeDataStorePath(object):
@@ -48,6 +84,9 @@ def fake_datastore():
     tables = DataTables(None)   # `directory` ignored since `_open` is patched
     tables._open = dspath
     datastore.tables.saverow.side_effect = tables.saverow
+
+    datastore.save_exit_reason = functools.partial(DataStore.save_exit_reason,
+                                                   datastore)
 
     # For debugging:
     datastore._tables = tables
@@ -93,6 +132,7 @@ def make_driver(
         J0=J0,
         D0=D0,
         S0=S0,
+        driver_class=LegacyGANDriverWithCSV,
         **run_config))
 
     setup_fake_gan(rc.gan)
@@ -154,6 +194,7 @@ class GenFakeUpdateResults(BaseFakeUpdateResults):
         'model_info.rejections',
         'model_info.unused',
         'rate_penalty',
+        'dynamics_penalty',
     )
     size = len(fields)
 
@@ -198,9 +239,10 @@ def test_gan_driver_iterate(iterations):
     rc.datastore.path.assert_called_with('disc_param', 'last.npz')
 
     # Make sure headers (column names) are saved:
+    learning_recorder = rc.driver.learning_recorder
     rc.datastore.tables.saverow.assert_any_call(
-        LearningRecorder.filename,
-        LearningRecorder.column_names,
+        learning_recorder.filename,
+        learning_recorder.column_names,
         echo=not driver.quiet
     )
     disc_learning_column_names = ['gen_step', 'disc_step']
@@ -209,18 +251,20 @@ def test_gan_driver_iterate(iterations):
     rc.datastore.tables.saverow.assert_any_call('disc_learning.csv',
                                                 disc_learning_column_names,
                                                 echo=False)
+
     discriminator = rc.gan.discriminator
-    disc_param_stats_column_names = ['gen_step', 'disc_step'] + [
-        '{}.nnorm'.format(p.name)  # Normalized NORM
-        for p in lasagne.layers.get_all_params(discriminator, trainable=True)
-    ]
+    disc_param_stats_column_names = ['gen_step', 'disc_step']
+    disc_param_stats_column_names.extend(
+        rc.driver.discparamstats_recorder.disc_param_unique_names(
+            p.name for p in
+            lasagne.layers.get_all_params(discriminator, trainable=True)))
     disc_param_stats_column_names = tuple(disc_param_stats_column_names)
     rc.datastore.tables.saverow.assert_any_call('disc_param_stats.csv',
                                                 disc_param_stats_column_names,
                                                 echo=False)
 
     for name, skiprows, width, length in [
-            ('learning.csv', 1, len(LearningRecorder.column_names),
+            ('learning.csv', 1, len(learning_recorder.column_names),
              iterations),
             ('disc_learning.csv', 1, len(disc_learning_column_names),
              iterations * n_critic),
@@ -250,7 +294,7 @@ def test_gan_driver_iterate(iterations):
     def lasagne_load(name):
         stream, = rc.datastore.path.side_effect.returned['disc_param', name]
         stream.seek(0)
-        return lasagne_param_file.load(stream)
+        return param_file.load(stream)
 
     stored_values = lasagne_load(driver.disc_param_template)
     desired_values = lasagne.layers.get_all_param_values(rc.gan.discriminator)

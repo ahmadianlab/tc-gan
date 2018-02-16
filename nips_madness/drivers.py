@@ -1,22 +1,61 @@
 from logging import getLogger
 import collections
+import contextlib
 
 import lasagne
 import numpy as np
 
 from . import execution
-from . import lasagne_param_file
 from . import ssnode
+from .core import BaseComponent
+from .lasagne_toppings import param_file
 from .recorders import LearningRecorder, GenParamRecorder, \
+    LegacyLearningRecorder, FlexGenParamRecorder, \
     DiscLearningRecorder, DiscParamStatsRecorder, MMLearningRecorder, \
-    ConditionalTuningCurveStatsRecorder, UpdateResult
+    GenMomentsRecorder, \
+    ConditionalTuningCurveStatsRecorder
+from .utils import Namespace
 
 logger = getLogger(__name__)
+
+
+def is_at_interval(step, interval):
+    return interval > 0 and step % interval == 0
 
 
 def net_isfinite(layer):
     return all(np.isfinite(arr).all() for arr in
                lasagne.layers.get_all_param_values(layer))
+
+
+@contextlib.contextmanager
+def recording_exit_reason(datastore):
+    try:
+        yield
+    except KeyboardInterrupt:
+        datastore.save_exit_reason(
+            reason='keyboard_interrupt',
+            good=False,
+        )
+        logger.info('Re-raising...')
+        raise
+    except execution.KnownError:
+        raise
+    except Exception as err:
+        exception = str(err)
+        logger.info('Unknown exception: %s', exception)
+        datastore.save_exit_reason(
+            reason='uncaught_exception',
+            good=False,
+            exception=exception,
+        )
+        logger.info('Re-raising...')
+        raise
+    else:
+        datastore.save_exit_reason(
+            reason='end_of_iteration',
+            good=True,
+        )
 
 
 class GANDriver(object):
@@ -35,16 +74,28 @@ class GANDriver(object):
 
     """
 
+    def make_learning_recorder(self):
+        return LegacyLearningRecorder.from_driver(self)
+
+    def make_generator_recorder(self):
+        return GenParamRecorder.from_driver(self)
+
+    def make_discparamstats_recorder(self):
+        return DiscParamStatsRecorder.from_driver(self)
+
+    def make_disclearning_recorder(self):
+        return DiscLearningRecorder.from_driver(self)
+
     def __init__(self, gan, datastore, **kwargs):
         self.gan = gan
         self.datastore = datastore
         self.__dict__.update(kwargs)
 
     def pre_loop(self):
-        self.learning_recorder = LearningRecorder.from_driver(self)
-        self.generator_recorder = GenParamRecorder.from_driver(self)
-        self.discparamstats_recorder = DiscParamStatsRecorder.from_driver(self)
-        self.disclearning_recorder = DiscLearningRecorder.from_driver(self)
+        self.learning_recorder = self.make_learning_recorder()
+        self.generator_recorder = self.make_generator_recorder()
+        self.discparamstats_recorder = self.make_discparamstats_recorder()
+        self.disclearning_recorder = self.make_disclearning_recorder()
         self.rejection_limiter = SSNRejectionLimiter.from_driver(self)
         self.disc_loss_limiter = disc_loss_limiter(self)
 
@@ -85,9 +136,8 @@ class GANDriver(object):
         self.learning_recorder.record(gen_step, update_result)
         jj, dd, ss = self.generator_recorder.record(gen_step)
 
-        if self.disc_param_save_interval > 0 \
-                and gen_step % self.disc_param_save_interval == 0:
-            lasagne_param_file.dump(
+        if is_at_interval(gen_step, self.disc_param_save_interval):
+            param_file.dump(
                 self.gan.discriminator,
                 self.datastore.path('disc_param',
                                     self.disc_param_template.format(gen_step)))
@@ -100,12 +150,6 @@ class GANDriver(object):
             JDS_true=list(map(ssnode.DEFAULT_PARAMS.get, 'JDS')),
             quit_JDS_threshold=self.quit_JDS_threshold,
         )
-
-    def post_loop(self):
-        self.datastore.dump_json(dict(
-            reason='end_of_iteration',
-            good=True,
-        ), 'exit.json')
 
     def iterate(self, update_func):
         """
@@ -122,7 +166,7 @@ class GANDriver(object):
 
         """
         if self.disc_param_save_on_error:
-            update_func = lasagne_param_file.wrap_with_save_on_error(
+            update_func = param_file.wrap_with_save_on_error(
                 self.gan.discriminator,
                 self.datastore.path('disc_param', 'pre_error.npz'),
                 self.datastore.path('disc_param', 'post_error.npz'),
@@ -130,10 +174,10 @@ class GANDriver(object):
 
         self.pre_loop()
         logger.info('%s: start iterations', self.__class__.__name__)
-        for gen_step in range(self.iterations):
-            self.post_update(gen_step, update_func(gen_step))
+        with recording_exit_reason(self.datastore):
+            for gen_step in range(self.iterations):
+                self.post_update(gen_step, update_func(gen_step))
         logger.info('%s: maximum iterations reached', self.__class__.__name__)
-        self.post_loop()
 
 
 def maybe_quit(datastore, JDS_fake, JDS_true, quit_JDS_threshold):
@@ -254,6 +298,12 @@ class WGANDiscLossLimiter(object):
 class BPTTWGANDriver(GANDriver):
     # TODO: don't rely on GANDriver
 
+    def make_learning_recorder(self):
+        return LearningRecorder.from_driver(self)
+
+    def make_generator_recorder(self):
+        return FlexGenParamRecorder.from_driver(self)
+
     def run(self, gan):
         learning_it = gan.learning()
 
@@ -282,27 +332,17 @@ class BPTTWGANDriver(GANDriver):
                                                   gen_mean + data_mean)
 
                     # If not info.is_discriminator, then the generator
-                    # step was just taken.  Let's return a result that
-                    # GANDriver understands.
-                    return UpdateResult(
-                        Gloss=info.gen_loss,
-                        Dloss=disc_info.disc_loss,
-                        Daccuracy=disc_info.accuracy,
-                        SSsolve_time=info.gen_time,
-                        gradient_time=info.disc_time,
-                        model_info=ssnode.null_FixedPointsInfo,
-                        rate_penalty=disc_info.dynamics_penalty,
-                        # For BPTTcWGANDriver:
-                        info=info,
-                        disc_info=disc_info,
-                    )
+                    # step was just taken.
+                    return Namespace(info=info, disc_info=disc_info)
                 # See: [[./recorders.py::def record.*update_result]]
 
 
 class BPTTcWGANDriver(BPTTWGANDriver):
 
     def post_update(self, gen_step, update_result):
-        self.tuning_curve_recorder.record(gen_step, update_result.disc_info)
+        if is_at_interval(gen_step, self.tc_stats_record_interval):
+            self.tuning_curve_recorder.record(gen_step,
+                                              update_result.disc_info)
         super(BPTTcWGANDriver, self).post_update(gen_step, update_result)
 
     def pre_loop(self):
@@ -311,16 +351,18 @@ class BPTTcWGANDriver(BPTTWGANDriver):
             = ConditionalTuningCurveStatsRecorder.from_driver(self)
 
 
-class MomentMatchingDriver(object):
+class MomentMatchingDriver(BaseComponent):
 
     # TODO: refactor out common code with GANDriver
 
     def __init__(self, mmatcher, datastore, iterations, quiet,
+                 gen_moments_record_interval,
                  quit_JDS_threshold=-1):
         self.mmatcher = mmatcher
         self.datastore = datastore
         self.iterations = iterations
         self.quiet = quiet
+        self.gen_moments_record_interval = gen_moments_record_interval
         self.quit_JDS_threshold = quit_JDS_threshold
 
     # For compatibility with GenParamRecorder:
@@ -328,16 +370,17 @@ class MomentMatchingDriver(object):
 
     def pre_loop(self):
         self.learning_recorder = MMLearningRecorder.from_driver(self)
-        self.generator_recorder = GenParamRecorder.from_driver(self)
+        self.gen_moments_recorder = GenMomentsRecorder.from_driver(self)
+        self.generator_recorder = FlexGenParamRecorder.from_driver(self)
 
     def post_update(self, gen_step, update_result):
         self.learning_recorder.record(gen_step, update_result)
-
-        self.datastore.tables.saverow(
-            'gen_moments.csv',
-            list(update_result.gen_moments.flat))
+        if is_at_interval(gen_step, self.gen_moments_record_interval):
+            self.gen_moments_recorder.record(gen_step, update_result)
 
         jj, dd, ss = self.generator_recorder.record(gen_step)
+
+        self.datastore.flush_all()
 
         maybe_quit(
             self.datastore,
@@ -345,12 +388,6 @@ class MomentMatchingDriver(object):
             JDS_true=list(map(ssnode.DEFAULT_PARAMS.get, 'JDS')),
             quit_JDS_threshold=self.quit_JDS_threshold,
         )
-
-    def post_loop(self):
-        self.datastore.dump_json(dict(
-            reason='end_of_iteration',
-            good=True,
-        ), 'exit.json')
 
     def iterate(self, update_func):
         """
@@ -368,10 +405,10 @@ class MomentMatchingDriver(object):
         """
         self.pre_loop()
         logger.info('%s: start iterations', self.__class__.__name__)
-        for gen_step in range(self.iterations):
-            self.post_update(gen_step, update_func(gen_step))
+        with recording_exit_reason(self.datastore):
+            for gen_step in range(self.iterations):
+                self.post_update(gen_step, update_func(gen_step))
         logger.info('%s: maximum iterations reached', self.__class__.__name__)
-        self.post_loop()
 
     def run(self, learner):
         learning_it = learner.learning()

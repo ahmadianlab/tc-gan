@@ -29,5 +29,9 @@ test-old-gan: prepare
 doc: misc/rc/rc.sh env
 	misc/with-env $(MAKE) --directory=doc html
 
+doc-from-scratch:
+	$(MAKE) --directory=doc clean
+	$(MAKE) doc
+
 include misc/conda.mk
 include misc/rc/setup.mk

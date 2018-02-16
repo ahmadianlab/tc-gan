@@ -1,4 +1,36 @@
+"""
+A module to help building complex objects based on composable components.
+
+It is based on the concept of :term:`emitter` function:
+
+.. glossary::
+
+   emitter
+
+     A callable that takes *arbitrary* keyword arguments and return a
+     tuple of an object and unused subset of the keyword arguments.
+     Example:
+
+     >>> def emit_alpha(alpha, **kwargs):
+     ...     return alpha + 1, kwargs
+     >>> kwargs = dict(alpha=1, beta=2)
+     >>> obj, rest = emit_alpha(**kwargs)
+     >>> rest
+     {'beta': 2}
+
+     Typically, such callable is a function with name
+     ``emit_<something>`` or a `classmethod` with name
+     ``<class_name>.consume_kwargs`` which emits an instance of the
+     class ``<class_name>``.  For example, see: `.emit_ssn`,
+     `BaseComponent.consume_kwargs`.
+
+See `BaseComponent` usage for why it helps composing elements.
+
+"""
+
 import inspect
+
+from .utils import is_theano
 
 
 class BaseComponent(object):
@@ -68,6 +100,30 @@ class BaseComponent(object):
       ...
     ValueError: Not all key-value pairs are consumed: ['spam']
 
+    Parameters passed to a `BaseComponent` subclass can be retrieved
+    by `to_config` method, provided that such subclass follows the
+    convention that arguments are set to the attributes with the same
+    name.
+
+    >>> bike.to_config()
+    {'color': 'brown'}
+
+    To include configurations of subcomponents, `to_config` method
+    must be overridden, ideally in a way that matches with
+    `consume_kwargs`:
+
+    >>> class DumpableBike(Bike):
+    ...
+    ...     def to_config(self):
+    ...         config = super(DumpableBike, self).to_config()
+    ...         config.update(self.wheel.to_config())
+    ...         config.update(self.handle.to_config())
+    ...         return config
+    ...
+    >>> config = dict(spokes=28, brakes=2, color='brown')
+    >>> bike2 = DumpableBike.from_dict(config)
+    >>> assert bike2.to_config() == config
+
     """
 
     @classmethod
@@ -100,47 +156,6 @@ class BaseComponent(object):
         return cls(*args, **clskwds), kwargs
 
     @classmethod
-    def consume_config(cls, config, *init_args, **init_kwargs):
-        """
-        Instantiate `cls` using a subset of `config` and return the rest.
-
-        It is conceptually equivalent to::
-
-          cls.consume_kwargs(*init_kwargs, **dict(config, **init_kwargs))
-
-        However, it does following extra checks:
-
-        * Make sure `config` and `init_kwargs` do NOT contain any
-          shared keys.
-        * Make sure `init_kwargs` is used by `cls.__init__`.
-
-        """
-        # MAYBE: Turn consume_config into a function?  Not sure if
-        # subclasses want to override this method.
-        common = set(config) & set(init_kwargs)
-        if common:
-            raise ValueError(
-                '{cls}.consume_config() got multiple values for'
-                ' configurations: {}'.format(sorted(common),
-                                             cls=cls.__name__))
-
-        kwargs = dict(config, **init_kwargs)
-        self, rest = cls.consume_kwargs(*init_args, **kwargs)
-
-        unused = set(init_kwargs) - (set(init_kwargs) - set(rest))
-        if unused:
-            raise ValueError(
-                '{cls}.consume_config() got following keyword arguments'
-                ' which were NOT consumed by {cls}.consume_kwargs().'
-                ' Make sure to use keyword arguments defined in'
-                ' {cls}.consume_kwargs() and/or {cls}.__init__():'
-                ' {}'.format(sorted(unused),
-                             cls=cls.__name__)
-            )
-
-        return self, rest
-
-    @classmethod
     def from_dict(cls, dct):
         """
         Instantiate `cls` using a dictionary `dct`.
@@ -156,19 +171,123 @@ class BaseComponent(object):
                 .format(sorted(rest)))
         return self
 
+    def to_config(self):
+        """
+        Return a `dict` which can be used to construct an equivalent instance.
 
-def consume_subdict(cls, key, dct, *args, **kwargs):
+        Note that this method is relying on the convention that
+        arguments are set to the attributes with the same name.
+        Subclasses must override this method if this is not the case.
+        """
+        config = {}
+        for name in inspect.getargspec(type(self)).args:
+            try:
+                value = getattr(self, name)
+            except AttributeError:
+                continue
+
+            if isinstance(value, BaseComponent):
+                continue
+
+            # Handle theano shared variable:
+            if is_theano(value):
+                if hasattr(value, 'get_value'):
+                    config[name] = value.get_value()
+                continue
+            # MAYBE: Move the above theano-related block to subclass,
+            #        to remove theano dependence from this module.
+
+            config[name] = value
+
+        return config
+
+
+def consume_config(emitter, config, *args, **kwargs):
     """
-    Instantiate `cls` using ``dct[key]`` and return the rest.
+    Call `emitter` using a subset of `config` and return the rest.
+
+    It is conceptually equivalent to::
+
+      emitter(*args, **dict(config, **kwargs))
+
+    However, it does following extra checks:
+
+    * Make sure `config` and `kwargs` do NOT contain any shared keys.
+    * Make sure `kwargs` is used by `emitter`.
+
+    Parameters
+    ----------
+    emitter : callable
+        An :term:`emitter`.
+    config : dict
+        A dictionary which may contain keyword arguments for `emitter`.
+    args
+        Positional arguments for `emitter`.
+    kwargs
+        Keyword arguments for `emitter`.
+
+    Returns
+    -------
+    obj
+        Returned value of `emitter`.
+    rest : dict
+        Unused subset of `config`.
+
+    """
+    common = set(config) & set(kwargs)
+    if common:
+        raise ValueError(
+            'Trying to pass multiple values for configurations to'
+            ' {emitter}(): {}'.format(sorted(common), emitter=emitter))
+
+    total_kwargs = dict(config, **kwargs)
+    obj, rest = emitter(*args, **total_kwargs)
+
+    unused = set(kwargs) - (set(kwargs) - set(rest))
+    if unused:
+        raise ValueError(
+            'consume_config({emitter}, ...) got the following keyword'
+            ' arguments which were NOT consumed by {emitter}().  Make'
+            ' sure to pass keyword arguments consumed by {emitter}(): {}'
+            .format(sorted(unused), emitter=emitter)
+        )
+
+    return obj, rest
+
+
+def consume_subdict(emitter, key, dct, *args, **kwargs):
+    """
+    Return ``emitter(*args, **dct[key], **kwargs)`` with unused part of `dct`.
 
     The sub-dictionary ``dct[key]`` may not exist (assumed be an empty
     dictionary if so) and it is removed if all contents in
     ``dct[key]`` are consumed.  Thus, it is safe to call this function
-    with the same `key` and different `cls` multiple times.
+    with the same `key` and different `emitter` multiple times.
+
+    Parameters
+    ----------
+    emitter : callable
+        An :term:`emitter`.
+    key
+        A key to be used for looking up `dct`.
+    dct : dict
+        ``dct[key]`` may exist and may contain keyword arguments for
+        `emitter`.
+    args
+        Positional arguments for `emitter`.
+    kwargs
+        Keyword arguments for `emitter`.
+
+    Returns
+    -------
+    obj
+        Returned value of `emitter`.
+    rest : dict
+        Unused subset of `dct`.
 
     """
     rest = dict(dct)
-    obj, subrest = cls.consume_config(rest.pop(key, {}), *args, **kwargs)
+    obj, subrest = consume_config(emitter, rest.pop(key, {}), *args, **kwargs)
     if subrest:
         rest[key] = subrest
     return obj, rest

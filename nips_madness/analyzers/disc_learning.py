@@ -1,3 +1,7 @@
+"""
+Old loader/plotting module.  # TODO: remove it
+"""
+
 import json
 import os
 import warnings
@@ -6,36 +10,14 @@ from matplotlib import pyplot
 import numpy as np
 
 from ..utils import csv_line
+from .learning import (
+    disc_param_stats_to_pretty_label as param_stats_to_pretty_label,
+)
 
 defaults = dict(
     title_params=['layers', 'disc_normalization'],
     figsize=(9, 3),
 )
-
-
-def param_stats_to_pretty_label(name):
-    """
-    Convert param_stats names to latex label for plotting.
-
-    >>> param_stats_to_pretty_label('W.nnorm')
-    '$|W_0|$'
-    >>> param_stats_to_pretty_label('W.nnorm.1')
-    '$|W_1|$'
-    >>> param_stats_to_pretty_label('b.nnorm.2')
-    '$|b_2|$'
-    >>> param_stats_to_pretty_label('scales.nnorm.3')
-    '$|g_3|$'
-    >>> param_stats_to_pretty_label('spam')
-
-    """
-    parts = name.split('.')
-    if 2 <= len(parts) <= 3 and parts[1] == 'nnorm':
-        var = parts[0]
-        suffix = parts[2] if len(parts) == 3 else '0'
-        if var == 'scales':
-            var = 'g'
-            # "g" for gain; see: Ba et al (2016) Layer Normalization
-        return '$|{}_{}|$'.format(var, suffix)
 
 
 class DiscriminatorLog(object):

@@ -1,4 +1,4 @@
-from types import SimpleNamespace
+from logging import getLogger
 
 import lasagne
 import numpy as np
@@ -10,12 +10,15 @@ from ..evaluator import MagicEvaluator
 from ..gradient_expressions.utils import sample_sites_from_stim_space_impl
 from ..utils import (
     cached_property, cartesian_product, theano_function, StopWatch,
-    as_randomstate,
+    as_randomstate, Namespace,
 )
-from .bptt_gan import (
-    BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, GeneratorTrainer,
+from .wgan import (
+    BaseTrainer, BPTTWassersteinGAN, DEFAULT_PARAMS, emit_generator_trainer,
 )
-from .ssn import TuningCurveGenerator
+from .ssn import TuningCurveGenerator, make_tuning_curve_generator
+from .utils import gridify_tc_samples
+
+logger = getLogger(__name__)
 
 DEFAULT_PARAMS = dict(
     DEFAULT_PARAMS,
@@ -102,7 +105,6 @@ class ConditionalProber(BaseComponent):
 
 
 class ConditionalTuningCurveGenerator(TuningCurveGenerator):
-    prober_class = ConditionalProber
 
     output_shape = property(lambda self: (self.batchsize, self.num_tcdom))
     cond_shape = property(lambda self: (self.batchsize, 3))
@@ -118,30 +120,11 @@ class ConditionalTuningCurveGenerator(TuningCurveGenerator):
         return [self.prober.outputs[0], conditions]
 
 
-class MapCloneConditionalTuningCurveGenerator(ConditionalTuningCurveGenerator):
-    from .ssn import MapCloneEulerSSNModel as model_class
-
-
-_tcg_classes = {
-    'default': ConditionalTuningCurveGenerator,
-    'mapclone': MapCloneConditionalTuningCurveGenerator,
-}
-"""
-Mapping form ``ssn_impl`` to tuning curve generator class.
-"""
-
-
-def make_conditional_tuning_curve_generator(config, *init_args, **init_kwargs):
-    config = dict(config)
-    ssn_impl = config.pop('ssn_impl', 'default')
-    cls = _tcg_classes[ssn_impl]
-    return cls.consume_config(config, *init_args, **init_kwargs)
-
-
 class ConditionalDiscriminator(BaseComponent):
 
     def __init__(self, shape, cond_shape, loss_type,
-                 layers, normalization, nonlinearity):
+                 layers, normalization, nonlinearity,
+                 net_options=None):
         self.l_in = lasagne.layers.InputLayer(shape)
         self.l_cond = lasagne.layers.InputLayer(cond_shape)
         self.l_eff_in = lasagne.layers.ConcatLayer([self.l_in, self.l_cond])
@@ -149,7 +132,8 @@ class ConditionalDiscriminator(BaseComponent):
         l_hidden = simple_discriminator.stack_hidden_layers(
             self.l_eff_in, layers=layers,
             normalization=normalization,
-            nonlinearity=nonlinearity)
+            nonlinearity=nonlinearity,
+            options=net_options)
         self.l_out = simple_discriminator.make_output_layer(
             l_hidden, loss_type=loss_type)
 
@@ -320,16 +304,19 @@ class RandomChoiceSampler(object):
 
         """
         cell_types = [0, 1] if include_inhibitory_neurons else [0]
-
-        # This is the order of dimensions varied in subsample_neurons:
-        cond_values = [contrasts, bandwidths, cell_types, norm_probes]
-        shape = (len(data),) + tuple(map(len, cond_values))
-        nested = data.reshape(shape)
-
-        # Shuffle the dimension to the order that RandomChoiceSampler
-        # understands:
-        nested = nested.transpose((0, 3, 4, 1, 2))
+        nested = gridify_tc_samples(
+            data,
+            num_contrasts=len(contrasts),
+            num_bandwidths=len(bandwidths),
+            num_cell_types=len(cell_types),
+            num_probes=len(norm_probes),
+        )
         cond_values = [cell_types, norm_probes, contrasts, bandwidths]
+
+        # TC data is reshaped and shuffled to the format that
+        # RandomChoiceSampler understands:
+        assert nested.shape == (len(data),) + tuple(map(len, cond_values))
+
         return cls(nested, cond_values, **kwargs)
 
     def __init__(self, nested, cond_values, e_ratio,
@@ -425,8 +412,10 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
     def __init__(self, gen, disc, gen_trainer, disc_trainer,
                  bandwidths, contrasts, norm_probes,
                  e_ratio, include_inhibitory_neurons,
+                 rate_penalty_threshold,
                  num_models, probes_per_model,
                  critic_iters_init, critic_iters, lipschitz_cost,
+                 disc_rate_penalty_bound,
                  seed=0):
         self.gen = gen
         self.disc = disc
@@ -438,12 +427,14 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         self.norm_probes = np.asarray(norm_probes)
         self.e_ratio = e_ratio
         self.include_inhibitory_neurons = include_inhibitory_neurons
+        self.rate_penalty_threshold = rate_penalty_threshold
         self.num_models = num_models
         self.probes_per_model = probes_per_model
 
         self.critic_iters_init = critic_iters_init
         self.critic_iters = critic_iters
         self.lipschitz_cost = lipschitz_cost
+        self.disc_rate_penalty_bound = disc_rate_penalty_bound
         self.rng = as_randomstate(seed)
 
         assert gen.batchsize == self.num_models * self.probes_per_model
@@ -471,22 +462,41 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
             self.num_models, self.probes_per_model,
         )
 
-    def gen_forward(self, zs, batch):
-        return self.gen.forward(model_zs=zs, **batch.gen_kwargs)
+    def gen_forward(self, batch):
+        return self.gen.forward(
+            rng=self.rng,
+            model_rate_penalty_threshold=self.rate_penalty_threshold,
+            **batch.gen_kwargs)
 
     def train_discriminator(self, info):
         batch = self.next_minibatch()  # ConditionalMinibatch
         xd = batch.tuning_curves
         cd = batch.conditions
-        num_models = batch.num_models
         batchsize = batch.batchsize
         eps = self.rng.rand(batchsize, 1)
-        zg = self.rng.rand(num_models, self.num_neurons, self.num_neurons)
         with self.gen_forward_watch:
-            gen_out = self.gen_forward(zg, batch)
+            gen_out = self.gen_forward(batch)
         xg = gen_out.prober_tuning_curve
         xp = eps * xd + (1 - eps) * xg
         cg = cp = cd
+
+        info.gen_out = gen_out
+        info.dynamics_penalty = gen_out.model_dynamics_penalty
+        info.rate_penalty = gen_out.model_rate_penalty
+        info.xd = xd
+        info.xg = xg
+        info.xp = xp
+        info.cd = info.cg = info.cp = cd
+        info.batch = batch
+        info.gen_time = self.gen_forward_watch.times[-1]
+
+        bound = self.disc_rate_penalty_bound
+        if bound > 0 and gen_out.model_rate_penalty > bound:
+            info.disc_loss = np.nan
+            info.accuracy = np.nan
+            info.disc_time = np.nan
+            return info
+
         with self.disc_train_watch:
             info.disc_loss = self.disc_trainer.train(
                 xg, xd, xp,
@@ -495,36 +505,20 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
             )
 
         info.accuracy = self.disc.accuracy(xg, cg, xd, cd)
-        info.gen_out = gen_out
-        info.dynamics_penalty = gen_out.model_dynamics_penalty
-        info.xd = xd
-        info.xg = xg
-        info.xp = xp
-        info.cd = info.cg = info.cp = cd
-        info.batch = batch
-        info.gen_time = self.gen_forward_watch.times[-1]
         info.disc_time = self.disc_train_watch.times[-1]
         return info
 
     def train_generator(self, info, batch):
-        num_models = batch.num_models
-        zg = self.rng.rand(num_models, self.num_neurons, self.num_neurons)
         gen_kwargs = batch.gen_kwargs
         with self.gen_train_watch:
             info.gen_loss = self.gen_trainer.train(
-                # Stimulator:
-                gen_kwargs['stimulator_bandwidths'],
-                gen_kwargs['stimulator_contrasts'],
-                # Model:
-                zg,
-                # ConditionalProber:
-                gen_kwargs['prober_norm_probes'],
-                gen_kwargs['prober_model_ids'],
-                gen_kwargs['prober_cell_types'],
-            )
+                rng=self.rng,
+                model_rate_penalty_threshold=self.rate_penalty_threshold,
+                **gen_kwargs)
 
         info.gen_forward_time = self.gen_forward_watch.sum()
-        info.gen_time = self.gen_train_watch.sum() + info.gen_forward_time
+        info.gen_train_time = self.gen_train_watch.sum()
+        info.gen_time = info.gen_train_time + info.gen_forward_time
         info.disc_time = self.disc_train_watch.sum()
         return info
 
@@ -534,30 +528,53 @@ class ConditionalBPTTWassersteinGAN(BPTTWassersteinGAN):
         self.disc_train_watch = StopWatch()
 
         for disc_step in range(critic_iters):
-            info = SimpleNamespace(is_discriminator=True, gen_step=gen_step,
-                                   disc_step=disc_step)
+            info = Namespace(is_discriminator=True, gen_step=gen_step,
+                             disc_step=disc_step)
             info = self.train_discriminator(info)
             yield info
+        disc_info = info
         batch = info.batch
 
-        info = SimpleNamespace(is_discriminator=False, gen_step=gen_step)
-        yield self.train_generator(info, batch)
+        info = Namespace(is_discriminator=False, gen_step=gen_step)
+        info = self.train_generator(info, batch)
+
+        logger.debug(
+            '[Loss] Acc: %-9.3g D: %-9.3g G: %-9.3g'
+            ' [Time] Fwd: %.3g D: %.3g G: %.3g',
+            disc_info.accuracy,
+            disc_info.disc_loss,
+            info.gen_loss,
+            self.gen_forward_watch.mean(),
+            self.disc_train_watch.mean(),
+            self.gen_train_watch.mean(),
+        )
+
+        yield info
 
 
 def make_gan(config):
-    """
+    """make_gan(config: dict) -> (GAN, dict)
     Initialize a GAN given `config` and return unconsumed part of `config`.
     """
-    return _make_gan_from_kwargs(**dict(DEFAULT_PARAMS, **config))
+    kwargs = dict(DEFAULT_PARAMS, **config)
+    kwargs['gen'] = dict(DEFAULT_PARAMS['gen'], **config.get('gen', {}))
+    kwargs['disc'] = dict(DEFAULT_PARAMS['disc'], **config.get('disc', {}))
+    return _make_gan_from_kwargs(**kwargs)
 
 
 def _make_gan_from_kwargs(
         J0, S0, D0, num_sites, bandwidths, contrasts,
         num_models, probes_per_model,
         hide_cell_type,
+        consume_union=True,
         **rest):
-    gen, rest = make_conditional_tuning_curve_generator(
+    if 'V0' in rest:
+        rest['V'] = rest.pop('V0')
+    rate_penalty_threshold = rest['gen'].pop('rate_penalty_threshold')  # FIXME
+    disc_rate_penalty_bound = rest['disc'].pop('rate_penalty_bound')  # FIXME
+    gen, rest = make_tuning_curve_generator(
         rest,
+        consume_union=consume_union,
         batchsize=num_models * probes_per_model,
         # Stimulator:
         num_tcdom=len(bandwidths),
@@ -566,24 +583,32 @@ def _make_gan_from_kwargs(
         J=J0,
         D=D0,
         S=S0,
+        # Use conditional generator:
+        emit_prober=ConditionalProber.consume_kwargs,
+        emit_tcg=ConditionalTuningCurveGenerator.consume_kwargs,
     )
     disc, rest = consume_subdict(
         (CellTypeBlindDiscriminator if hide_cell_type else
-         ConditionalDiscriminator),
+         ConditionalDiscriminator).consume_kwargs,
         'disc', rest,
         shape=gen.output_shape,
         cond_shape=gen.cond_shape,
         loss_type='WD',
     )
     gen_trainer, rest = consume_subdict(
-        GeneratorTrainer, 'gen', rest,
+        emit_generator_trainer, 'gen', rest,
         gen, disc,
     )
     disc_trainer, rest = consume_subdict(
-        ConditionalCriticTrainer, 'disc', rest,
+        ConditionalCriticTrainer.consume_kwargs, 'disc', rest,
         disc,
     )
+    if consume_union:
+        for key in ['V_min', 'V_max']:
+            rest.pop(key, None)
     return ConditionalBPTTWassersteinGAN.consume_kwargs(
         gen, disc, gen_trainer, disc_trainer, bandwidths, contrasts,
         num_models=num_models, probes_per_model=probes_per_model,
+        rate_penalty_threshold=rate_penalty_threshold,
+        disc_rate_penalty_bound=disc_rate_penalty_bound,
         **rest)

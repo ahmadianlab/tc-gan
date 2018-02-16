@@ -1,7 +1,10 @@
+from logging import getLogger
 import contextlib
 
 import lasagne
 import numpy as np
+
+logger = getLogger(__name__)
 
 version = 1
 
@@ -64,9 +67,15 @@ def save_on_error(layer, pre_path, post_path):
         haserror = False
     finally:
         if haserror:
+            logger.info('An error occurred. Saving parameters to: %s, %s',
+                        pre_path, post_path)
+
             np.savez_compressed(pre_path, **values)
             np.savez_compressed(post_path,
                                 **get_all_param_values_as_dict(layer))
+
+            logger.info('Saved parameters to: %s, %s',
+                        pre_path, post_path)
 
 
 def wrap_with_save_on_error(layer, pre_path, post_path):

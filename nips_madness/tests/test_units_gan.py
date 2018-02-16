@@ -12,7 +12,7 @@ from ..gradient_expressions.utils import subsample_neurons, \
 from ..run import gan as run_gan
 from ..run.gan import GenerativeAdversarialNetwork, setup_gan, train_gan
 from .. import ssnode
-from .test_drivers import fake_datastore
+from .test_legacy_drivers import fake_datastore
 
 
 def make_gan(
@@ -48,7 +48,7 @@ def make_gan(
         disc_l1_regularization=0,
         disc_l2_regularization=0,
         gen_learn_rate=0.01,
-        disc_learn_rate=0.01,
+        disc_learn_rate=0.0001,
         rate_penalty_threshold=150,
         rate_penalty_no_I=False,
         WGAN_lambda=10,

@@ -9,7 +9,7 @@ from logging import getLogger
 
 import numpy as np
 
-from ..networks.finite_time_sampler import FiniteTimeTuningCurveSampler
+from ..networks.fixed_time_sampler import FixedTimeTuningCurveSampler
 from ..utils import StopWatch, log_timing
 
 logger = getLogger(__name__)
@@ -46,7 +46,7 @@ def ssn_forward(params, repeat, method):
             try:
                 sampler = sampler_store[i]
             except KeyError:
-                sampler = FiniteTimeTuningCurveSampler \
+                sampler = FixedTimeTuningCurveSampler \
                     .from_dict(sampler_config)
                 with log_timing('sampler.prepare()'):
                     sampler.prepare()

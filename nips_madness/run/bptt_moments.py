@@ -6,8 +6,7 @@ from logging import getLogger
 
 import numpy as np
 
-from . import gan as plain_gan
-from .bptt_wgan import generate_dataset
+from .bptt_wgan import generate_dataset_and_save, do_learning
 from .. import execution
 from .. import utils
 from ..drivers import MomentMatchingDriver
@@ -23,15 +22,9 @@ def learn(driver, **generate_dataset_kwargs):
     logger.info('Compiling Theano functions...')
     with utils.log_timing('gan.prepare()'):
         mmatcher.prepare()
-    ssn = mmatcher.gen
 
-    data = generate_dataset(
-        driver,
-        sample_sites=mmatcher.sample_sites,
-        include_inhibitory_neurons=mmatcher.include_inhibitory_neurons,
-        num_sites=ssn.num_sites,
-        bandwidths=mmatcher.bandwidths,
-        contrasts=mmatcher.contrasts,
+    data = generate_dataset_and_save(
+        driver.datastore, mmatcher,
         **generate_dataset_kwargs)
 
     mmatcher.set_dataset(data)
@@ -65,6 +58,10 @@ def make_parser():
     parser.add_argument(
         '--quiet', action='store_true',
         help='Do not print loss values per epoch etc.')
+    parser.add_argument(
+        '--gen-moments-record-interval', default=100, type=int,
+        help='''Save tuning curve moments for each given
+        generator step. -1 means to never save.''')
 
     # Generator
     parser.add_argument(
@@ -101,13 +98,18 @@ def make_parser():
     for name in 'JDS':
         parser.add_argument(
             '--{}-min'.format(name),
-            default=1e-3, type=eval,
+            default=1e-3, type=float,
             help='''Lower limit of the parameter {}.
             '''.format(name))
         parser.add_argument(
             '--{}-max'.format(name),
-            default=10, type=eval,
+            default=10, type=float,
             help='''Upper limit of the parameter {}.
+            '''.format(name))
+        parser.add_argument(
+            '--{}0'.format(name),
+            default=0.01, type=eval,
+            help='''Initial value the parameter {} of the generator.
             '''.format(name))
 
     # Generator trainer
@@ -150,18 +152,9 @@ def make_parser():
     return parser
 
 
-def init_driver(
-        datastore,
-        iterations, quiet,
-        **run_config):
-
+def init_driver(**run_config):
     mmatcher, rest = make_moment_matcher(run_config)
-    driver = MomentMatchingDriver(
-        mmatcher, datastore,
-        iterations=iterations,
-        quiet=quiet,
-    )
-
+    driver, rest = MomentMatchingDriver.consume_kwargs(mmatcher, **rest)
     return dict(driver=driver,
                 **rest)
 
@@ -170,8 +163,8 @@ def main(args=None):
     parser = make_parser()
     ns = parser.parse_args(args)
 
-    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver,
-                          script_file=__file__)
+    do_learning(learn, vars(ns), init_driver=init_driver,
+                script_file=__file__)
 
 
 if __name__ == '__main__':

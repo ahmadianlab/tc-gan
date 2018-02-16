@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 
 from ... import ssnode
-from ...core import BaseComponent
+from ...core import BaseComponent, consume_config
 from ...utils import report_allclose_tols
 from ..cwgan import RandomChoiceSampler
-from .test_cwgan import make_gan
+from .test_cwgan import emit_gan
 from .test_euler_ssn import JDS
 
 
@@ -146,7 +146,7 @@ def test_compare_with_sample_tuning_curves(
         truth_size, probes_per_model, norm_probes,
         include_inhibitory_neurons,
         seqlen=4000, rtol=5e-4, atol=5e-4):
-    gan, rest = make_gan(
+    gan, rest = emit_gan(
         J0=JDS['J'],
         D0=JDS['D'],
         S0=JDS['S'],
@@ -161,8 +161,10 @@ def test_compare_with_sample_tuning_curves(
         include_time_avg=True,
     )
     gen = gan.gen
-    sampler, rest = SamplerWrapper.consume_config(
-        rest, gan, RandomChoiceSampler,
+    sampler, rest = consume_config(
+        SamplerWrapper.consume_kwargs,
+        rest, gan,
+        sampler_class=RandomChoiceSampler,
     )
     dataset = sampler.random_minibatches()
 
@@ -171,6 +173,7 @@ def test_compare_with_sample_tuning_curves(
         assert zs.shape == (gan.num_models, gen.num_neurons, gen.num_neurons)
         gen_kwargs = batch.gen_kwargs
         gen_kwargs['prober_model_ids'] = model_ids  # [1]_
+        gen_kwargs['model_rate_penalty_threshold'] = 200
         gen_out = gen.forward(model_zs=zs, **gen_kwargs)
         xd = batch.tuning_curves          # tuning curves from dataset
         xg = gen_out.prober_tuning_curve  # tuning curves from generator

@@ -1,3 +1,40 @@
+"""
+Tuning curve generator based on SSN.
+
+This module implements tuning curve generator (`TuningCurveGenerator`)
+based on SSN (`EulerSSNModel`).  For a high-level overview, see
+:ref:`general-construction`.
+
+The (default) tuning curve generator is composed of the following
+components:
+
+- `TuningCurveGenerator`
+
+  - `BandwidthContrastStimulator` (:term:`stimulator`)
+  - `EulerSSNModel` (:term:`fixed-point solver`)
+  - `FixedProber` (:term:`prober`)
+
+`TuningCurveGenerator` is designed in a way that each component is
+pluggable.  See, e.g., `.ConditionalTuningCurveGenerator`.
+
+`EulerSSNModel` is further composed of its sub-components
+`EulerSSNCore` and `EulerSSNLayer`.  This additional complexity is for
+safely using `lasagne.layers.CustomRecurrentLayer` so that its
+`unroll_scan` option can be used to boost computation throughput.
+
+This module also include `MapCloneEulerSSNModel` (and
+`MapCloneEulerSSNCore`) which is the old version of `EulerSSNModel`
+(and `EulerSSNCore`) implemented in a different strategy (i.e.,
+combination of `theano.map` and `theano.clone`).  It seems that
+non-MapClone version is faster but no extensive benchmark has been
+done.  Let's keep those implementation at the moment.
+
+For the usage of `TuningCurveGenerator`, see: `.BPTTWassersteinGAN`,
+and `.BPTTMomentMatcher`.
+
+"""
+
+import abc
 import collections
 
 import lasagne
@@ -5,10 +42,10 @@ import numpy as np
 import theano
 
 from .. import ssnode
-from ..core import BaseComponent
+from ..core import BaseComponent, consume_config
 from ..gradient_expressions.make_w_batch import make_W_with_x
 from ..utils import cached_property, theano_function, log_timing, asarray, \
-    is_theano
+    is_theano, get_array_module
 
 
 def int_or_lscalr(value, name):
@@ -20,6 +57,70 @@ def int_or_lscalr(value, name):
         return theano.tensor.lscalar(name)
     else:
         return value
+
+
+def neu_array(pop_array, num_sites, pops=None):
+    """
+    Tile each element of `pop_array` for `num_sites` times.
+
+    >>> neu_array([0, 1], 2)
+    array([0, 0, 1, 1])
+
+    It works with Theano array too, provided the third argument `pops`
+    is provided:
+
+    >>> pa = theano.tensor.vector('x', dtype='int16')
+    >>> na = neu_array(pa, 2, 3)
+    >>> na.eval({pa: np.array([0, 1, 2], dtype=pa.dtype)})
+    array([0, 0, 1, 1, 2, 2], dtype=int16)
+
+    """
+    pop_array = asarray(pop_array)
+    if not is_theano(pop_array):
+        pops = pop_array.shape[0]
+    xp = get_array_module(pop_array)
+
+    return xp.concatenate([xp.tile(pop_array[i], num_sites)
+                           for i in range(pops)])
+
+
+def maybe_mixin_noise(self, rng=None, kwargs={}):
+    if rng:
+        noise = self.gen_noise(rng, **kwargs)
+        if set(noise) & set(kwargs):
+            raise ValueError("keys {} and 'rng' cannot be specified"
+                             " simultaneously"
+                             .format(sorted(noise)))
+        kwargs.update(noise)
+    return kwargs
+
+
+def concat_flat(arrays):
+    flat = []
+    for a in arrays:
+        flat.extend(a.flat)
+    return flat
+
+
+def make_flat_param_names(parameters):
+    def names(p):
+        if p.ndim == 0:
+            return np.asarray(p.name)
+        elif p.ndim == 1:
+            V = (p.name + '_{}').format
+            return np.array([V('E'), V('I')])
+        elif p.ndim == 2:
+            J = (p.name + '_{}').format
+            return np.array([
+                [J('EE'), J('EI')],
+                [J('IE'), J('II')],
+            ])
+        else:
+            raise ValueError('Only ndim=1 and ndim=2 are supported.'
+                             ' Given parameter {} has ndim={}.'
+                             .format(p, p.ndim))
+
+    return tuple(concat_flat(map(names, parameters)))
 
 
 class BandwidthContrastStimulator(BaseComponent):
@@ -48,10 +149,12 @@ class BandwidthContrastStimulator(BaseComponent):
     num_tcdom : int
         Number of points in :term:`tuning curve domain` (TC dom).
 
-    bandwidths : theano.vector.matrix
+    bandwidths : theano.tensor.matrix
+        shape: ``(batchsize, num_tcdom)``;
         :math:`s` in :eq:`BandwidthContrastStimulator-input`
 
-    contrasts : theano.vector.matrix
+    contrasts : theano.tensor.matrix
+        shape: ``(batchsize, num_tcdom)``;
         :math:`A` in :eq:`BandwidthContrastStimulator-input`
 
     smoothness : float
@@ -75,6 +178,8 @@ class BandwidthContrastStimulator(BaseComponent):
             from theano.tensor import exp
             return 1 / (1 + exp(-x / smoothness))
 
+        # x, b, c stim: arrays broadcastable to:
+        #     (batchsize, num_tcdom, num_sites)
         x = self.site_to_band.reshape((1, 1, -1))
         b = theano.tensor.shape_padright(self.bandwidths)
         c = theano.tensor.shape_padright(self.contrasts)
@@ -89,17 +194,20 @@ class BandwidthContrastStimulator(BaseComponent):
 
     num_neurons = property(lambda self: self.num_sites * 2)
 
+    def get_all_params(self):
+        return []
 
-class MapCloneEulerSSNCore(BaseComponent):
+
+class AbstractEulerSSNCore(BaseComponent, abc.ABC):
 
     """
-    Implementation of single Euler step for SSN.
+    Abstract base class for implementing single Euler step for SSN.
 
     See: `EulerSSNCore`.
 
     """
 
-    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
+    def __init__(self, stimulator, ext, J, D, S, k, n, tau_E, tau_I, dt,
                  io_type):
 
         J = np.asarray(J, dtype=theano.config.floatX)
@@ -108,6 +216,7 @@ class MapCloneEulerSSNCore(BaseComponent):
         assert J.shape == D.shape == S.shape == (2, 2)
 
         self.stimulator = stimulator
+        self.ext = ext
         self.J = theano.shared(J, name='J')
         self.D = theano.shared(D, name='D')
         self.S = theano.shared(S, name='S')
@@ -132,6 +241,33 @@ class MapCloneEulerSSNCore(BaseComponent):
 
         self.post_init()
 
+    @abc.abstractmethod
+    def post_init(self):
+        """ Called at the end of `__init__`. """
+
+    @abc.abstractmethod
+    def get_output_for(self, r):
+        """
+        Calculate next Euler step output of given input `r`.
+
+        Called via `.EulerSSNLayer.get_output_for`.
+        See also: `lasagne.layers.Layer.get_output_for`
+        """
+
+    def get_all_params(self):
+        params = self.stimulator.get_all_params()
+        return params + [self.J, self.D, self.S]
+
+
+class MapCloneEulerSSNCore(AbstractEulerSSNCore):
+
+    """
+    Implementation of single Euler step for SSN.
+
+    See: `EulerSSNCore`.
+
+    """
+
     def post_init(self):
         stimulator = self.stimulator
         num_sites = stimulator.num_sites
@@ -142,8 +278,6 @@ class MapCloneEulerSSNCore(BaseComponent):
                                 num_sites,
                                 stimulator.site_to_band)[0].T
         self.Wt.name = 'Wt'
-
-        self.ext = theano.tensor.matrix('ext')
 
     def get_output_for(self, r):
         f = self.f
@@ -172,65 +306,50 @@ class EulerSSNLayer(lasagne.layers.Layer):
 
         super(EulerSSNLayer, self).__init__(incoming, **kwargs)
 
-        self.add_param(self.ssn.J, (2, 2), name='J')
-        self.add_param(self.ssn.D, (2, 2), name='D')
-        self.add_param(self.ssn.S, (2, 2), name='S')
+        for param in ssn.get_all_params():
+            shape = param.get_value().shape
+            self.add_param(param, shape)
 
     def get_output_for(self, input, **kwargs):
         return self.ssn.get_output_for(input, **kwargs)
 
 
-class MapCloneEulerSSNModel(BaseComponent):
+class AbstractEulerSSNModel(BaseComponent, abc.ABC):
 
     r"""
-    Implementation of SSN in Theano (based on map & clone combo).
+    Abstract base class of SSN.
 
     Attributes
     ----------
+    rate_penalty : Theano scalar expression
+        :math:`\mathtt{mean}_{b,i,t} \mathtt{ReLU}(r_{b,i}(t) - \theta)`
+    rate_penalty_threshold : `theano.tensor.scalar`
+        :math:`\theta` of above
     dynamics_penalty : Theano scalar expression
         :math:`\mathtt{mean}_{b,i,t} (r_{b,i}(t) - r_{b,i}(t - \Delta t))^2`
 
     """
 
-    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
-                 io_type,
-                 unroll_scan=False,
-                 skip_steps=None, seqlen=None,
-                 include_time_avg=False):
-        self.stimulator = stimulator
-        self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
-        self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+    @abc.abstractmethod
+    def __init__(self):
+        pass
 
-        ssn = MapCloneEulerSSNCore(
-            stimulator=stimulator,
-            J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
-            io_type=io_type,
-        )
-        # num_tcdom = "batch dimension" when using Lasagne:
-        num_neurons = self.stimulator.num_neurons
-        shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
-        self._setup_layers(ssn, shape, unroll_scan)
-
-        self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
-        rs = rates[:, self.skip_steps:]
-        time_avg = rs.mean(axis=1)  # shape: (num_tcdom, num_neurons)
-        dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
-
-        # self.zs.shape: (batchsize, num_neurons, num_neurons)
-        self.zs = theano.tensor.tensor3('zs')
-        # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
-        self.time_avg = self._map_clone(time_avg)
-        self.time_avg.name = 'time_avg'
-        self.dynamics_penalty = self._map_clone(dynamics_penalty).mean()
-        # TODO: make sure theano.clone is not bottleneck here.
-        self.dynamics_penalty.name = 'dynamics_penalty'
-        # TODO: find if assigning a name to an expression is a valid usecase
-
-        self.inputs = (self.zs,)
-        if include_time_avg:
-            self.outputs = (self.dynamics_penalty, self.time_avg)
+    @property
+    def inputs(self):
+        if self.include_rate_penalty:
+            return (self.zs, self.rate_penalty_threshold)
         else:
-            self.outputs = (self.dynamics_penalty,)
+            return (self.zs,)
+
+    @property
+    def outputs(self):
+        outputs = (self.dynamics_penalty,)
+        if self.include_rate_penalty:
+            outputs += (self.rate_penalty,)
+        if self.include_time_avg:
+            return outputs + (self.time_avg,)
+        else:
+            return outputs
 
     def _setup_layers(self, ssn, shape, unroll_scan):
         shape_sym = shape
@@ -265,17 +384,125 @@ class MapCloneEulerSSNModel(BaseComponent):
         )
         self.unroll_scan = unroll_scan
 
-    zmat = property(lambda self: self.l_ssn.ssn.zmat)
-    ext = property(lambda self: self.l_ssn.ssn.ext)
     dt = property(lambda self: self.l_ssn.ssn.dt)
     io_type = property(lambda self: self.l_ssn.ssn.io_type)
     J = property(lambda self: self.l_ssn.ssn.J)
     D = property(lambda self: self.l_ssn.ssn.D)
     S = property(lambda self: self.l_ssn.ssn.S)
+    get_all_params = property(lambda self: self.l_ssn.ssn.get_all_params)
 
     num_tcdom = property(lambda self: self.stimulator.num_tcdom)
     num_sites = property(lambda self: self.stimulator.num_sites)
     num_neurons = property(lambda self: self.stimulator.num_neurons)
+
+    @property
+    def solver_inputs(self):
+        return tuple(v for v in self.inputs
+                     if v is not self.rate_penalty_threshold)
+
+    @property
+    def solver_input_names(self):
+        return collect_names(['', 'stimulator_'],
+                             [self.solver_inputs, self.stimulator.inputs])
+
+    @cached_property
+    def compute_trajectories_impl(self):
+        return theano_function(
+            self.solver_inputs + self.stimulator.inputs,
+            self.all_trajectories,
+        )
+
+    def compute_trajectories(self, rng=None, **kwargs):
+        kwargs = maybe_mixin_noise(self, rng, kwargs)
+        values = [kwargs.pop(k) for k in self.solver_input_names]
+        assert not kwargs
+        return self.compute_trajectories_impl(*values)
+
+    @cached_property
+    def compute_time_avg_impl(self):
+        return theano_function(
+            self.solver_inputs + self.stimulator.inputs,
+            self.time_avg,
+        )
+
+    def compute_time_avg(self, rng=None, **kwargs):
+        kwargs = maybe_mixin_noise(self, rng, kwargs)
+        values = [kwargs.pop(k) for k in self.solver_input_names]
+        assert not kwargs
+        return self.compute_time_avg_impl(*values)
+
+    def gen_noise(self, rng, stimulator_bandwidths, **_):
+        batchsize, _num_tcdom = stimulator_bandwidths.shape
+        num_neurons = self.num_neurons
+        return dict(
+            zs=rng.rand(batchsize, num_neurons, num_neurons)
+        )
+
+
+class MapCloneEulerSSNModel(AbstractEulerSSNModel):
+
+    """
+    Implementation of SSN in Theano (based on map & clone combo).
+    """
+
+    ssn_type = 'default'
+
+    @classmethod
+    def consume_kwargs(cls, stimulator, **kwargs):
+        ssn, kwargs = MapCloneEulerSSNCore.consume_kwargs(
+            stimulator=stimulator,
+            ext=theano.tensor.matrix('ext'),
+            **kwargs)
+        return super(MapCloneEulerSSNModel, cls).consume_kwargs(
+            stimulator=stimulator,
+            ssn=ssn,
+            **kwargs)
+    # Setting ext=theano.tensor.matrix('ext') here is not very clean.
+    # Ideally, it should be implemented in MapCloneEulerSSNCore.
+    # However, since AbstractEulerSSNCore.__init__ is not short and
+    # its call signature has to be modified if ext were to be defined
+    # in MapCloneEulerSSNCore.  This is why ext is created here.
+
+    def __init__(self, stimulator, ssn,
+                 unroll_scan=False,
+                 skip_steps=None, seqlen=None,
+                 include_rate_penalty=True,
+                 include_time_avg=False):
+        self.stimulator = stimulator
+        self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
+        self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+        self.include_rate_penalty = include_rate_penalty
+        self.include_time_avg = include_time_avg
+
+        self.ext = ssn.ext
+        # num_tcdom = "batch dimension" when using Lasagne:
+        num_neurons = self.stimulator.num_neurons
+        shape = (self.stimulator.num_tcdom, self.seqlen, num_neurons)
+        self._setup_layers(ssn, shape, unroll_scan)
+
+        self.trajectories = rates = lasagne.layers.get_output(self.l_rec)
+        rs = rates[:, self.skip_steps:]
+        time_avg = rs.mean(axis=1)  # shape: (num_tcdom, num_neurons)
+        dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
+
+        # self.zs.shape: (batchsize, num_neurons, num_neurons)
+        self.zs = theano.tensor.tensor3('zs')
+        # self.time_avg.shape: (batchsize, num_tcdom, num_neurons)
+        self.time_avg = self._map_clone(time_avg)
+        self.time_avg.name = 'time_avg'
+        self.dynamics_penalty = self._map_clone(dynamics_penalty).mean()
+        # TODO: make sure theano.clone is not bottleneck here.
+        self.dynamics_penalty.name = 'dynamics_penalty'
+        # TODO: find if assigning a name to an expression is a valid usecase
+
+        from lasagne.nonlinearities import rectify
+        self.rate_penalty_threshold \
+            = threshold = theano.tensor.scalar('rate_penalty_threshold')
+        rate_penalty = rectify(rs - threshold).mean()
+        self.rate_penalty = self._map_clone(rate_penalty).mean()
+        self.rate_penalty.name = 'rate_penalty'
+
+    zmat = property(lambda self: self.l_ssn.ssn.zmat)
 
     def _map_clone(self, expr):
         return theano.map(
@@ -295,22 +522,8 @@ class MapCloneEulerSSNModel(BaseComponent):
         """
         return self._map_clone(self.trajectories)
 
-    @cached_property
-    def compute_trajectories(self):
-        return theano_function(
-            (self.zs,) + self.stimulator.inputs,
-            self.all_trajectories,
-        )
 
-    @cached_property
-    def compute_time_avg(self):
-        return theano_function(
-            (self.zs,) + self.stimulator.inputs,
-            self.time_avg,
-        )
-
-
-class EulerSSNCore(MapCloneEulerSSNCore):
+class EulerSSNCore(AbstractEulerSSNCore):
 
     """
     Implementation of single Euler step for SSN.
@@ -339,8 +552,6 @@ class EulerSSNCore(MapCloneEulerSSNCore):
         ).swapaxes(1, 2)
         self.Wt.name = 'Wt'
 
-        self.ext = stimulator.stimulus
-
     def get_output_for(self, r):
         """
         Get computation graph representing a single Euler step.
@@ -365,27 +576,37 @@ class EulerSSNCore(MapCloneEulerSSNCore):
         return r_next
 
 
-class EulerSSNModel(MapCloneEulerSSNModel):
+class EulerSSNModel(AbstractEulerSSNModel):
 
     """
     Implementation of SSN in Theano (based on `batched_dot`).
     """
 
-    def __init__(self, stimulator, J, D, S, k, n, tau_E, tau_I, dt,
-                 io_type,
+    ssn_type = 'default'
+
+    @classmethod
+    def consume_kwargs(cls, stimulator, **kwargs):
+        ssn, kwargs = EulerSSNCore.consume_kwargs(
+            stimulator=stimulator,
+            ext=stimulator.stimulus,
+            **kwargs)
+        return super(EulerSSNModel, cls).consume_kwargs(
+            stimulator=stimulator,
+            ssn=ssn,
+            **kwargs)
+
+    def __init__(self, stimulator, ssn,
                  unroll_scan=False,
                  skip_steps=None, seqlen=None,
+                 include_rate_penalty=True,
                  include_time_avg=False):
         self.stimulator = stimulator
         self.skip_steps = int_or_lscalr(skip_steps, 'sample_beg')
         self.seqlen = int_or_lscalr(seqlen, 'seqlen')
+        self.include_rate_penalty = include_rate_penalty
+        self.include_time_avg = include_time_avg
 
         num_neurons = self.stimulator.num_neurons
-        ssn = EulerSSNCore(
-            stimulator=stimulator,
-            J=J, D=D, S=S, k=k, n=n, tau_E=tau_E, tau_I=tau_I, dt=dt,
-            io_type=io_type,
-        )
         # self.zs.shape: (batchsize, num_neurons, num_neurons)
         self.zs = ssn.zs
         batchsize = self.zs.shape[0]
@@ -405,13 +626,11 @@ class EulerSSNModel(MapCloneEulerSSNModel):
         self.dynamics_penalty = ((rs[:, 1:] - rs[:, :-1]) ** 2).mean()
         self.dynamics_penalty.name = 'dynamics_penalty'
 
-        self.inputs = (self.zs,)
-        if include_time_avg:
-            self.outputs = (self.dynamics_penalty, self.time_avg)
-        else:
-            self.outputs = (self.dynamics_penalty,)
-
-    _map_clone = None  # must not be called for this class
+        from lasagne.nonlinearities import rectify
+        self.rate_penalty_threshold \
+            = threshold = theano.tensor.scalar('rate_penalty_threshold')
+        self.rate_penalty = rectify(rs - threshold).mean()
+        self.rate_penalty.name = 'rate_penalty'
 
     @property
     def all_trajectories(self):
@@ -421,6 +640,140 @@ class EulerSSNModel(MapCloneEulerSSNModel):
         Array of shape (`.batchsize`, `.num_tcdom`, `.seqlen`, `.num_neurons`).
         """
         return self.trajectories.swapaxes(1, 2)
+
+
+class HeteroInputWrapper(BaseComponent):
+    """
+    Stimulator wrapper.
+
+    Attributes
+    ----------
+    V : `theano.shared`
+        Generator parameter for input variability.
+    vpop : theano.tensor.vector
+        shape: ``(2,)``;
+        `.V` reshaped so that the first element is for the excitatory
+        populations and the second element is for the inhibitory
+        populations.
+    zs_in : theano.tensor.matrix
+        shape: ``(batchsize, num_neurons)``;
+        Random variable to be multiplied by `.vpop`.
+    dist_in : {'bernoulli', 'uniform'}
+        distribution of `.zs_in`.
+
+    """
+
+    dist_in_choices = ('bernoulli', 'uniform')
+
+    def __init__(self, stimulator, V=0, dist_in=dist_in_choices[0]):
+        self.stimulator = stimulator
+
+        self.dist_in = dist_in
+        assert dist_in in self.dist_in_choices
+
+        self.init_variability(V)
+
+        # self.zs_in.shape: (batchsize, num_neurons)
+        self.zs_in = theano.tensor.matrix('zs_in')
+
+        # self.amplification, vs, zs: arrays broadcastable to:
+        #     (batchsize, num_tcdom, num_neurons)
+        vs = neu_array(self.vpop, stimulator.num_sites, 2).reshape((1, 1, -1))
+        zs = self.zs_in.reshape((self.zs_in.shape[0], 1, self.zs_in.shape[1]))
+        self.amplification = amp = 1 + vs * zs
+
+        self.stimulus = amp * self.stimulator.stimulus
+
+    def init_variability(self, V):
+        """
+        Setup attributes `.V` and `.vpop` from the constructor argument `V`.
+        """
+        V = np.asarray(V, dtype=theano.config.floatX)
+        V = np.broadcast_to(V, 2)
+        V = np.ascontiguousarray(V)  # [#contiguous]_
+        self.V = theano.shared(V, name='V')
+        self.vpop = self.V
+
+    # .. [#contiguous] Converting `V` to a contiguous array before
+    #    passing it to `theano.shared` is important since otherwise
+    #    `TuningCurveGenerator.set_params` fails with ``ValueError:
+    #    ('Destination GpuArray is not contiguous', 'Container name
+    #    "V"')`` when ``THEANO_FLAGS=device=cuda``.
+    #
+    # .. [[./tests/test_tuning_curve.py::test_tcg_set_params]]
+    # .. [[./dataset.py::set_params]]
+
+    def get_all_params(self):
+        params = self.stimulator.get_all_params()
+        return params + [self.V]
+
+    def gen_noise(self, rng, stimulator_bandwidths, **_):
+        batchsize, _num_tcdom = stimulator_bandwidths.shape
+        num_neurons = self.num_neurons
+        shape = (batchsize, num_neurons)
+        if self.dist_in == 'bernoulli':
+            zs_in = rng.choice(2, shape) * 2 - 1
+        elif self.dist_in == 'uniform':
+            zs_in = rng.rand(*shape) * 2 - 1
+        else:
+            raise ValueError('Unknown dist_in: {}'.format(self.dist_in))
+        return dict(zs_in=zs_in)
+
+    def __getattr__(self, name):
+        """ Return ``self.stimulator.XXX`` when ``self.XXX`` is accessed. """
+        try:
+            super(HeteroInputWrapper, self).__getattr__(name)
+        except AttributeError:
+            return getattr(self.stimulator, name)
+
+
+class DegenerateHeteroInputWrapper(HeteroInputWrapper):
+
+    def init_variability(self, V):
+        V = np.asarray(V, dtype=theano.config.floatX)
+        self.V = theano.shared(V, name='V')
+        self.vpop = theano.tensor.as_tensor_variable([self.V, self.V])
+
+        assert V.ndim == 0
+        assert self.V.ndim == 0
+        assert self.vpop.ndim == 1
+
+
+class HeteroInEulerSSNModel(EulerSSNModel):
+    """
+    SSN with heterogeneous (random) input.
+    """
+
+    ssn_type = 'heteroin'
+    input_wrapper_class = HeteroInputWrapper
+
+    @classmethod
+    def consume_kwargs(cls, stimulator, **kwargs):
+        stimulator, kwargs = cls.input_wrapper_class.consume_kwargs(
+            stimulator=stimulator,
+            **kwargs)
+        return super(HeteroInEulerSSNModel, cls).consume_kwargs(
+            stimulator=stimulator,
+            **kwargs)
+
+    @property
+    def inputs(self):
+        return (self.stimulator.zs_in,) + \
+            super(HeteroInEulerSSNModel, self).inputs
+
+    def gen_noise(self, rng, **kwargs):
+        noise = super(HeteroInEulerSSNModel, self).gen_noise(rng, **kwargs)
+        noise.update(self.stimulator.gen_noise(rng, **kwargs))
+        return noise
+
+
+class DegenerateHeteroInEulerSSNModel(HeteroInEulerSSNModel):
+    ssn_type = 'deg-heteroin'
+    input_wrapper_class = DegenerateHeteroInputWrapper
+
+
+def is_heteroin(gen):
+    return hasattr(gen.model.stimulator, 'V')
 
 
 class FixedProber(BaseComponent):
@@ -508,18 +861,6 @@ def collect_names(prefixes, var_lists):
 
 class TuningCurveGenerator(BaseComponent):
 
-    stimulator_class = BandwidthContrastStimulator
-    model_class = EulerSSNModel
-    prober_class = FixedProber
-
-    @classmethod
-    def consume_kwargs(cls, **kwargs):
-        stimulator, rest = cls.stimulator_class.consume_kwargs(**kwargs)
-        model, rest = cls.model_class.consume_kwargs(stimulator, **rest)
-        prober, rest = cls.prober_class.consume_kwargs(model, **rest)
-        return super(TuningCurveGenerator, cls).consume_kwargs(
-            stimulator, model, prober, **rest)
-
     def __init__(self, stimulator, model, prober, batchsize):
         self.stimulator = stimulator
         self.model = model
@@ -532,6 +873,7 @@ class TuningCurveGenerator(BaseComponent):
                                    self.prober.outputs])
         self.OutType = collections.namedtuple('OutType', out_names)
 
+        # TODO: make _input_names public
         self._input_names = collect_names(
             ['stimulator_', 'model_', 'prober_'],
             [self.stimulator.inputs,
@@ -562,16 +904,40 @@ class TuningCurveGenerator(BaseComponent):
                 self.prober.outputs)
 
     @cached_property
-    def _forward(self):
+    def forward_impl(self):
         return theano_function(self.inputs, self.outputs)
 
-    def forward(self, **kwargs):
+    def forward(self, rng=None, **kwargs):
+        kwargs = maybe_mixin_noise(self, rng, kwargs)
         values = [kwargs.pop(k) for k in self._input_names]
         assert not kwargs
-        return self.OutType(*self._forward(*values))
+        return self.OutType(*self.forward_impl(*values))
 
+    def gen_noise(self, rng, **kwargs):
+        model_noise = self.model.gen_noise(rng, **kwargs)
+        return {
+            'model_' + k: v for k, v in model_noise.items()
+        }
+        # .keys() is ['model_zs'] for EulerSSNModel
+        # .keys() is ['model_zs', 'model_zs_in'] for HeteroInEulerSSNModel
+
+    @property
     def get_all_params(self):
-        return [self.model.J, self.model.D, self.model.S]
+        return self.model.get_all_params
+
+    def get_flat_param_names(self):
+        return make_flat_param_names(self.get_all_params())
+
+    def get_flat_param_values(self):
+        return concat_flat(p.get_value() for p in self.get_all_params())
+
+    def set_params(self, params):
+        rest = dict(params)
+        for p in self.get_all_params():
+            if p.name in rest:
+                p.set_value(np.asarray(rest.pop(p.name), dtype=p.dtype))
+        if rest:
+            raise ValueError('Unknown parameters: {}'.format(rest))
 
     def get_output(self, **kwargs):
         if not kwargs:
@@ -586,26 +952,67 @@ class TuningCurveGenerator(BaseComponent):
 
     def prepare(self):
         """ Force compile Theano functions. """
-        with log_timing("compiling {}._forward"
+        with log_timing("compiling {}.forward_impl"
                         .format(self.__class__.__name__)):
-            self._forward
+            self.forward_impl
+
+    def to_config(self):
+        config = super(TuningCurveGenerator, self).to_config()
+        for component in [self.stimulator, self.model.l_ssn.ssn, self.model,
+                          self.prober]:
+            config.update(component.to_config())
+        config['ssn_type'] = ssn_type_of(self)
+        config['ssn_impl'] = ('mapclone' if isinstance(self.model,
+                                                       MapCloneEulerSSNModel)
+                              else 'default')
+        return config
 
 
-class MapCloneTuningCurveGenerator(TuningCurveGenerator):
-    model_class = MapCloneEulerSSNModel
-
-
-_tcg_classes = {
-    'default': TuningCurveGenerator,
-    'mapclone': MapCloneTuningCurveGenerator,
+_ssn_classes = {
+    ('default', 'default'): EulerSSNModel,
+    ('mapclone', 'default'): MapCloneEulerSSNModel,
+    ('default', 'heteroin'): HeteroInEulerSSNModel,
+    ('default', 'deg-heteroin'): DegenerateHeteroInEulerSSNModel,
 }
 """
-Mapping form ``ssn_impl`` to tuning curve generator class.
+Mapping form ``(ssn_impl, ssn_type)`` to SSN model class.
 """
 
+ssn_impl_choices = ('default', 'mapclone')
+ssn_type_choices = ('default', 'heteroin', 'deg-heteroin')
+assert set(ssn_impl_choices) == set(k for k, _ in _ssn_classes)
+assert set(ssn_type_choices) == set(k for _, k in _ssn_classes)
+assert all(k == v.ssn_type for (_, k), v in _ssn_classes.items())
 
-def make_tuning_curve_generator(config, *init_args, **init_kwargs):
-    config = dict(config)
-    ssn_impl = config.pop('ssn_impl', 'default')
-    cls = _tcg_classes[ssn_impl]
-    return cls.consume_config(config, *init_args, **init_kwargs)
+
+def ssn_type_of(gen):
+    return gen.model.ssn_type
+
+
+def emit_ssn(*args, ssn_impl='default', ssn_type='default', **kwargs):
+    cls = _ssn_classes[ssn_impl, ssn_type]
+    return cls.consume_kwargs(*args, **kwargs)
+
+
+def emit_tuning_curve_generator(
+        emit_stimulator=BandwidthContrastStimulator.consume_kwargs,
+        emit_model=emit_ssn,
+        emit_prober=FixedProber.consume_kwargs,
+        emit_tcg=TuningCurveGenerator.consume_kwargs,
+        consume_union=True,
+        **kwargs):
+    stimulator, kwargs = emit_stimulator(**kwargs)
+    model, kwargs = emit_model(stimulator=stimulator, **kwargs)
+    prober, kwargs = emit_prober(model=model, **kwargs)
+    tgc, kwargs = emit_tcg(stimulator, model, prober, **kwargs)
+    if consume_union:
+        for key in ['V', 'dist_in']:
+            kwargs.pop(key, None)
+    return tgc, kwargs
+
+
+def make_tuning_curve_generator(config, **kwargs):
+    """make_tuning_curve_generator(config: dict, **kwargs) -> (TCG, dict)
+    Return a tuple of a tuning curve generator and an unused part of `config`.
+    """
+    return consume_config(emit_tuning_curve_generator, config, **kwargs)

@@ -1,35 +1,42 @@
-from types import SimpleNamespace
+import itertools
 
 from matplotlib import pyplot
+import numpy as np
 
-from ..utils import csv_line
-from .mm_loader import MomentMatchingData
-from .learning import plot_gen_params
+from ..utils import Namespace
+from .learning import plot_gen_params, gen_param_smape, maybe_downsample_to
 
 
-def plot_loss(data, ax=None):
+def plot_loss(rec, ax=None, downsample_to=None, yscale_rate_penalty='log'):
     if ax is None:
         _, ax = pyplot.subplots()
 
-    ax.plot(data.epochs,
-            data.log.learning.data[:, 1],
-            label='loss')
+    df = maybe_downsample_to(downsample_to, rec.learning)
+    lines = ax.plot('epoch', 'loss', label='loss', data=df)
     ax.set_yscale('log')
 
-    ax.legend(loc='best')
+    for key in ['rate_penalty', 'dynamics_penalty']:
+        if key in df:
+            color = 'C1'
+            ax_rate_penalty = ax.twinx()
+            lines += ax_rate_penalty.plot(
+                'epoch', key, data=df,
+                label=key, color=color, alpha=0.8)
+            ax_rate_penalty.tick_params('y', colors=color)
+            ax_rate_penalty.set_yscale(yscale_rate_penalty)
+            break
+
+    ax.legend(
+        lines, [l.get_label() for l in lines],
+        loc='best')
 
 
-def plot_moments(data, moment, ax=None):
+def plot_moments(rec, moment, ax=None, downsample_to=None):
     if ax is None:
         _, ax = pyplot.subplots()
 
-    imom = {
-        'mean': 0,
-        'var': 1,
-    }[moment]
-
-    gen_moments = data.gen_moments[:, imom]
-    ax.plot(data.epochs, gen_moments, linewidth=0.1)
+    ax.plot('epoch', moment, linewidth=0.1,
+            data=maybe_downsample_to(downsample_to, rec.gen_moments))
     ax.set_yscale('log')
 
     ax.text(0.05, 0.95,
@@ -41,25 +48,71 @@ def plot_moments(data, moment, ax=None):
             transform=ax.transAxes)
 
 
-def plot_mm_learning(data, title_params=None):
+def moments_smape(rec):
+    gen_moments = rec.gen_moments[rec.moment_names]  # exclude 'epoch' etc.
+    num = gen_moments.sub(rec.data_moments)
+    den = gen_moments.add(rec.data_moments)
+    return 200 * np.nanmean(np.abs(num / den), axis=1)
+
+
+def plot_mm_smape(rec, ax=None, downsample_to=None, colors=0,
+                  ylim=(0, 200)):
+    """
+    Plot sMPAE of mean TC and generator parameter.
+
+    Parameters
+    ----------
+    rec : `.MomentMatchingRecords`
+
+    """
+    if ax is None:
+        _, ax = pyplot.subplots()
+
+    if isinstance(colors, int):
+        colors = map('C{}'.format, itertools.count(colors))
+    else:
+        colors = iter(colors)
+
+    ax.plot(maybe_downsample_to(downsample_to, rec.gen_moments['epoch']),
+            maybe_downsample_to(downsample_to, moments_smape(rec)),
+            color=next(colors),
+            label='Mom. sMAPE')
+    ax.plot(maybe_downsample_to(downsample_to, rec.generator['epoch']),
+            maybe_downsample_to(downsample_to, gen_param_smape(rec)),
+            color=next(colors),
+            label='G param. sMAPE')
+
+    ax.legend(loc='best')
+
+    if ylim:
+        ax.set_ylim(ylim)
+
+
+def plot_mm_learning(rec, title_params=None, downsample_to=None):
+    common = dict(downsample_to=downsample_to)
+    is_heteroin = rec.rc.ssn_type in ('heteroin', 'deg-heteroin')
     fig, axes = pyplot.subplots(nrows=3, ncols=3,
                                 sharex=True,
                                 squeeze=False, figsize=(9, 6))
 
-    plot_loss(data, axes[0, 0])
-    plot_moments(data, 'mean', axes[0, 1])
-    plot_moments(data, 'var', axes[0, 2])
+    plot_loss(rec, axes[0, 0], **common)
+    plot_mm_smape(rec, ax=axes[0, 2], **common)
 
-    plot_gen_params(data, axes=axes[1, :])
-    plot_gen_params(data, axes=axes[2, :],
-                    yscale='log', legend=False, ylim=False)
+    if is_heteroin:
+        plot_gen_params(rec, axes=[axes[0, 1]] + list(axes[1, :]), **common)
+    else:
+        plot_gen_params(rec, axes=axes[1, :], **common)
+    plot_gen_params(rec, axes=axes[2, :], param_array_names=['J', 'D', 'S'],
+                    yscale='log', legend=False, ylim=False, **common)
 
     for ax in axes[-1]:
         ax.set_xlabel('epoch')
 
     def add_upper_ax(ax):
         def sync_xlim(ax):
-            ax_up.set_xlim(*map(data.epoch_to_step, ax.get_xlim()))
+            ax_up.set_xlim(*map(epoch_to_step, ax.get_xlim()))
+
+        epoch_to_step = rec.rc.epoch_to_step
 
         ax_up = ax.twiny()
         ax_up.set_xlabel('step')
@@ -73,47 +126,9 @@ def plot_mm_learning(data, title_params=None):
     # http://matplotlib.org/gallery/subplots_axes_and_figures/fahrenheit_celsius_scales.html
     # https://github.com/matplotlib/matplotlib/issues/7161#issuecomment-249620393
 
-    fig.suptitle(data.pretty_spec(title_params))
-    return SimpleNamespace(
+    fig.suptitle(rec.pretty_spec(title_params, tex=True))
+    return Namespace(
         fig=fig,
         axes=axes,
         axes_upper=axes_upper,
     )
-
-
-def cli_mm_learning(datastore, show, figpath, title_params):
-    data = MomentMatchingData(datastore)
-    arts = plot_mm_learning(data, title_params)
-    fig = arts.fig
-    if show:
-        pyplot.show()
-    if figpath:
-        fig.savefig(figpath)
-
-
-def main(args=None):
-    import argparse
-
-    class CustomFormatter(argparse.RawDescriptionHelpFormatter,
-                          argparse.ArgumentDefaultsHelpFormatter):
-        pass
-    parser = argparse.ArgumentParser(
-        formatter_class=CustomFormatter,
-        description=__doc__)
-
-    parser.add_argument(
-        'datastore',
-        help='''Path to moment matching output directory. It can also
-        be any file in such directory; filename part is ignored.''')
-    parser.add_argument('--figpath')
-    parser.add_argument('--show', action='store_true')
-    parser.add_argument(
-        '--title-params', type=csv_line(str),
-        help='Comma separated name of parameters to be used in figure title.')
-
-    ns = parser.parse_args(args)
-    cli_mm_learning(**vars(ns))
-
-
-if __name__ == '__main__':
-    main()

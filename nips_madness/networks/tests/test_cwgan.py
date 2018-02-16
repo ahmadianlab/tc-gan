@@ -1,42 +1,31 @@
-import numpy as np
 import pytest
 
+from . import test_wgan
 from .. import cwgan
 
+TEST_PARAMS = dict(
+    test_wgan.TEST_PARAMS,
+    norm_probes=[0],
+)
 
-def make_gan(norm_probes=[0],
-             include_inhibitory_neurons=True,
-             **kwargs):
-    probes_per_model = len(norm_probes)
-    if include_inhibitory_neurons:
-        probes_per_model *= 2
-    kwargs.setdefault('probes_per_model', probes_per_model)
 
-    return cwgan.make_gan(dict(dict(
-        J0=np.ones((2, 2)) * 0.01,
-        D0=np.ones((2, 2)) * 0.01,
-        S0=np.ones((2, 2)) * 0.01,
-        gen=dict(
-            J_min=1e-3,
-            J_max=10,
-            D_min=1e-3,
-            D_max=10,
-            S_min=1e-3,
-            S_max=10,
-            dynamics_cost=1,
-        ),
-        disc=dict(
-            layers=[],
-            normalization='none',
-            nonlinearity='rectify',
-        ),
-        critic_iters_init=1,
-        critic_iters=1,
-        norm_probes=norm_probes,
-        include_inhibitory_neurons=include_inhibitory_neurons,
-        lipschitz_cost=10,
-        truth_size=1,
-    ), **kwargs))
+def make_config(**kwargs):
+    config = dict(
+        TEST_PARAMS,
+        **kwargs)
+    del kwargs
+    norm_probes = config['norm_probes']
+    include_inhibitory_neurons = config['include_inhibitory_neurons']
+    if 'probes_per_model' not in config:
+        probes_per_model = len(norm_probes)
+        if include_inhibitory_neurons:
+            probes_per_model *= 2
+        config['probes_per_model'] = probes_per_model
+    return config
+
+
+def emit_gan(**kwargs):
+    return cwgan.make_gan(make_config(**kwargs))
 
 
 def fake_data(gan, truth_size):
@@ -49,9 +38,10 @@ def fake_data(gan, truth_size):
 @pytest.mark.parametrize('config', [
     {},
     dict(hide_cell_type=True),
+    dict(ssn_type='heteroin'),
 ])
 def test_smoke_cgan(config):
-    gan, rest = make_gan(**config)
+    gan, rest = emit_gan(**config)
     data = fake_data(gan, rest['truth_size'])
     gan.set_dataset(data)
     learning_it = gan.learning()
@@ -64,5 +54,44 @@ def test_smoke_cgan(config):
 
 
 def test_hide_cell_type():
-    gan, _rest = make_gan(hide_cell_type=True)
+    gan, _rest = emit_gan(hide_cell_type=True)
     assert isinstance(gan.disc, cwgan.CellTypeBlindDiscriminator)
+
+
+@pytest.mark.parametrize('ssn_type', ['heteroin', 'deg-heteroin'])
+def test_cwgan_heteroin(ssn_type):
+    gan, _rest = emit_gan(ssn_type=ssn_type)
+    # Those attributes must exist:
+    gan.gen.model.stimulator.V
+    gan.gen_trainer.V_min
+    gan.gen_trainer.V_max
+
+
+def normalize_to_gen_config(config):
+    mixed = make_config(**config)
+    config = dict(cwgan.DEFAULT_PARAMS)
+    config.update(mixed)
+
+    bandwidths = config['bandwidths']
+    config.setdefault('num_tcdom', len(bandwidths))
+
+    num_models = config.pop('num_models')
+    probes_per_model = config.pop('probes_per_model')
+    config.setdefault('batchsize', num_models * probes_per_model)
+
+    test_wgan.normalize_to_gen_config_common(config)
+
+    for key in ['hide_cell_type', 'e_ratio', 'norm_probes']:
+        config.pop(key, None)
+    return config
+
+
+@pytest.mark.parametrize('config', [
+    {},
+    dict(ssn_type='heteroin'),
+    dict(ssn_type='deg-heteroin'),
+])
+def test_cwgan_gen_to_config(config):
+    test_wgan.test_wgan_gen_to_config(config,
+                                      emit_gan,
+                                      normalize_to_gen_config)

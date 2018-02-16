@@ -7,61 +7,20 @@ from logging import getLogger
 import numpy as np
 
 from . import gan as plain_gan
-from .. import ssnode
 from .. import utils
 from ..drivers import BPTTWGANDriver
-from ..networks.bptt_gan import make_gan, DEFAULT_PARAMS
+from ..networks.dataset import generate_dataset
+from ..networks.fixed_time_sampler import new_JDS
+from ..networks.wgan import make_gan, DEFAULT_PARAMS
 
 logger = getLogger(__name__)
 
 
-def generate_dataset(
-        driver,
-        num_sites, bandwidths, contrasts,
-        truth_size, truth_seed,
-        sample_sites, include_inhibitory_neurons,
-        true_ssn_options={}):
-
-    logger.info('Generating the truth...')
-    with utils.log_timing('sample_tuning_curves()'):
-        data, (_, _, fpinfo) = ssnode.sample_tuning_curves(
-            sample_sites=sample_sites,
-            NZ=truth_size,
-            seed=truth_seed,
-            bandwidths=bandwidths,
-            contrast=contrasts,
-            N=num_sites,
-            track_offset_identity=True,
-            include_inhibitory_neurons=include_inhibitory_neurons,
-            **dict(dict(
-                dt=5e-4,  # as in ./gan.py
-                max_iter=100000,
-                io_type='asym_power',
-                rate_stop_at=200,
-                # For io_type='asym_power' (and 'asym_linear'),
-                # `rate_stop_at` determines the rate at which the
-                # solver terminates and reject the sample.  Let's use
-                # this feature to exclude extremely large rate in the
-                # tuning curve data.  But let's not make it too large,
-                # since transiently having large rate is OK.
-                #
-                # TODO: Add another rate limiting which acts only on
-                #       the tuning curve data (i.e., sub-sampled fixed
-                #       point) to allow large transient rate and large
-                #       rates in non-sampled locations.
-            ), **true_ssn_options))
-    data = np.array(data.T)      # shape: (N_data, nb)
-
-    logger.info('Information of sampled tuning curves:')
-    logger.info('  len(data): %s', len(data))
-    logger.info('  rejections: %s', fpinfo.rejections)
-    logger.info('  rejection rate'
-                ' = rejections / (rejections + len(data)) : %s',
-                fpinfo.rejections / (fpinfo.rejections + len(data)))
-    logger.info('  error codes: %r', fpinfo.counter)
+def generate_dataset_and_save(datastore, learner, **kwargs):
+    data = generate_dataset(learner, **kwargs)
 
     with utils.log_timing('numpy.save("truth.npy", data)'):
-        np.save(driver.datastore.path('truth.npy'), data)
+        np.save(datastore.path('truth.npy'), data)
     # Note: saving in .npy rather than .npz so that it can be
     # deduplicated (by, e.g., git-annex).
 
@@ -76,14 +35,8 @@ def learn(driver, **generate_dataset_kwargs):
     with utils.log_timing('gan.prepare()'):
         gan.prepare()
 
-    ssn = gan.gen
-    data = generate_dataset(
-        driver,
-        sample_sites=gan.sample_sites,
-        include_inhibitory_neurons=gan.include_inhibitory_neurons,
-        num_sites=ssn.num_sites,
-        bandwidths=gan.bandwidths,
-        contrasts=gan.contrasts,
+    data = generate_dataset_and_save(
+        driver.datastore, gan,
         **generate_dataset_kwargs)
 
     gan.set_dataset(data)
@@ -245,6 +198,29 @@ def init_driver(
                 **rest)
 
 
+def preprocess(run_config):
+    """
+    Pre-process `run_config` before it is dumped to ``info.json``.
+    """
+    plain_gan.preprocess(run_config)
+
+    true_ssn_options = run_config.setdefault('true_ssn_options', {})
+    # Default to "new" JDS:
+    for key in ['J', 'D', 'S']:
+        true_ssn_options.setdefault(key, new_JDS[key].tolist())
+    if run_config.get('ssn_type') == 'heteroin':
+        true_ssn_options.setdefault('V', [0.3, 0])
+    elif run_config.get('ssn_type') == 'deg-heteroin':
+        true_ssn_options.setdefault('V', 0.5)
+
+
+def do_learning(learn, run_config, script_file, init_driver,
+                preprocess=preprocess, **kwargs):
+    plain_gan.do_learning(
+        learn, run_config, script_file, init_driver,
+        preprocess=preprocess, **kwargs)
+
+
 def main(args=None):
     parser = make_parser()
     ns = parser.parse_args(args)
@@ -253,8 +229,8 @@ def main(args=None):
     # init_driver.  See also: [[../execution.py::layers_str]]
     ns.layers = ns.disc_layers
 
-    plain_gan.do_learning(learn, vars(ns), init_driver=init_driver,
-                          script_file=__file__)
+    do_learning(learn, vars(ns), init_driver=init_driver,
+                script_file=__file__)
 
 
 if __name__ == '__main__':

@@ -179,7 +179,7 @@ class FixedTimeTuningCurveSampler(object):
             num_contrasts=len(self.contrasts),
             num_bandwidths=len(self.bandwidths),
             num_cell_types=int(self.include_inhibitory_neurons) + 1,
-            num_probes=len(self.gen.probes)
+            num_probes=len(self._norm_probes),
         )
 
     def tc_samples_as_dataframe(self, data):

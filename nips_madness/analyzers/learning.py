@@ -41,7 +41,7 @@ def gen_param_smape(rec):
 
 
 def plot_data_smape(rec, ax=None, downsample_to=None, colors=0,
-                    ylim=(0, 200)):
+                    ylim=(0, 200), legend=True):
     """
     Plot sMPAE of mean TC and generator parameter.
 
@@ -52,6 +52,7 @@ def plot_data_smape(rec, ax=None, downsample_to=None, colors=0,
     """
     if ax is None:
         _, ax = pyplot.subplots()
+    arts = Namespace(ax=ax)
 
     if isinstance(colors, int):
         colors = map('C{}'.format, itertools.count(colors))
@@ -59,18 +60,24 @@ def plot_data_smape(rec, ax=None, downsample_to=None, colors=0,
         colors = iter(colors)
 
     TC_mean = maybe_downsample_to(downsample_to, rec.TC_mean)
-    ax.plot(TC_mean['epoch'], smape(TC_mean['gen'], TC_mean['data']),
-            color=next(colors),
-            label='TC sMAPE')
-    ax.plot(maybe_downsample_to(downsample_to, rec.generator['epoch']),
-            maybe_downsample_to(downsample_to, gen_param_smape(rec)),
-            color=next(colors),
-            label='G param. sMAPE')
+    arts.lines_tc_mean = ax.plot(
+        TC_mean['epoch'], smape(TC_mean['gen'], TC_mean['data']),
+        color=next(colors),
+        label='TC sMAPE')
+    arts.lines_gen_param = ax.plot(
+        maybe_downsample_to(downsample_to, rec.generator['epoch']),
+        maybe_downsample_to(downsample_to, gen_param_smape(rec)),
+        color=next(colors),
+        label='G param. sMAPE')
+    arts.lines = arts.lines_tc_mean + arts.lines_gen_param
 
-    ax.legend(loc='best')
+    if legend:
+        ax.legend(loc='best')
 
     if ylim:
         ax.set_ylim(ylim)
+
+    return arts
 
 
 def plot_tc_errors(rec, legend=True, ax=None, per_stim=False,

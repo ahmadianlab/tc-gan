@@ -66,3 +66,19 @@ def simulate_terminations(records=None, glob=None, progress=False, **kwargs):
     else:
         records = make_progressbar(not progress)(records)
     return pandas.DataFrame(sweep_terminators(records, **kwargs))
+
+
+def simulate_terminations_snr(*args,
+                              gait_funcs=[gaiting.pw1e], rollings=['snr'],
+                              thresholds=[1.0, 0.75, 0.5, 0.25],
+                              **kwargs):
+    """
+    Same as `simulate_terminations` but with rolling SNR.
+
+    Options are default to the values that work well with rolling SNR.
+    """
+    return simulate_terminations(*args,
+                                 gait_funcs=gait_funcs,
+                                 rollings=rollings,
+                                 thresholds=thresholds,
+                                 **kwargs)

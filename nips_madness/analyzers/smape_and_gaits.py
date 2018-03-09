@@ -44,8 +44,8 @@ def plot_smape_and_gaits(rec, gait_funcs=[gaiting.smr1e, gaiting.pw1e],
                     lines += ax.plot(
                         maybe_downsample_to(downsample_to, xs),
                         maybe_downsample_to(downsample_to, ys),
-                        label='{} lookback={} smooth={}'.format(
-                            gait.__name__, lookback_rate, smooth_rate),
+                        label='{} {} bck={} sth={}'.format(
+                            gait.__name__, stat, lookback_rate, smooth_rate),
                         color=next(colors))
 
     if yscale:

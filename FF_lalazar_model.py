@@ -2,12 +2,11 @@ import lasagne
 import theano
 import theano.tensor as T
 import numpy as np
-import discriminators.simple_discriminator as SD
 import math 
 import sys 
 import time
 import FF_functions.lalazar_func as IO_func
-
+import FF_functions.discriminator as SD
 
 # Use single precision (even when it is running in CPU):
 theano.config.floatX = 'float32'
@@ -72,7 +71,21 @@ print(tag)
 start_params = [np.log(2.),np.log(.3),np.log(1000),0.,np.log(1.),np.log(1.)]
 
 #import the data
-curves = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
+curves1 = read_dat("lalazar_data/TuningCurvesFull_Pronation.dat")
+curves2 = read_dat("lalazar_data/TuningCurvesFull_Supination.dat")
+
+print(curves1.shape)
+print(curves2.shape)
+
+allcurves = np.concatenate([curves1,curves2],axis = 0)
+print(allcurves[0,0])
+np.random.shuffle(allcurves)
+print(allcurves[0,0])
+
+curves = allcurves[:allcurves.shape[0]/2]
+testcurves = allcurves[allcurves.shape[0]/2:]
+np.savetxt("./test_curves.csv",testcurves)
+
 #curves = np.array([[x if x > 5 else 0 for x in tc] for tc in curves])
 #curves = np.array([(x - x.mean())/(x.max() - x.min() + .001) for x in curves])
 
@@ -230,7 +243,7 @@ def train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep = 5):
 
         np.save("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
     
-        for dstep in range(1000 if k == 0 else NDstep):
+        for dstep in range(500 if k == 0 else NDstep):
             #get the samples for training
             SS = F_gen()
             DD = F_gen()
@@ -255,7 +268,7 @@ def train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep = 5):
             F.write("{},{}\n".format(gloss,dloss))
             F.close()
 
-            max_min_par(lasagne.layers.get_all_param_values(Dparams))
+#            max_min_par(lasagne.layers.get_all_param_values(Dparams))
 
 
         SS = F_gen()
@@ -397,13 +410,13 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     dpars = lasagne.layers.get_all_params(discriminator)
 
-    plam = .00001
+    plam = 1.
     Ploss = (dpars[0]**2).sum()
 
     for p in dpars[1:]:
         Ploss += (p**2).sum()
 
-    lam = 10.
+    lam = 1.
 
     Wdist = D_sam_out.mean() - D_dat_out.mean()
     D_loss_exp = D_sam_out.mean() - D_dat_out.mean() + lam*Dgrad_penalty + plam * Ploss#discriminator loss
@@ -412,7 +425,7 @@ def make_WGAN_funcs(generator, Gparams, Ginputs, layers, INSHAPE):
 
     
     #we can just use lasagne/theano derivatives to get the grads for the discriminator
-    lr = .001
+    lr = .01
     
     b1 = .5
     b2 = .9

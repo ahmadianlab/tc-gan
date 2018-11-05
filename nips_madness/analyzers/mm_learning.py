@@ -56,7 +56,7 @@ def moments_smape(rec):
 
 
 def plot_mm_smape(rec, ax=None, downsample_to=None, colors=0,
-                  ylim=(0, 200)):
+                  ylim=(0, 200), legend=True):
     """
     Plot sMPAE of mean TC and generator parameter.
 
@@ -67,25 +67,32 @@ def plot_mm_smape(rec, ax=None, downsample_to=None, colors=0,
     """
     if ax is None:
         _, ax = pyplot.subplots()
+    arts = Namespace(ax=ax)
 
     if isinstance(colors, int):
         colors = map('C{}'.format, itertools.count(colors))
     else:
         colors = iter(colors)
 
-    ax.plot(maybe_downsample_to(downsample_to, rec.gen_moments['epoch']),
-            maybe_downsample_to(downsample_to, moments_smape(rec)),
-            color=next(colors),
-            label='Mom. sMAPE')
-    ax.plot(maybe_downsample_to(downsample_to, rec.generator['epoch']),
-            maybe_downsample_to(downsample_to, gen_param_smape(rec)),
-            color=next(colors),
-            label='G param. sMAPE')
+    arts.lines_moments = ax.plot(
+        maybe_downsample_to(downsample_to, rec.gen_moments['epoch']),
+        maybe_downsample_to(downsample_to, moments_smape(rec)),
+        color=next(colors),
+        label='Mom. sMAPE')
+    arts.lines_tc_mean = ax.plot(
+        maybe_downsample_to(downsample_to, rec.generator['epoch']),
+        maybe_downsample_to(downsample_to, gen_param_smape(rec)),
+        color=next(colors),
+        label='G param. sMAPE')
+    arts.lines = arts.lines_moments + arts.lines_tc_mean
 
-    ax.legend(loc='best')
+    if legend:
+        ax.legend(loc='best')
 
     if ylim:
         ax.set_ylim(ylim)
+
+    return arts
 
 
 def plot_mm_learning(rec, title_params=None, downsample_to=None):

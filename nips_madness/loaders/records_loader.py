@@ -386,7 +386,8 @@ class BaseRecords(object):
             norm_probes=self.rc.norm_probes,
             batchsize=self.rc.batchsize,
         )
-        config.update(kwargs)
+        for key in kwargs:
+            config.pop(key, None)
         sampler, _ = consume_config(
             FixedTimeTuningCurveSampler.consume_kwargs,
             config, **kwargs)

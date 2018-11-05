@@ -10,7 +10,7 @@ def update_single_param(updater, before):
     param = theano.shared(np.asarray(before, dtype=theano.config.floatX))
     loss = param.mean() * 0  # multiply by 0 to ignore the loss part
     updates = updater(loss, [param])
-    fun = theano.function([], loss, updates=updates, mode='FAST_COMPILE')
+    fun = theano.function([], loss, updates=updates)
     fun()
 
     return SimpleNamespace(

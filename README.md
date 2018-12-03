@@ -33,6 +33,16 @@ This should prepare everything required for simulations, including
 installation of the relevant packages (such as Theano and Lasagne) and
 compilation of the C modules.  See below for more information.
 
+### Building a Docker image
+
+To build a Docker image, run
+
+```
+docker image build -t tc-gan .
+```
+
+where `tc-gan` can be an arbitrary tag.
+
 
 ### Compiling C code in the cluster node
 
@@ -120,6 +130,15 @@ Just run:
 ```
 make test
 ```
+
+### Running the test suite in Docker
+
+```
+docker run -t --rm tc-gan make test
+```
+
+where `tc-gan` is the tag used by `docker image build` in _Building a
+Docker image_.
 
 
 ## Some useful commands

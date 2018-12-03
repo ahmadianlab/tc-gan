@@ -1,0 +1,32 @@
+.git
+
+# from .gitignore
+**/*.log
+**/*.pyc
+/*.mat
+**/*.so
+**/*.csv
+**/*.sh.*
+**/*~
+**/.cache
+**/.ipynb_checkpoints
+/prof
+python
+taka
+disc_params/
+logfiles
+env
+gbarello/
+
+# from doc/.gitignore
+doc/build
+doc/source/api
+
+# from misc/rc/.gitignore
+misc/rc/rc.sh
+
+# from nips_madness/ext/.gitignore
+nips_madness/ext/gsl*
+
+# from test-results/.gitignore
+test-results/*

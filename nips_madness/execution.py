@@ -94,6 +94,9 @@ def relevant_environ(_environ=os.environ):
 
 
 def git_output(args):
+    if not os.path.exists(os.path.join(PROJECT_ROOT, ".git")):
+        logger.warn("Not in a Git repository. Skip executing.: %s", args)
+        return ""
     return subprocess.check_output(
         args,
         cwd=PROJECT_ROOT,

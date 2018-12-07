@@ -44,6 +44,18 @@ docker image build -t tc-gan .
 where `tc-gan` can be an arbitrary tag.
 
 
+## How to run simulations described in the paper
+
+To produce data for `Figure $i`, look at the directory `scripts/fig$i`
+and run script `run.sh` in the directories below.  Each `run.sh` can
+be invoked as follows.
+
+* `scripts/fig4/{mm,gan}/run.sh`, `scripts/fig6/{mm,gan}/*/run.sh`:
+  `./run.sh [PATH/TO/PROJECT_ROOT/run]` where `PATH/TO/PROJECT_ROOT`
+  is the directory with this `README.md` file.  The default first
+  argument is `/opt/tc-gan/run`.
+
+
 ### Compiling C code in the cluster node
 
 C code can be compiled by just running `make ext` at the root of this

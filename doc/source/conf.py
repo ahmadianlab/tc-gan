@@ -62,7 +62,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'NIPS madness ↻'
+project = u'TC-GAN'
 author = u'Takafumi Arakaki, Gabriel Barello, Yashar Ahmadian'
 copyright = u'2017, ' + author
 
@@ -164,7 +164,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'tc_gan.tex', u'nips\\_madness Documentation',
+    (master_doc, 'tc_gan.tex', u'tc\\_gan Documentation',
      author, 'manual'),
 ]
 

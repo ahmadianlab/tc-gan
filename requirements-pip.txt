@@ -1,4 +1,4 @@
 https://github.com/Lasagne/Lasagne/archive/20efd95de558a613a138f3e3e6cd690008f48ca6.zip#egg=Lasagne
-progressbar2
-pytest-flakes
+progressbar2==3.34.3
+pytest-flakes==2.0.0
 pudb

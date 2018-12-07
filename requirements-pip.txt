@@ -1,4 +1,4 @@
-git+https://github.com/Lasagne/Lasagne@20efd95de558a613a138f3e3e6cd690008f48ca6#egg=Lasagne
+https://github.com/Lasagne/Lasagne/archive/20efd95de558a613a138f3e3e6cd690008f48ca6.zip#egg=Lasagne
 progressbar2
 pytest-flakes
 pudb

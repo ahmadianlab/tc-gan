@@ -25,8 +25,8 @@ doc/source/api
 # from misc/rc/.gitignore
 misc/rc/rc.sh
 
-# from nips_madness/ext/.gitignore
-nips_madness/ext/gsl*
+# from tc_gan/ext/.gitignore
+tc_gan/ext/gsl*
 
 # from test-results/.gitignore
 test-results/*

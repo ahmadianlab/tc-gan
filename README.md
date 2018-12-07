@@ -146,5 +146,5 @@ Docker image_.
 Generate tuning curves:
 
 ```sh
-./run nips_madness/analyzers/csv_tuning_curves.py -- logfiles/SSNGAN_XXX.log tcs --NZ=100
+./run tc_gan/analyzers/csv_tuning_curves.py -- logfiles/SSNGAN_XXX.log tcs --NZ=100
 ```

@@ -6,7 +6,7 @@ PYTEST_OPTS ?=
 prepare: env ext
 
 ext: misc/rc/rc.sh env
-	misc/with-env $(MAKE) --directory=nips_madness/ext
+	misc/with-env $(MAKE) --directory=tc_gan/ext
 
 test: prepare
 	$(PYTEST) -k 'not slowtest'

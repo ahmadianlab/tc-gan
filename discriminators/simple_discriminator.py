@@ -1,5 +1,5 @@
 import warnings
-warnings.warn('Use nips_madness.networks.simple_discriminator instead of {}'
+warnings.warn('Use tc_gan.networks.simple_discriminator instead of {}'
               .format(__name__))
 
-from nips_madness.networks.simple_discriminator import *
+from tc_gan.networks.simple_discriminator import *

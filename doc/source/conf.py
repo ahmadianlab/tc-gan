@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# nips_madness documentation build configuration file, created by
+# tc_gan documentation build configuration file, created by
 # sphinx-quickstart on Sun Oct  1 00:13:13 2017.
 #
 # This file is execfile()d with the current directory set to its
@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.pardir,
                                                 os.path.pardir)))
 
 try:
-    from nips_madness.execution import git_revision
+    from tc_gan.execution import git_revision
     gitrev = git_revision()
 except:
     gitrev = 'master'
@@ -137,7 +137,7 @@ html_context = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'nips_madnessdoc'
+htmlhelp_basename = 'tc_gandoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -164,7 +164,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'nips_madness.tex', u'nips\\_madness Documentation',
+    (master_doc, 'tc_gan.tex', u'nips\\_madness Documentation',
      author, 'manual'),
 ]
 
@@ -174,7 +174,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'nips_madness', u'nips_madness Documentation',
+    (master_doc, 'tc_gan', u'tc_gan Documentation',
      [author], 1)
 ]
 
@@ -185,8 +185,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'nips_madness', u'nips_madness Documentation',
-     author, 'nips_madness', 'One line description of project.',
+    (master_doc, 'tc_gan', u'tc_gan Documentation',
+     author, 'tc_gan', 'One line description of project.',
      'Miscellaneous'),
 ]
 
@@ -229,9 +229,9 @@ def run_apidoc(_):
     main(['--force', '--separate', '--private',
           '--output-dir', os.path.join(here, 'api'),
           # Module path:
-          os.path.join(root, 'nips_madness'),
+          os.path.join(root, 'tc_gan'),
           # Exclude:
-          os.path.join(root, 'nips_madness', '__main__.py')])
+          os.path.join(root, 'tc_gan', '__main__.py')])
 
 
 def setup(app):

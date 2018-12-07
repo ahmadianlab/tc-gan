@@ -5,8 +5,8 @@ Convenient entry point to run modules.
 
 Examples::
 
-  ./run nips_madness/benchmarks/solve_dynamics.py
-  ./run nips_madness/benchmarks/resubmit_threshold.py -- --repeat=10
+  ./run tc_gan/benchmarks/solve_dynamics.py
+  ./run tc_gan/benchmarks/resubmit_threshold.py -- --repeat=10
 
 """
 
@@ -50,13 +50,13 @@ def run_module(module, arguments, use_pdb, use_pudb, pidfile,
     if os.path.isfile(module) and module.endswith('.py'):
         relpath = os.path.relpath(os.path.realpath(module), here)
         module = relpath[:-len('.py')].replace(os.path.sep, '.')
-    from nips_madness.execution import KnownError
+    from tc_gan.execution import KnownError
     loaded = importlib.import_module(module)
     if not hasattr(loaded, 'main'):
         print('Module', module, 'do not have main function.')
         return 1
     if assert_repo_is_clean:
-        from nips_madness.execution import git_is_clean
+        from tc_gan.execution import git_is_clean
         if not git_is_clean():
             print('Repository is not clean.')
             return 3
@@ -64,7 +64,7 @@ def run_module(module, arguments, use_pdb, use_pudb, pidfile,
     # Make sure that (1) Theano is imported so that this process
     # is included in the following execution of nvidia-smi and (2)
     # GPU is logged via Python:
-    from nips_madness.utils import log_theano_info
+    from tc_gan.utils import log_theano_info
     log_theano_info()
 
     if record_env:
@@ -107,9 +107,9 @@ def main(args=None):
     parser.add_argument(
         'module',
         help='''
-        File path (e.g., nips_madness/benchmarks/solve_dynamics.py) to
+        File path (e.g., tc_gan/benchmarks/solve_dynamics.py) to
         a module or "dotted import path" (e.g.,
-        nips_madness.benchmarks.resubmit_threshold).
+        tc_gan.benchmarks.resubmit_threshold).
         ''')
     parser.add_argument(
         'arguments', nargs='*',

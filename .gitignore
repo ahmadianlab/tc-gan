@@ -14,3 +14,5 @@ disc_params/
 logfiles
 env
 gbarello/
+*.pdf
+FF_logs

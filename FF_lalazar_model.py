@@ -84,7 +84,7 @@ print(allcurves[0,0])
 
 curves = allcurves[:allcurves.shape[0]/2]
 testcurves = allcurves[allcurves.shape[0]/2:]
-np.savetxt("./test_curves.csv",testcurves)
+np.savetxt("./FF_test_curves.csv",testcurves)
 
 #curves = np.array([[x if x > 5 else 0 for x in tc] for tc in curves])
 #curves = np.array([(x - x.mean())/(x.max() - x.min() + .001) for x in curves])
@@ -240,8 +240,6 @@ def train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep = 5):
 
 
     for k in range(niter):
-
-        np.save("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
     
         for dstep in range(500 if k == 0 else NDstep):
             #get the samples for training
@@ -279,7 +277,9 @@ def train_wgan(D_step,G_step,G_in,F_gen,Dparams,STIM,INSHAPE,tag,NDstep = 5):
         F.close()
 
 
- 
+        if k%1000 == 0:
+            np.save("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
+            
         if k%1==0:
             ndm = 10
             dl = np.round(RF_low.get_value(),ndm)
@@ -340,8 +340,6 @@ def train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,):
 
 
     for k in range(niter):
-
-        np.save("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
     
         SS = F_gen()
         DD = F_gen()
@@ -358,7 +356,10 @@ def train_gan(D_step,G_step,G_in,F_gen,STIM,INSHAPE,tag,):
         F = open(LOSS,"a")
         F.write("{},{}\n".format(gloss,dloss))
         F.close()
-        
+
+        if k%1000 == 0:
+            np.save("disc_params/D_par_{}_".format(k) + tag,lasagne.layers.get_all_param_values(Dparams))
+                    
         if k%1==0:
             ndm = 10
             dl = np.round(RF_low.get_value(),ndm)

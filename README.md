@@ -55,6 +55,7 @@ be invoked as follows.
   is the directory with this `README.md` file.  The default first
   argument is `/opt/tc-gan/run`.
 
+To reproduce the visualizations of figures 3 and 4 use the ipython notebooks `Fig3_analysis.ipynb` and `Fig4_analysis.ipynb`. In `Fig4_analaysis.ipynb` you must manually set the path of the tuning curve data.
 
 ### Compiling C code in the cluster node
 

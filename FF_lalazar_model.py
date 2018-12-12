@@ -8,6 +8,8 @@ where XPOINTS is the number of gridpoints along each dimention to
 discritize 3D space into.
 """
 
+from __future__ import division, print_function
+
 import lasagne
 import theano
 import theano.tensor as T
@@ -31,7 +33,7 @@ def max_min_par(P):
     for p in P:
         m = np.max([m,np.max(np.reshape(np.abs(p),[-1]))])
 
-    print m
+    print(m)
 
 def read_dat(F):
     f = open(F,"r")
@@ -92,8 +94,8 @@ print(allcurves[0,0])
 np.random.shuffle(allcurves)
 print(allcurves[0,0])
 
-curves = allcurves[:allcurves.shape[0]/2]
-testcurves = allcurves[allcurves.shape[0]/2:]
+curves = allcurves[:allcurves.shape[0] // 2]
+testcurves = allcurves[allcurves.shape[0] // 2:]
 np.savetxt("./FF_test_curves.csv",testcurves)
 
 #curves = np.array([[x if x > 5 else 0 for x in tc] for tc in curves])

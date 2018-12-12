@@ -138,7 +138,8 @@ directory.
 Examples:
 
 * `./docker-run --dry-run`: Print commands to be executed.
-* `./docker-run`: Starts an interactive session.
+* `./docker-run`: Starts an interactive bash session.
+* `./docker-run -i -- ipython`: Starts an interactive IPython session.
 * `./docker-run -- ./run tc_gan.run.bptt_cwgan [-- ARGUMENTS]`: Run a
   submodule `tc_gan.run.bptt_cwgan` as a script.  Replace it with any
   module with the `main` function.

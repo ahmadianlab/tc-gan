@@ -71,8 +71,13 @@ def docker_run(dry_run, rebuild, tag, tty, project_root, runargs):
             )
             return sys.exit(code)
 
-    if runargs and runargs[0] == "--":
-        runargs = runargs[1:]
+    try:
+        i = runargs.index("--")
+    except ValueError:
+        runopts = []
+    else:
+        runopts = runargs[:i]
+        runargs = runargs[i + 1 :]
     runcmd = (
         [
             "docker",
@@ -82,6 +87,7 @@ def docker_run(dry_run, rebuild, tag, tty, project_root, runargs):
             "--volume={}:{}".format(project_root, "/srv/tc-gan"),
         ]
         + ([] if runargs else ["--interactive"])
+        + runopts
         + [tag]
         + runargs
     )

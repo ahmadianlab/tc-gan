@@ -25,6 +25,8 @@ COPY misc/conda.mk $builddir/misc/
 COPY misc/rc/setup.mk $builddir/misc/rc/
 RUN make -C $builddir configure-default env CONDA=/opt/miniconda/bin/conda
 
+ENV PATH=$TC_GAN_ENV/bin:$PATH
+
 # Setup and switch user
 ARG TC_GAN_USER=tc-gan
 ARG TC_GAN_UID=1000

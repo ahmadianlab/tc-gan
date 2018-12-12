@@ -14,6 +14,7 @@ make env-update    # Update conda environment
 
 ## Requirements
 
+- `python`
 - `conda`
 - `gcc` or `icc`
 
@@ -32,16 +33,6 @@ These commands have to be run only once (in principle).
 This should prepare everything required for simulations, including
 installation of the relevant packages (such as Theano and Lasagne) and
 compilation of the C modules.  See below for more information.
-
-### Building a Docker image
-
-To build a Docker image, run
-
-```
-docker image build -t tc-gan .
-```
-
-where `tc-gan` can be an arbitrary tag.
 
 
 ## How to run simulations described in the paper
@@ -137,21 +128,38 @@ Mapped name None to device cuda: Tesla K80 (0000:04:00.0)
 (where `ln1` is a head node and `n098` is a GPU node)
 
 
+## Executing commands inside Docker
+
+Our program can be run inside the Docker container.  We provide
+`./docker-run` script to help setting up the Docker container.  You
+may manually build the Docker image from `Dockerfile` in this
+directory.
+
+Examples:
+
+* `./docker-run --dry-run`: Print commands to be executed.
+* `./docker-run`: Starts an interactive session.
+* `./docker-run -- ./run tc_gan.run.bptt_cwgan [-- ARGUMENTS]`: Run a
+  submodule `tc_gan.run.bptt_cwgan` as a script.  Replace it with any
+  module with the `main` function.
+* `./docker-run -- make test`: Run tests.
+
+Notes:
+
+* `./docker-run` builds an appropriate Docker image with all the
+  requirements when it is run for the first time.  No explicit build
+  step is required.
+* `./docker-run` mounts the project root directory as the current
+  directory inside the Docker image.  Saving files to under directory
+  will be reflected in the host filesystem.
+
+
 ## Testing
 
 Just run:
 ```
 make test
 ```
-
-### Running the test suite in Docker
-
-```
-docker run -t --rm tc-gan make test
-```
-
-where `tc-gan` is the tag used by `docker image build` in _Building a
-Docker image_.
 
 
 ## Some useful commands

@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+
+"""
+Invoke docker-run(1) and mount this repository in the Docker container.
+
+Examples::
+
+    ./docker-run
+    ./docker-run -- make test
+
+This script is essentially equivalent to the following command::
+
+    docker image build [...] --tag=TAG PROJECT_ROOT  # if TAG does not exist
+    docker run [...] --volume=PROJECT_ROOT:/srv/tc-gan TAG ARGS...
+
+where `[...]` are the options filled appropriately.  To check the actual
+docker commands to be run, use `--dry-run` option.  For a finer control,
+run the docker commands directly.
+"""
+
+from subprocess import check_output, call, CalledProcessError
+from getpass import getuser
+import sys
+import os
+
+
+def error(*args):
+    print(*args, file=sys.stderr)
+
+
+def ignore(*_):
+    pass
+
+
+def docker_run(dry_run, rebuild, tag, tty, project_root, runargs):
+    if dry_run:
+        msg = error
+    else:
+        msg = ignore
+
+    try:
+        has_tag = bool(check_output(["docker", "images", "--quiet", tag]).strip())
+    except CalledProcessError as err:
+        sys.exit(err.returncode)
+
+    if not has_tag or rebuild:
+        buildcmd = [
+            "docker",
+            "image",
+            "build",
+            "--tag",
+            tag,
+            "--build-arg",
+            "TC_GAN_USER={}".format(getuser()),
+            "--build-arg",
+            "TC_GAN_UID={}".format(os.getuid()),
+            "--build-arg",
+            "TC_GAN_GID={}".format(os.getgid()),
+            project_root,
+        ]
+        msg("Run:", *buildcmd)
+        if dry_run:
+            code = 0
+        else:
+            code = call(buildcmd)
+        if code != 0:
+            error(
+                "Not executing `docker run` as `docker image build failed`"
+                " with exit code",
+                code,
+            )
+            return sys.exit(code)
+
+    if runargs and runargs[0] == "--":
+        runargs = runargs[1:]
+    runcmd = (
+        [
+            "docker",
+            "run",
+            "--tty={}".format(tty),
+            "--rm",
+            "--volume={}:{}".format(project_root, "/srv/tc-gan"),
+        ]
+        + ([] if runargs else ["--interactive"])
+        + [tag]
+        + runargs
+    )
+    if dry_run:
+        msg("Run:", *runcmd)
+    else:
+        os.execvp(runcmd[0], runcmd)
+
+
+def main(args=None):
+    import argparse
+
+    class CustomFormatter(
+        argparse.RawDescriptionHelpFormatter, argparse.ArgumentDefaultsHelpFormatter
+    ):
+        pass
+
+    parser = argparse.ArgumentParser(
+        formatter_class=CustomFormatter, description=__doc__
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print docker commands to be run without executing them.",
+    )
+    parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="Re-build Docker image even if it already exists.",
+    )
+    parser.add_argument(
+        "--tty", choices=("false", "true"), default="true", help="see `man docker-run`"
+    )
+    parser.add_argument(
+        "--tag", default="tc-gan-{}".format(getuser()), help="see `man docker-run`"
+    )
+    parser.add_argument(
+        "--project-root",
+        default=os.path.dirname(os.path.realpath(__file__)),
+        help="Path to the root directory of this repository.",
+    )
+    ns, runargs = parser.parse_known_args(args)
+    ns.runargs = runargs
+    docker_run(**vars(ns))
+
+
+if __name__ == "__main__":
+    main()

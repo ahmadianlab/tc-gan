@@ -3,7 +3,7 @@ source "$thisdir/rc/rc.sh"
 
 # Use readlink instead of realpath since it is available in more
 # environments:
-env="$(readlink --canonicalize $thisdir/../env)"
+env="${TC_GAN_ENV:-$(readlink --canonicalize $thisdir/../env)}"
 
 export PATH="$env/bin:$PATH"
 export CPATH="$env/include:$CPATH"

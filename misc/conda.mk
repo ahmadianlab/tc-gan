@@ -1,14 +1,19 @@
+TC_GAN_ENV ?= ${CURDIR}/env
+export TC_GAN_ENV
+
 CONDA = conda
 CONDA_OPTS ?= --yes
 
 CONDA_INSTALL_OPTS = \
-${CONDA_OPTS} --prefix env --file requirements-conda.txt
+${CONDA_OPTS} --prefix $(TC_GAN_ENV) --file requirements-conda.txt
 
-PIP = ${PWD}/env/bin/pip
+PIP = ${TC_GAN_ENV}/bin/pip
 
-.PHONY: conda-* pip-* env-*
+.PHONY: conda-* pip-* env-* env
 
-env:
+env: $(TC_GAN_ENV)
+
+$(TC_GAN_ENV):
 	${CONDA} create ${CONDA_INSTALL_OPTS}
 	${MAKE} pip-install
 

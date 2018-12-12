@@ -4,7 +4,6 @@ import lasagne
 import theano
 import theano.tensor as T
 import numpy as np
-import discriminators.simple_discriminator as SD
 import math 
 import sys 
 import time

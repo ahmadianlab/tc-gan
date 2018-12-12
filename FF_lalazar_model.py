@@ -18,7 +18,7 @@ import math
 import sys 
 import time
 import FF_functions.lalazar_func as IO_func
-import FF_functions.discriminator as SD
+import tc_gan.networks.simple_discriminator as SD
 
 # Use single precision (even when it is running in CPU):
 theano.config.floatX = 'float32'

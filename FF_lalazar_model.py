@@ -1,3 +1,13 @@
+"""
+Run FF model WGAN fit and output tuning curve data throughout fit.
+
+Use:
+   python ./FF_lalazar_model.py XPOINTS
+
+where XPOINTS is the number of gridpoints along each dimention to
+discritize 3D space into.
+"""
+
 import lasagne
 import theano
 import theano.tensor as T

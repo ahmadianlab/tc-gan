@@ -1,3 +1,13 @@
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("true_data_path",type = str,help = "Path to the true data files.")
+parser.add_argument("GAN_data_path",type = str,help = "Path to the GAN fit data files.")
+parser.add_argument("MM_data_path",type = str,help = "Path to the MM fit data files.")
+                            
+args = vars(parser.parse_args())
+
 import numpy as np
 
 import matplotlib as mpl
@@ -23,9 +33,9 @@ def read_csv(f,header = False,skip = 1):
     print(out.shape)
     return out
 
-true_data_loc = ###SET ME
-GAN_data_loc = ###SET ME
-MM_data_loc = ###SET ME
+true_data_loc = args["true_data_path"]
+GAN_data_loc = args["GAN_data_path"]
+MM_data_loc = args["MM_data_path"]
 
 gepochs = np.loadtxt(GAN_data_loc + "sample_epochs.csv")
 glabels = ["0000000000"[:-len(str(i))] + str(i) + ".csv" for i in range(len(epochs))]

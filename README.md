@@ -147,6 +147,8 @@ Examples:
 
 Notes:
 
+* You can use `--env` flag to pass `THEANO_FLAGS`.  For example:
+  `./docker-run --env THEANO_FLAGS=device=cuda,floatX=float32,force_device=True -- python FF_lalazar_model.py 40`
 * `./docker-run` builds an appropriate Docker image with all the
   requirements when it is run for the first time.  No explicit build
   step is required.

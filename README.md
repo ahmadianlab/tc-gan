@@ -37,6 +37,25 @@ compilation of the C modules.  See below for more information.
 
 ## How to run trainings described in the paper
 
+### Figure 3
+
+Run the following command to produce data for Figure 3.
+
+```sh
+./setup.sh
+python FF_lalazar_model.py 40
+```
+
+To run the last command in a Docker container, use, e.g.,
+
+```sh
+./docker-run \
+    --env THEANO_FLAGS=device=cuda,floatX=float32,force_device=True -- \
+    python FF_lalazar_model.py 40
+```
+
+### Figure 4 and 6
+
 To produce data for `Figure $i`, look at the directory `scripts/fig$i`
 and run script `run.sh` in the directories below.  Invoking `run.sh`
 runs the training and store the result in the directory in which

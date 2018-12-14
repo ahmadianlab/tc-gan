@@ -43,8 +43,7 @@ be invoked as follows.
 
 * `scripts/fig4/{mm,gan}/run.sh`, `scripts/fig6/{mm,gan}/*/run.sh`:
   `./run.sh [PATH/TO/PROJECT_ROOT/run]` where `PATH/TO/PROJECT_ROOT`
-  is the directory with this `README.md` file.  The default first
-  argument is `/opt/tc-gan/run`.
+  is the directory with this `README.md` file.
 
 To reproduce the visualizations of figures 3 and 4 use the scripts `Fig3analysis.py` and `Fig4analysis.py`. In `Fig4analaysis.py` you must manually set the path of the tuning curve data using the positional command line arguments. To recreate figure 5 use `Fig5analysis.py` using the positional command line arguments to set the path to the GAN and MM data you wish to use. The script assumes that the true parameters of both runs are the same. TO recreaste figure 6 use `Fig6analysis.py`. This script assumes that you have already run the `fig6` run script and all the resulting data is saved in the folders `scripts/fig6/*`.
 

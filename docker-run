@@ -10,8 +10,8 @@ Examples::
 
 This script is essentially equivalent to the following command::
 
-    docker image build [...] --tag=TAG PROJECT_ROOT  # if TAG does not exist
-    docker run [...] --volume=PROJECT_ROOT:/srv/tc-gan TAG ARGS...
+    nvidia-docker image build [...] --tag=TAG PROJECT_ROOT  # if required
+    nvidia-docker run [...] --volume=PROJECT_ROOT:/srv/tc-gan TAG ARGS...
 
 where `[...]` are the options filled appropriately.  To check the actual
 docker commands to be run, use `--dry-run` option.  For a finer control,
@@ -107,7 +107,8 @@ def main(args=None):
         pass
 
     parser = argparse.ArgumentParser(
-        formatter_class=CustomFormatter, description=__doc__
+        formatter_class=CustomFormatter, description=__doc__,
+        usage="%(prog)s [docker_options] [--] [command [args]]",
     )
 
     parser.add_argument(

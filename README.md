@@ -35,16 +35,40 @@ installation of the relevant packages (such as Theano and Lasagne) and
 compilation of the C modules.  See below for more information.
 
 
-## How to run simulations described in the paper
+## How to run trainings described in the paper
+
+### Figure 3
+
+Run the following command to produce data for Figure 3.
+
+```sh
+./setup.sh
+python FF_lalazar_model.py 40
+```
+
+To run the last command in a Docker container, use, e.g.,
+
+```sh
+./docker-run \
+    --env THEANO_FLAGS=device=cuda,floatX=float32,force_device=True -- \
+    python FF_lalazar_model.py 40
+```
+
+### Figure 4 and 6
 
 To produce data for `Figure $i`, look at the directory `scripts/fig$i`
-and run script `run.sh` in the directories below.  Each `run.sh` can
-be invoked as follows.
+and run script `run.sh` in the directories below.  Invoking `run.sh`
+runs the training and store the result in the directory in which
+`run.sh` is located.  To run it inside a Docker container, put
+`./docker-run` and appropriate options in front of it, e.g.,
 
-* `scripts/fig4/{mm,gan}/run.sh`, `scripts/fig6/{mm,gan}/*/run.sh`:
-  `./run.sh [PATH/TO/PROJECT_ROOT/run]` where `PATH/TO/PROJECT_ROOT`
-  is the directory with this `README.md` file.  The default first
-  argument is `/opt/tc-gan/run`.
+```sh
+./docker-run \
+    --env THEANO_FLAGS=device=cuda,floatX=float32,force_device=True -- \
+    scripts/fig4/gan/run.sh
+```
+
+## How to analyze and plot the figures in the paper
 
 To reproduce the visualizations of figures 3 and 4 use the scripts `Fig3analysis.py` and `Fig4analysis.py`. In `Fig4analaysis.py` you must manually set the path of the tuning curve data using the positional command line arguments. To recreate figure 5 use `Fig5analysis.py` using the positional command line arguments to set the path to the GAN and MM data you wish to use. The script assumes that the true parameters of both runs are the same. TO recreaste figure 6 use `Fig6analysis.py`. This script assumes that you have already run the `fig6` run script and all the resulting data is saved in the folders `scripts/fig6/*`.
 

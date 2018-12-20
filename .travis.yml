@@ -6,8 +6,7 @@ services:
   - docker
 
 script:
-  - docker image build --tag tc-gan .
-  - docker run --volume=$PWD:/srv/tc-gan tc-gan make test-quick test-flakes
+  - ./docker-run --docker=docker -- make test-quick test-flakes
 
 notifications:
   email: false

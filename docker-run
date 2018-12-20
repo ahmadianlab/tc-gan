@@ -32,12 +32,11 @@ def ignore(*_):
     pass
 
 
-def docker_run(dry_run, rebuild, tag, tty, project_root, runargs):
+def docker_run(docker, dry_run, rebuild, tag, tty, project_root, runargs):
     if dry_run:
         msg = error
     else:
         msg = ignore
-    docker = "nvidia-docker"
 
     try:
         has_tag = bool(check_output([docker, "images", "--quiet", tag]).strip())
@@ -71,6 +70,12 @@ def docker_run(dry_run, rebuild, tag, tty, project_root, runargs):
                 code,
             )
             return sys.exit(code)
+
+    rcsh = os.path.join(project_root, "misc", "rc", "rc.sh")
+    if not os.path.exists(rcsh):
+        msg(rcsh, "does not exist; creating it...")
+        if not dry_run:
+            open(rcsh, "w").close()
 
     try:
         i = runargs.index("--")
@@ -107,10 +112,19 @@ def main(args=None):
         pass
 
     parser = argparse.ArgumentParser(
-        formatter_class=CustomFormatter, description=__doc__,
+        formatter_class=CustomFormatter,
+        description=__doc__,
         usage="%(prog)s [docker_options] [--] [command [args]]",
     )
 
+    parser.add_argument(
+        "--docker",
+        default="nvidia-docker",
+        help="""
+        Docker runtime command.  It may be set to plain `docker` when the GPU
+        is not required.
+        """,
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",

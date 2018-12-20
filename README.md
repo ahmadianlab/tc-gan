@@ -1,4 +1,7 @@
 # Code repository for "Inferring neural circuit structure from datasets of heterogeneous tuning curves"
+
+[![Build Status][travis-img]][travis-url]
+
 This package includes codes that implement the experiments Of Arakaki et al., Inferring neural circuit structure from datasets of heterogeneous tuning curves, which used Generative Adversarial Networks and Moment Matching to fit two mechanistic circuit models to tuning curve datasets.  
 
 ## Summary of entry points
@@ -196,3 +199,6 @@ Generate tuning curves:
 ```sh
 ./run tc_gan/analyzers/csv_tuning_curves.py -- logfiles/SSNGAN_XXX.log tcs --NZ=100
 ```
+
+[travis-img]: https://travis-ci.com/ahmadianlab/tc-gan.svg?branch=master
+[travis-url]: https://travis-ci.org/ahmadianlab/tc-gan

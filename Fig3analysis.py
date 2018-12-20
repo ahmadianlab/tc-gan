@@ -61,7 +61,7 @@ def rsquared(tc,getp = False):
 def com(tc):
     
     tcrs = np.copy(np.reshape(tc,[3,3,3,1]))
-    tcrs = (tcrs - tcrs.mean())/(tcrs.max() - tcrs.min() + .001)
+    tcrs = (tcrs - tcrs.mean())/(tcrs.max() - tcrs.min())
     
     dif = np.stack([np.ravel(tcrs[1:]-tcrs[:-1]),np.ravel(tcrs[:,1:]-tcrs[:,:-1]),np.ravel(tcrs[:,:,1:]-tcrs[:,:,:-1])])
     return np.std(np.abs(dif))

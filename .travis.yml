@@ -6,7 +6,7 @@ services:
   - docker
 
 script:
-  - ./docker-run --docker=docker -- make test-quick test-flakes
+  - ./docker-run --docker=docker -- make test
 
 notifications:
   email: false

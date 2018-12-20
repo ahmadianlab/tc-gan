@@ -70,7 +70,7 @@ runs the training and store the result in the directory in which
 
 ## How to analyze and plot the figures in the paper
 
-To reproduce the visualizations of figures 3 and 4 use the scripts `Fig3analysis.py` and `Fig4analysis.py`. In `Fig4analaysis.py` you must manually set the path of the tuning curve data using the positional command line arguments. To recreate figure 5 use `Fig5analysis.py` using the positional command line arguments to set the path to the GAN and MM data you wish to use. The script assumes that the true parameters of both runs are the same. TO recreaste figure 6 use `Fig6analysis.py`. This script assumes that you have already run the `fig6` run script and all the resulting data is saved in the folders `scripts/fig6/*`.
+To reproduce the visualizations of figures 3 and 4 use the scripts `Fig3analysis.py` and `Fig4analysis.py`. In `Fig4analaysis.py` you must manually set the path of the tuning curve data using the positional command line arguments. To recreate figure 5 use `Fig5analysis.py` using the positional command line arguments to set the path to the GAN and MM data you wish to use. The script assumes that the true parameters of both runs are the same. To recreate figure 6 use `Fig6analysis.py`. This script assumes that you have already run the `fig6` run script and all the resulting data is saved in the folders `scripts/fig6/*`.
 
 ### Compiling C code in the cluster node
 

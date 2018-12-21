@@ -175,4 +175,4 @@ Software included in `tc-gan` is licensed under the MIT license.
 See `LICENSE` file.
 
 [travis-img]: https://travis-ci.com/ahmadianlab/tc-gan.svg?branch=master
-[travis-url]: https://travis-ci.org/ahmadianlab/tc-gan
+[travis-url]: https://travis-ci.com/ahmadianlab/tc-gan
